@@ -33,6 +33,18 @@ def create_therapy_session_sheet(service, sheet_title):
         
         # Prepare the data for insertion
         values = data
+
+        times_prompted_per_word = [ word_row[1] for word_row in data[1:] ]
+        times_prompted = sum(times_prompted_per_word)
+
+        times_on_own_per_word = [ word_row[2] for word_row in data[1:] ]
+        times_on_own = sum(times_on_own_per_word)
+
+        values = values + [
+            [],
+            [],
+            [ f"Jimmy was prompted {times_prompted} times but said the word himself {times_on_own} times." ]
+        ]
         
         # Define the range where data will be inserted (starting from A1)
         range_name = 'Sheet1!A1'
