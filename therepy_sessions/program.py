@@ -3,6 +3,7 @@
 import os
 from google_service import Create_Service
 from file_creator import create_therapy_session_sheet
+from sheet_importer import image_to_text_simple, image_to_text_with_opencv, image_to_text, image_to_text_with_preprocessing, table_to_text, table_to_text_complex
 
 FOLDER_PATH = r'<Folder Path>'
 CLIENT_SECRET_FILE = '../../slpdataentry_3_credentials.json'
@@ -16,10 +17,24 @@ service = Create_Service(CLIENT_SECRET_FILE, API_SERVICE_NAME, API_VERSION, SCOP
 
 # Create the spreadsheet
 try:
-    file_result = create_therapy_session_sheet(service, "Therapy Session Data")
+    # file_to_import = 'sample_data/random_table.png'
+    # file_to_import = 'sample_data/veriety_w_prompting.png'
+    file_to_import = 'sample_data/table_only.png'
+    # data = image_to_text_simple(file_to_import)
+    # data = image_to_text_with_preprocessing(file_to_import)
+    # data = image_to_text_with_opencv(file_to_import)
+    # data = table_to_text_complex(file_to_import)
+    data = table_to_text(file_to_import) # Best success so far
+        
+    print(f"Successfully extracted text from: {file_to_import}")
+    print(f"Text length: {len(data)} characters")
+    print(f"Text:")
+    print(data)
+    
+    # file_result = create_therapy_session_sheet(service, "Therapy Session Data")
 
-    print(f"Successfully created spreadsheet with ID: {file_result['spreadsheet_id']}")
-    print(f"Updated {file_result['updated_cells']} cells")
-    print(f"Spreadsheet URL: {file_result['url']}")
+    # print(f"Successfully created spreadsheet with ID: {file_result['spreadsheet_id']}")
+    # print(f"Updated {file_result['updated_cells']} cells")
+    # print(f"Spreadsheet URL: {file_result['url']}")
 except Exception as e:
     print(f"Error creating spreadsheet: {e}")
