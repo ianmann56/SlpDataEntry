@@ -141,108 +141,106 @@ def table_to_text(image_path, language='eng'):
         FileNotFoundError: If the image file doesn't exist
         Exception: If OCR processing fails
     """
-    try:
-        # Check if file exists
-        if not os.path.exists(image_path):
-            raise FileNotFoundError(f"Image file not found: {image_path}")
-        
-        # Load and preprocess the image for better table detection
-        img = cv2.imread(image_path)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # Check if file exists
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"Image file not found: {image_path}")
     
-        # img = img.resize((1506, 412))
-        
-        # Apply threshold to get better contrast for table lines
-        thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-        
-        # Use pytesseract to detect table structure with specific PSM mode
-        # PSM 6 is good for uniform block of text (like tables)
-        # custom_config = r'--oem 3 --psm 6 --dpi 300 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .,|-()'
-        custom_config = r'--oem 3 --psm 12 --dpi 300'
-        
-        # Get detailed data with bounding boxes
-        data = pytesseract.image_to_data(img, lang=language, config=custom_config, output_type=pytesseract.Output.DICT)
-        print(data)
-        
-        # Extract text with positions to reconstruct table structure
-        words_with_positions = []
-        for i in range(len(data['text'])):
-            if int(data['conf'][i]) > 30:  # Filter out low confidence detections
-                text = data['text'][i].strip()
-                if text:  # Only add non-empty text
-                    words_with_positions.append({
-                        'text': text,
-                        'left': data['left'][i],
-                        'top': data['top'][i],
-                        'width': data['width'][i],
-                        'height': data['height'][i]
-                    })
-        
-        # Sort words by vertical position (top) first, then horizontal (left)
-        words_with_positions.sort(key=lambda x: (x['top'], x['left']))
-        
-        # Group words into rows based on vertical position
-        rows = []
-        current_row = []
-        row_threshold = 20  # Pixels tolerance for same row
-        
-        for word in words_with_positions:
-            if not current_row:
+    # Load and preprocess the image for better table detection
+    img = cv2.imread(image_path)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # img = img.resize((1506, 412))
+    
+    # Apply threshold to get better contrast for table lines
+    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+    
+    # Use pytesseract to detect table structure with specific PSM mode
+    # PSM 6 is good for uniform block of text (like tables)
+    custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\ \/:.,|-()'
+    # custom_config = r'--oem 3 --psm 12 --dpi 300'
+
+    height, width, channels = img.shape
+
+    img = cv2.resize(img, (height*3, width*3))
+    
+    # Get detailed data with bounding boxes
+    data = pytesseract.image_to_data(img, lang=language, config=custom_config, output_type=pytesseract.Output.DICT)
+    print(data)
+    
+    # Extract text with positions to reconstruct table structure
+    words_with_positions = []
+    for i in range(len(data['text'])):
+        print(f"{data['text'][i]} - {data['conf'][i]}")
+        if int(data['conf'][i]) > -1:  # Filter out low confidence detections
+            text = data['text'][i].strip()
+            if text:  # Only add non-empty text
+                words_with_positions.append({
+                    'text': text,
+                    'left': data['left'][i],
+                    'top': data['top'][i],
+                    'width': data['width'][i],
+                    'height': data['height'][i]
+                })
+    
+    # Sort words by vertical position (top) first, then horizontal (left)
+    words_with_positions.sort(key=lambda x: (x['top'], x['left']))
+    
+    # Group words into rows based on vertical position
+    rows = []
+    current_row = []
+    row_threshold = 20  # Pixels tolerance for same row
+    
+    for word in words_with_positions:
+        if not current_row:
+            current_row.append(word)
+        else:
+            # Check if word belongs to current row (similar y-position)
+            last_word_top = current_row[-1]['top']
+            if abs(word['top'] - last_word_top) <= row_threshold:
                 current_row.append(word)
             else:
-                # Check if word belongs to current row (similar y-position)
-                last_word_top = current_row[-1]['top']
-                if abs(word['top'] - last_word_top) <= row_threshold:
-                    current_row.append(word)
-                else:
-                    # Start new row
-                    if current_row:
-                        rows.append(sorted(current_row, key=lambda x: x['left']))
-                    current_row = [word]
+                # Start new row
+                if current_row:
+                    rows.append(sorted(current_row, key=lambda x: x['left']))
+                current_row = [word]
+    
+    # Add the last row
+    if current_row:
+        rows.append(sorted(current_row, key=lambda x: x['left']))
+    
+    # Convert rows to CSV format
+    csv_rows = []
+    for row in rows:
+        # Group words that are close horizontally into cells
+        cells = []
+        current_cell_words = []
+        cell_threshold = 50  # Pixels tolerance for same cell
         
-        # Add the last row
-        if current_row:
-            rows.append(sorted(current_row, key=lambda x: x['left']))
-        
-        # Convert rows to CSV format
-        csv_rows = []
-        for row in rows:
-            # Group words that are close horizontally into cells
-            cells = []
-            current_cell_words = []
-            cell_threshold = 50  # Pixels tolerance for same cell
-            
-            for word in row:
-                if not current_cell_words:
+        for word in row:
+            if not current_cell_words:
+                current_cell_words.append(word)
+            else:
+                last_word_right = current_cell_words[-1]['left'] + current_cell_words[-1]['width']
+                if word['left'] - last_word_right <= cell_threshold:
                     current_cell_words.append(word)
                 else:
-                    last_word_right = current_cell_words[-1]['left'] + current_cell_words[-1]['width']
-                    if word['left'] - last_word_right <= cell_threshold:
-                        current_cell_words.append(word)
-                    else:
-                        # Create cell from current words
-                        cell_text = ' '.join([w['text'] for w in current_cell_words])
-                        cells.append(cell_text)
-                        current_cell_words = [word]
-            
-            # Add the last cell
-            if current_cell_words:
-                cell_text = ' '.join([w['text'] for w in current_cell_words])
-                cells.append(cell_text)
-            
-            if cells:  # Only add non-empty rows
-                csv_rows.append(cells)
+                    # Create cell from current words
+                    cell_text = ' '.join([w['text'] for w in current_cell_words])
+                    cells.append(cell_text)
+                    current_cell_words = [word]
         
-        print(f"Successfully extracted table from: {image_path}")
-        print(f"Found {len(csv_rows)} rows of data")
+        # Add the last cell
+        if current_cell_words:
+            cell_text = ' '.join([w['text'] for w in current_cell_words])
+            cells.append(cell_text)
         
-        return csv_rows
-        
-    except FileNotFoundError:
-        raise
-    except Exception as error:
-        print(f"Error processing table in image {image_path}: {error}")
-        raise
+        if cells:  # Only add non-empty rows
+            csv_rows.append(cells)
+    
+    print(f"Successfully extracted table from: {image_path}")
+    print(f"Found {len(csv_rows)} rows of data")
+    
+    return csv_rows
 
 
 def table_to_text_complex(image_path, language='eng'):
