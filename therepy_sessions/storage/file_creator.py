@@ -8,7 +8,7 @@ data = [
 ]
 
 
-def create_therapy_session_sheet(service, sheet_title):
+def create_therapy_session_sheet(data, sheet_title, inject_google_service):
     """
     Creates a Google Sheet with therapy session data.
     
@@ -19,13 +19,16 @@ def create_therapy_session_sheet(service, sheet_title):
     Returns:
         dict: Response containing spreadsheet ID and other details
     """
+    # Dependency Injection
+    service = inject_google_service()
+    
     # Create a new spreadsheet
     spreadsheet = {
         'properties': {
             'title': sheet_title
         }
     }
-    
+
     # Create the spreadsheet
     spreadsheet_result = service.spreadsheets().create(body=spreadsheet).execute()
     spreadsheet_id = spreadsheet_result.get('spreadsheetId')

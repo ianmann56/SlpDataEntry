@@ -2,41 +2,39 @@
 
 import os
 import sys
-from google_service import Create_Service
-from file_creator import create_therapy_session_sheet
-from aws_sheet_importer import image_to_text
-# from sheet_importer import image_to_text_simple, image_to_text_with_opencv, image_to_text, image_to_text_with_preprocessing, table_to_text, table_to_text_complex
+from clients.google_service import create_google_service
+from clients.aws_clients import construct_textract_client
+from collection.images.aws_image_collection import image_to_text
+from storage.file_creator import create_therapy_session_sheet
+from interpretation.student_data_template import ColumnTableStudentDataSheetTemplate
 
 FOLDER_PATH = r'<Folder Path>'
-CLIENT_SECRET_FILE = '../../slpdataentry_3_credentials.json'
-# CLIENT_SECRET_FILE = '../../slpdataentry-client-key.json'
-API_SERVICE_NAME = 'sheets'
-API_VERSION = 'v4'
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 
-# Build the Sheets API service object
-service = Create_Service(CLIENT_SECRET_FILE, API_SERVICE_NAME, API_VERSION, SCOPES)
+# Construct the various clients
+google_service = create_google_service()
+textract_client = construct_textract_client()
 
 # Create the spreadsheet
 try:
     file_to_import = sys.argv[1]
-    # file_to_import = 'sample_data/random_table.png'
-    # file_to_import = 'sample_data/veriety_w_prompting.png'
-    # file_to_import = 'sample_data/table_only.png'
-    # file_to_import = 'sample_data/no_table_left_align.png'
-    # data = image_to_text_simple(file_to_import)
-    # data = image_to_text_with_preprocessing(file_to_import)
-    # data = image_to_text_with_opencv(file_to_import)
-    # data = table_to_text_complex(file_to_import)
-    # data = table_to_text(file_to_import) # Best success so far
-    data = image_to_text(file_to_import)
+
+    data_sheet_content = image_to_text(file_to_import, lambda: textract_client)
         
     print(f"Successfully extracted text from: {file_to_import}")
-    print(f"Text length: {len(data)} characters")
     print(f"Text:")
-    print(data)
+    print(data_sheet_content.text)
+    print(f"Tables:")
+    print(data_sheet_content.tables)
+
+    template = ColumnTableStudentDataSheetTemplate(["Word", "Times w/Prompting", "Times w/o Prompting"])
+    data_sheet = template.interpret_student_data_sheet(data_sheet_content)
+
+    print(data_sheet.student_key)
+    print(data_sheet.date)
+    print(data_sheet.student_goal)
+    print(data_sheet.tables)
     
-    # file_result = create_therapy_session_sheet(service, "Therapy Session Data")
+    # file_result = create_therapy_session_sheet(data, "Therapy Session Data", lambda: google_service)
 
     # print(f"Successfully created spreadsheet with ID: {file_result['spreadsheet_id']}")
     # print(f"Updated {file_result['updated_cells']} cells")
