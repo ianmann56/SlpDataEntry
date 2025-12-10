@@ -7,6 +7,7 @@ data = [
   [ "Gallop", 0, 1 ]
 ]
 
+FOLDER_PATH = r'<Folder Path>'
 
 def create_therapy_session_sheet(data, sheet_title, inject_google_service):
     """
