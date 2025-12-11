@@ -1,3 +1,4 @@
+import json
 import os
 from botocore.exceptions import ClientError, NoCredentialsError
 
@@ -33,23 +34,13 @@ def image_to_text(image_path, inject_textract_client):
         # Call Textract analyze_document with TABLES feature
         response = textract_client.analyze_document(
             Document={'Bytes': image_bytes},
-            FeatureTypes=['TABLES']
+            FeatureTypes=['FORMS', 'TABLES']
         )
         
-        # Extract regular text
-        extracted_text = ""
-        for block in response.get('Blocks', []):
-            if block['BlockType'] == 'LINE':
-                extracted_text += block['Text'] + '\n'
-        
-        # Extract table data
-        tables = []
-        for block in response.get('Blocks', []):
-            if block['BlockType'] == 'TABLE':
-                table = _extract_table_from_block(response, block)
-                tables.append(table)
+        form_data = _extract_form_data(response)
+        tables = _extract_table_data(response)
     
-        return StudentDataSheetImport(extracted_text.strip(), tables)
+        return StudentDataSheetImport(form_data, tables)
         
     except FileNotFoundError:
         raise
@@ -57,6 +48,87 @@ def image_to_text(image_path, inject_textract_client):
         raise Exception(f"AWS Textract error: {str(e)}")
     except Exception as e:
         raise Exception(f"Error processing image {image_path}: {str(e)}")
+
+def _extract_table_data(response):
+    """
+    Extracts tabular data from Textract response.
+    
+    Args:
+        response: Full Textract response
+        
+    Returns:
+        list: A list of 2D lists that represent each row in the table.
+    """
+    tables = []
+    for block in response.get('Blocks', []):
+        if block['BlockType'] == 'TABLE':
+            table = _extract_table_from_block(response, block)
+            tables.append(table)
+    return tables
+
+
+def _extract_form_data(response):
+    """
+    Extracts form data (key-value pairs) from Textract response.
+    
+    Args:
+        response: Full Textract response
+        
+    Returns:
+        dict: A dictionary of the form where the key is the field label and
+              the value is the field value.
+    """
+    # Create lookup for blocks by ID
+    blocks = {block['Id']: block for block in response['Blocks']}
+    
+    form_fields = {}
+    
+    for block in response.get('Blocks', []):
+        if block['BlockType'] == 'KEY_VALUE_SET':
+            if block.get('EntityTypes') and 'KEY' in block['EntityTypes']:
+                # This is a key block, find its associated value
+                key_text = _get_text_from_block(response, block)
+                value_text = ""
+                
+                # Find the corresponding VALUE block
+                if 'Relationships' in block:
+                    for relationship in block['Relationships']:
+                        if relationship['Type'] == 'VALUE':
+                            for value_id in relationship['Ids']:
+                                value_block = blocks[value_id]
+                                if value_block['BlockType'] == 'KEY_VALUE_SET' and value_block.get('EntityTypes') and 'VALUE' in value_block['EntityTypes']:
+                                    value_text = _get_text_from_block(response, value_block)
+                                    break
+                
+                if key_text:
+                    form_fields[key_text.removesuffix(":")] = value_text
+    
+    return form_fields
+
+
+def _get_text_from_block(response, block):
+    """
+    Extracts text content from a block by following its child relationships.
+    
+    Args:
+        response: Full Textract response
+        block: Block to extract text from
+        
+    Returns:
+        str: Text content of the block
+    """
+    blocks = {block['Id']: block for block in response['Blocks']}
+    text = ""
+    
+    if 'Relationships' in block:
+        for relationship in block['Relationships']:
+            if relationship['Type'] == 'CHILD':
+                for child_id in relationship['Ids']:
+                    child_block = blocks[child_id]
+                    if child_block['BlockType'] == 'WORD':
+                        text += child_block['Text'] + ' '
+    
+    return text.strip()
 
 
 def _extract_table_from_block(response, table_block):

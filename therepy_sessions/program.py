@@ -7,7 +7,7 @@ from clients.google_service import create_google_service
 from clients.aws_clients import construct_textract_client
 from collection.images.aws_image_collection import image_to_text
 from storage.file_creator import create_therapy_session_sheet
-from interpretation.student_data_template import ColumnTableStudentDataSheetTemplate
+from interpretation.template_types.simple_table_student_data_sheet_template import ColumnTableStudentDataSheetTemplate
 
 def main():
     file_to_import = sys.argv[1]
@@ -20,11 +20,12 @@ def main():
         
     print(f"Successfully extracted text from: {file_to_import}")
     print(f"Text:")
-    print(data_sheet_content.text)
+    print(data_sheet_content.form_data)
     print(f"Tables:")
     print(data_sheet_content.tables)
 
-    template = ColumnTableStudentDataSheetTemplate(["Strategy", "Cause of Emotion"])
+    # template = ColumnTableStudentDataSheetTemplate(["Strategy", "Cause of Emotion"])
+    template = ColumnTableStudentDataSheetTemplate(["Category", "Sort Tally", "Label"])
     data_sheet = template.interpret_student_data_sheet(data_sheet_content)
 
     data_sheet.debug()
