@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from enum import Enum
 from interpretation.student_data_sheet import StudentDataSheet
 
-class BaseStudentDataSheetTemplate(ABC):
+class StudentDataSheetInterpreter:
   """
   Abstract base class for interpreting student data sheets from various sources.
   
@@ -59,6 +60,12 @@ class BaseStudentDataSheetTemplate(ABC):
   table structures or data sheet layouts in therapy session documentation.
   """
 
+  session_data_templates = []
+
+  def __init__(self, session_data_templates):
+    super().__init__()
+    self.session_data_templates = session_data_templates
+
   def interpret_student_data_sheet(self, data_sheet_content):
     """
     Takes the given imported student's data sheet from an image or some other external system
@@ -88,10 +95,18 @@ class BaseStudentDataSheetTemplate(ABC):
 
     data_sheet = StudentDataSheet(student_key, student_goal, date, time_in, time_out, measure)
 
-    tables = self._interpret_student_data_sheet_tables(data_sheet_content.tables)
+    data_sheet_interpretations = [
+      template.interpret_student_data_sheet_content(data_sheet_content)
+      for template
+      in self.session_data_templates
+    ]
 
-    for table in tables:
-      data_sheet.register_table(table)
+    for interpretation in data_sheet_interpretations:
+      for table in interpretation.tables:
+        data_sheet.register_table(table)
+
+      for scalar_name, scalar_dto in interpretation.scalars.items():
+        data_sheet.register_scalar(scalar_name, scalar_dto)
 
     return data_sheet
   
@@ -162,18 +177,42 @@ class BaseStudentDataSheetTemplate(ABC):
     """
     content_dto = text_by_label[label.lower()]
     return content_dto['content_without_label']
+  
+"""
+Represents the interpreted data from a data sheet.
+
+Properties:
+  tables: List of dictionaries representing all of the tables in the data sheet.
+    These will contain a list of columns and a list of key value mapping of column
+    name to the row value for each row in the table.
+  scalars: Dictionary where the key is the scalar field name and the value is a
+    DTO with the value and type (with those names as property names).
+"""
+DataSheetInterpretationDto = namedtuple('DataSheetInterpretationDto', ['tables', 'scalars'])
+
+class DataSheetScalarType(Enum):
+  TEXT = 'text' # For plain text
+  INT = 'int'
+  CHOICE = 'choice' # When field contains a selection out of discrete choices
+  DATE = 'date'
+  BOOLEAN = 'boolean'
+  
+class SessionDataTemplate(ABC):
 
   @abstractmethod
-  def _interpret_student_data_sheet_tables(self, data_sheet_tables):
+  def interpret_student_data_sheet_content(self, data_sheet_content):
     """
     Processes and interprets tabular data from the student data sheet.
     
     Purpose: Abstract method that subclasses must implement to define how
-    raw table data should be structured and interpreted. This allows different
-    template types to handle tables in their own specific way while maintaining
+    raw data should be structured and interpreted. This allows different
+    template types to handle data sheets in their own specific way while maintaining
     a consistent interface.
     
-    :param data_sheet_tables: List of 2D arrays representing tables from the data sheet
-    :return: Processed table data in a format specific to the template implementation
+    :param data_sheet_content: A dictionary with 2 properties:
+      tables: List of 2D arrays representing tables from the data sheet
+      form_data: A list of key value pairs where the key is the field name and the
+                 value is the value name.
+    :return: a DataSheetInterpretationDto representing the interpreted data
     """
     pass

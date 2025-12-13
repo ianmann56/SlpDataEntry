@@ -8,6 +8,7 @@ from clients.aws_clients import construct_textract_client
 from collection.images.aws_image_collection import image_to_text
 from storage.file_creator import create_therapy_session_sheet
 from interpretation.template_types.simple_table_student_data_sheet_template import ColumnTableStudentDataSheetTemplate
+from interpretation.student_data_sheet_interpreter import StudentDataSheetInterpreter
 
 def main():
     file_to_import = sys.argv[1]
@@ -25,7 +26,11 @@ def main():
     print(data_sheet_content.tables)
 
     # template = ColumnTableStudentDataSheetTemplate(["Strategy", "Cause of Emotion"])
-    template = ColumnTableStudentDataSheetTemplate(["Category", "Sort Tally", "Label"])
+    # template = ColumnTableStudentDataSheetTemplate(["Category", "Sort Tally", "Label"])
+
+    template = StudentDataSheetInterpreter([
+        ColumnTableStudentDataSheetTemplate(["Category", "Sort Tally", "Label"])
+    ])
     data_sheet = template.interpret_student_data_sheet(data_sheet_content)
 
     data_sheet.debug()

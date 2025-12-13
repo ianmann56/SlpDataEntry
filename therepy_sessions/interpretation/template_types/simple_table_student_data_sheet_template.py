@@ -1,7 +1,8 @@
-from interpretation.student_data_template import BaseStudentDataSheetTemplate
+from interpretation.student_data_sheet_interpreter import DataSheetInterpretationDto, DataSheetScalarType, SessionDataTemplate
+from interpretation.student_data_sheet import DataSheetScalarDto
 
 
-class ColumnTableStudentDataSheetTemplate(BaseStudentDataSheetTemplate):
+class ColumnTableStudentDataSheetTemplate(SessionDataTemplate):
   """
   Template implementation for data sheets containing tables with specific column structures.
 
@@ -29,7 +30,7 @@ class ColumnTableStudentDataSheetTemplate(BaseStudentDataSheetTemplate):
     super().__init__()
     self._columns = columns
 
-  def _interpret_student_data_sheet_tables(self, data_sheet_tables):
+  def interpret_student_data_sheet_content(self, data_sheet_content):
     """
     Processes multiple tables from the data sheet using column-based interpretation.
 
@@ -39,14 +40,16 @@ class ColumnTableStudentDataSheetTemplate(BaseStudentDataSheetTemplate):
     Purpose: Implements the abstract method from the base class to handle tables
     by applying column-based processing to each table individually.
 
-    :param data_sheet_tables: List of 2D arrays representing tables from the data sheet
-    :return: List of interpreted table objects with structured column data
+    :param data_sheet_content: List of 2D arrays representing tables from the data sheet
+    :return: a DataSheetInterpretationDto representing the interpreted data
     """
-    return [
+    tables = [
       self._interpret_single_student_data_sheet_table(raw_table)
       for raw_table
-      in data_sheet_tables
+      in data_sheet_content.tables
     ]
+
+    return DataSheetInterpretationDto(tables, {})
 
   def _interpret_single_student_data_sheet_table(self, data_sheet_table):
     """
@@ -59,7 +62,7 @@ class ColumnTableStudentDataSheetTemplate(BaseStudentDataSheetTemplate):
     :param data_sheet_table: 2D array where first row contains headers and subsequent rows contain data
     :return: Dictionary with 'columns' (expected column list) and 'data' (list of row dictionaries)
     :raises Exception: If any expected column is missing from the table headers
-    """
+    """    
     columns_in_data_sheet = data_sheet_table[0]
 
     for expected_col in self._columns:
@@ -77,7 +80,9 @@ class ColumnTableStudentDataSheetTemplate(BaseStudentDataSheetTemplate):
     for row_data in data_sheet_table[1:]:
       row_dto = {}
       for column_name, column_index in col_index_by_col_name.items():
-        row_dto[column_name] = row_data[column_index]
+        cell_data = row_data[column_index]
+        cell_data_dto = DataSheetScalarDto(column_name, cell_data, DataSheetScalarType.TEXT)
+        row_dto[column_name] = cell_data_dto
 
       data.append(row_dto)
 

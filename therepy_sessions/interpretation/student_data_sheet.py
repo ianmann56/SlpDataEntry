@@ -1,3 +1,15 @@
+from collections import namedtuple
+
+"""
+Represents a scalar in a student session data sheet.
+
+Properties:
+  key: The name of the scalar field
+  value: The value of the scalar field
+  type: The type that the scalar field value takes on (like int, vs choice, vs date).
+"""
+DataSheetScalarDto = namedtuple('DataSheetScalarDto', ['key', 'value', 'type'])
+
 class StudentDataSheet:
   _student_key = ""
   _student_goal = ""
@@ -6,6 +18,7 @@ class StudentDataSheet:
   _time_out = ""
   _measure = ""
   _tables = []
+  _scalars = {}
 
   def __init__(self, student_key, student_goal, date, time_in, time_out, measure):
     self._student_key = student_key
@@ -45,6 +58,13 @@ class StudentDataSheet:
   
   def register_table(self, table):
     self._tables.append(table)
+  
+  @property
+  def scalars(self):
+    return self._scalars
+  
+  def register_scalar(self, scalar_name, scalar_dto):
+    self._scalars[scalar_name] = scalar_dto
 
   def debug(self):
     print('========== Data Sheet ===========\nStudent Key:')
@@ -59,6 +79,8 @@ class StudentDataSheet:
     print(self.student_goal)
     print('=================================\nMeasure:')
     print(self.measure)
+    print('=================================\nOther Scalars:')
+    print(self.scalars)
     print('=================================\nTables:')
     print(self.tables)
     print('======== End Data Sheet =========')
