@@ -7,8 +7,9 @@ from clients.google_service import create_google_service
 from clients.aws_clients import construct_textract_client
 from collection.images.aws_image_collection import image_to_text
 from storage.file_creator import create_therapy_session_sheet
-from interpretation.template_types.simple_table_student_data_sheet_template import ColumnTableStudentDataSheetTemplate
+from interpretation.template_types.running_tally_interpreter import RunningTallyInterpreter
 from interpretation.student_data_sheet_interpreter import StudentDataSheetInterpreter
+from interpretation.student_data_sheet import DataSheetScalarType
 
 def main():
     file_to_import = sys.argv[1]
@@ -28,8 +29,12 @@ def main():
     # template = ColumnTableStudentDataSheetTemplate(["Strategy", "Cause of Emotion"])
     # template = ColumnTableStudentDataSheetTemplate(["Category", "Sort Tally", "Label"])
 
+    # template = StudentDataSheetInterpreter([
+    #     TableInterpreter(["Category", "Sort Tally", "Label"])
+    # ])
+
     template = StudentDataSheetInterpreter([
-        ColumnTableStudentDataSheetTemplate(["Category", "Sort Tally", "Label"])
+        RunningTallyInterpreter(DataSheetScalarType.CHOICE)
     ])
     data_sheet = template.interpret_student_data_sheet(data_sheet_content)
 

@@ -1,4 +1,5 @@
 from collections import namedtuple
+from enum import Enum
 
 """
 Represents a scalar in a student session data sheet.
@@ -9,6 +10,13 @@ Properties:
   type: The type that the scalar field value takes on (like int, vs choice, vs date).
 """
 DataSheetScalarDto = namedtuple('DataSheetScalarDto', ['key', 'value', 'type'])
+
+class DataSheetScalarType(Enum):
+  TEXT = 'text' # For plain text
+  INT = 'int'
+  CHOICE = 'choice' # When field contains a selection out of discrete choices
+  DATE = 'date'
+  BOOLEAN = 'boolean'
 
 class StudentDataSheet:
   _student_key = ""

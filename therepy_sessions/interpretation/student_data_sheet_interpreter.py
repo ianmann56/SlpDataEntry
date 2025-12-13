@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from enum import Enum
 from interpretation.student_data_sheet import StudentDataSheet
 
 class StudentDataSheetInterpreter:
@@ -189,15 +188,8 @@ Properties:
     DTO with the value and type (with those names as property names).
 """
 DataSheetInterpretationDto = namedtuple('DataSheetInterpretationDto', ['tables', 'scalars'])
-
-class DataSheetScalarType(Enum):
-  TEXT = 'text' # For plain text
-  INT = 'int'
-  CHOICE = 'choice' # When field contains a selection out of discrete choices
-  DATE = 'date'
-  BOOLEAN = 'boolean'
   
-class SessionDataTemplate(ABC):
+class SessionDataInterpreterBase(ABC):
 
   @abstractmethod
   def interpret_student_data_sheet_content(self, data_sheet_content):

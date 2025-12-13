@@ -1,8 +1,7 @@
-from interpretation.student_data_sheet_interpreter import DataSheetInterpretationDto, DataSheetScalarType, SessionDataTemplate
-from interpretation.student_data_sheet import DataSheetScalarDto
+from interpretation.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataInterpreterBase
+from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetScalarType
 
-
-class ColumnTableStudentDataSheetTemplate(SessionDataTemplate):
+class TableInterpreter(SessionDataInterpreterBase):
   """
   Template implementation for data sheets containing tables with specific column structures.
 
@@ -40,7 +39,10 @@ class ColumnTableStudentDataSheetTemplate(SessionDataTemplate):
     Purpose: Implements the abstract method from the base class to handle tables
     by applying column-based processing to each table individually.
 
-    :param data_sheet_content: List of 2D arrays representing tables from the data sheet
+    :param data_sheet_content: A dictionary with 2 properties:
+      tables: List of 2D arrays representing tables from the data sheet
+      form_data: A list of key value pairs where the key is the field name and the
+                 value is the value name.
     :return: a DataSheetInterpretationDto representing the interpreted data
     """
     tables = [
