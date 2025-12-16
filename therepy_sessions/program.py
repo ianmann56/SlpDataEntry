@@ -3,17 +3,37 @@
 import os
 import sys
 import traceback
+import darkdetect
+import tkinter as tk
+
+import sv_ttk
 from clients.google_service import create_google_service
 from clients.aws_clients import construct_textract_client
 from collection.images.aws_image_collection import image_to_text
+from interpretation.template_store import TemplateStore
+from interpretation.template_manager.template_management_window import DataSheetTemplateManagementWindow
 from storage.file_creator import create_therapy_session_sheet
 from interpretation.template_types.running_tally_interpreter import RunningTallyInterpreter
 from interpretation.student_data_sheet_interpreter import StudentDataSheetInterpreter
 from interpretation.student_data_sheet import DataSheetScalarType
 
 def main():
-    file_to_import = sys.argv[1]
+    # Create root Tkinter window
+    root = tk.Tk()
+    root.withdraw()  # Hide the root window since we're using the management window
 
+    # sv_ttk.set_theme("dark")
+    sv_ttk.set_theme(darkdetect.theme())
+    
+    # Create template store and show the template management window
+    template_store = TemplateStore()
+    app = DataSheetTemplateManagementWindow(template_store, root, close_callback=root.quit)
+    app.show()
+    
+    # Start the main event loop
+    root.mainloop()
+
+def blah():
     # Construct the various clients
     google_service = create_google_service()
     textract_client = construct_textract_client()
