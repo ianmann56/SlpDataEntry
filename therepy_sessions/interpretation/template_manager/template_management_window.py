@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 from interpretation.template_manager.template_editor_window import TemplateEditorWindow
 from interpretation.template_manager.template_creator_window import TemplateCreatorWindow
 from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
-from interpretation.template_manager.interpreter_configs import DEFAULT_INTERPRETER_CONFIGS
+from interpretation.template_manager.interpreter_configs import STUB_INTERPRETER_CONFIGS
 
 
 class DataSheetTemplateManagementWindow:
@@ -30,7 +30,7 @@ class DataSheetTemplateManagementWindow:
         
         self.template_store = template_store
         self.close_callback = close_callback
-        self.interpreter_configs = interpreter_configs or DEFAULT_INTERPRETER_CONFIGS
+        self.interpreter_configs = interpreter_configs or STUB_INTERPRETER_CONFIGS
         
         self._setup_window()
         self._create_widgets()

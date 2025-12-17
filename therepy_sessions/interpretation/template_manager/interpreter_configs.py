@@ -223,7 +223,7 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
 
 
 # Default configuration list - can be easily extended or modified
-DEFAULT_INTERPRETER_CONFIGS = [
+STUB_INTERPRETER_CONFIGS = [
     TableInterpreterConfig(),
     RunningTallyInterpreterConfig(),
     SimpleFormInterpreterConfig(),

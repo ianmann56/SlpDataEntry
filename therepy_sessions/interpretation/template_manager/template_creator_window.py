@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from interpretation.template_store import TemplateCreateDto
-from interpretation.template_manager.interpreter_configs import DEFAULT_INTERPRETER_CONFIGS
+from interpretation.template_manager.interpreter_configs import STUB_INTERPRETER_CONFIGS
 
 
 class TemplateCreatorWindow:
@@ -15,7 +15,7 @@ class TemplateCreatorWindow:
     - Save the new template
     """
     
-    def __init__(self, parent, template_store, save_callback, interpreter_configs=None):
+    def __init__(self, parent, template_store, save_callback, interpreter_configs=STUB_INTERPRETER_CONFIGS):
         """
         Initialize the template creator window.
         
@@ -28,7 +28,7 @@ class TemplateCreatorWindow:
         self.parent = parent
         self.template_store = template_store
         self.save_callback = save_callback
-        self.interpreter_configs = interpreter_configs or DEFAULT_INTERPRETER_CONFIGS
+        self.interpreter_configs = interpreter_configs
         self.window = tk.Toplevel(parent)
         
         # Form field variables
