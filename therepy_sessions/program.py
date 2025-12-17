@@ -20,9 +20,8 @@ from interpretation.student_data_sheet import DataSheetScalarType
 def main():
     # Create root Tkinter window
     root = tk.Tk()
-    root.withdraw()  # Hide the root window since we're using the management window
 
-    # sv_ttk.set_theme("dark")
+    # Set theme to light or dark based on system.
     sv_ttk.set_theme(darkdetect.theme())
     
     # Create template store and show the template management window

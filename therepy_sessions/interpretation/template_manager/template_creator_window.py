@@ -54,8 +54,12 @@ class TemplateCreatorWindow:
         
     def _create_form(self):
         """Create the template creation form."""
+        # Top-level frame for theming
+        top_frame = ttk.Frame(self.window)
+        top_frame.pack(fill=tk.BOTH, expand=True)
+        
         # Main container
-        main_frame = ttk.Frame(self.window, padding="20")
+        main_frame = ttk.Frame(top_frame, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Title

@@ -46,7 +46,11 @@ class TemplateEditorWindow:
 
     def _create_stub_content(self):
         """Create stub content for the editor window."""
-        main_frame = ttk.Frame(self.window, padding="20")
+        # Top-level frame for theming
+        top_frame = ttk.Frame(self.window)
+        top_frame.pack(fill=tk.BOTH, expand=True)
+        
+        main_frame = ttk.Frame(top_frame, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Stub message

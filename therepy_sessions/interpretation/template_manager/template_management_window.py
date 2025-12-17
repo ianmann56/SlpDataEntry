@@ -22,9 +22,10 @@ class DataSheetTemplateManagementWindow:
         Args:
             template_store (TemplateStore): Repository for template persistence operations
             master: Parent tkinter window
+            theme (str): Theme name to apply to this window
             close_callback: Optional callback function to call when window is closed
         """
-        self.window = tk.Toplevel(master)
+        self.window = master
         
         self.template_store = template_store
         self.close_callback = close_callback
@@ -35,27 +36,18 @@ class DataSheetTemplateManagementWindow:
     def _setup_window(self):
         """Configure the main window properties."""
         self.window.title("Data Sheet Template Management")
-        self.window.geometry("600x400")
         self.window.resizable(True, True)
         
         # Handle window close event
         self.window.protocol("WM_DELETE_WINDOW", self._on_close)
         
-        # Center the window
-        self.window.update_idletasks()
-        x = (self.window.winfo_screenwidth() // 2) - (600 // 2)
-        y = (self.window.winfo_screenheight() // 2) - (400 // 2)
-        self.window.geometry(f"600x400+{x}+{y}")
-        
     def _create_widgets(self):
         """Create and layout all the window widgets."""
         # Main container
         main_frame = ttk.Frame(self.window, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Configure grid weights
-        self.window.columnconfigure(0, weight=1)
-        self.window.rowconfigure(0, weight=1)
+        # Configure grid weights for main_frame
         main_frame.columnconfigure(1, weight=1)
         main_frame.rowconfigure(1, weight=1)
         
@@ -70,24 +62,36 @@ class DataSheetTemplateManagementWindow:
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(0, weight=1)
         
-        # Listbox with scrollbar
-        listbox_frame = ttk.Frame(list_frame)
-        listbox_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        listbox_frame.columnconfigure(0, weight=1)
-        listbox_frame.rowconfigure(0, weight=1)
+        # Treeview with scrollbar for template list
+        treeview_frame = ttk.Frame(list_frame)
+        treeview_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        treeview_frame.columnconfigure(0, weight=1)
+        treeview_frame.rowconfigure(0, weight=1)
         
-        self.templates_listbox = tk.Listbox(listbox_frame, height=10)
-        self.templates_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        # Create treeview for template list
+        columns = ("name", "id")
+        self.templates_treeview = ttk.Treeview(treeview_frame, columns=columns, show="tree headings", height=10)
+        self.templates_treeview.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Scrollbar for listbox
-        scrollbar = ttk.Scrollbar(listbox_frame, orient=tk.VERTICAL, command=self.templates_listbox.yview)
+        # Configure column headers
+        self.templates_treeview.heading("#0", text="Template")
+        self.templates_treeview.heading("name", text="Name")
+        self.templates_treeview.heading("id", text="ID")
+        
+        # Configure column widths
+        self.templates_treeview.column("#0", width=200, minwidth=150)
+        self.templates_treeview.column("name", width=200, minwidth=150)
+        self.templates_treeview.column("id", width=80, minwidth=50)
+        
+        # Scrollbar for treeview
+        scrollbar = ttk.Scrollbar(treeview_frame, orient=tk.VERTICAL, command=self.templates_treeview.yview)
         scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        self.templates_listbox.configure(yscrollcommand=scrollbar.set)
+        self.templates_treeview.configure(yscrollcommand=scrollbar.set)
         
         # Bind double-click event
-        self.templates_listbox.bind("<Double-Button-1>", self._on_template_double_click)
+        self.templates_treeview.bind("<Double-Button-1>", self._on_template_double_click)
         
-        # Populate listbox
+        # Populate treeview
         self._populate_templates_list()
         
         # Button frame
@@ -115,21 +119,33 @@ class DataSheetTemplateManagementWindow:
         close_button.pack(side=tk.RIGHT)
         
     def _populate_templates_list(self):
-        """Populate the listbox with available templates."""
-        self.templates_listbox.delete(0, tk.END)
+        """Populate the treeview with available templates."""
+        # Clear existing items
+        for item in self.templates_treeview.get_children():
+            self.templates_treeview.delete(item)
+            
         templates = self.template_store.get_all_templates()
         for template in templates:
-            display_text = f"{template.name} (ID: {template.id})"
-            self.templates_listbox.insert(tk.END, display_text)
+            self.templates_treeview.insert("", tk.END, 
+                                         text=template.name,
+                                         values=(template.name, template.id))
             
     def _get_selected_template(self):
         """Get the currently selected template."""
-        selection = self.templates_listbox.curselection()
+        selection = self.templates_treeview.selection()
         if not selection:
             return None
-        index = selection[0]
-        templates = self.template_store.get_all_templates()
-        return templates[index] if index < len(templates) else None
+        
+        # Get the selected item
+        item = selection[0]
+        values = self.templates_treeview.item(item, "values")
+        
+        if not values or len(values) < 2:
+            return None
+            
+        # Get template by ID
+        template_id = values[1]  # ID is the second value
+        return self.template_store.get_template_by_id(template_id)
         
     def _on_template_double_click(self, event):
         """Handle double-click on template list item."""
@@ -190,9 +206,6 @@ class DataSheetTemplateManagementWindow:
         
     def _on_close(self):
         """Handle window close button click."""
-        # Notify caller via callback if provided
-        if self.close_callback:
-            self.close_callback()
-        self.window.destroy()
+        self.close_callback()
             
 
