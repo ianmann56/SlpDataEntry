@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 from interpretation.template_manager.template_editor_window import TemplateEditorWindow
 from interpretation.template_manager.template_creator_window import TemplateCreatorWindow
 from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
+from interpretation.template_manager.interpreter_configs import DEFAULT_INTERPRETER_CONFIGS
 
 
 class DataSheetTemplateManagementWindow:
@@ -15,20 +16,21 @@ class DataSheetTemplateManagementWindow:
     - Edit existing templates (opens separate windows)
     """
     
-    def __init__(self, template_store, master, close_callback=None):
+    def __init__(self, template_store, master, close_callback=None, interpreter_configs=None):
         """
         Initialize the template management window.
         
         Args:
             template_store (TemplateStore): Repository for template persistence operations
             master: Parent tkinter window
-            theme (str): Theme name to apply to this window
             close_callback: Optional callback function to call when window is closed
+            interpreter_configs: List of InterpreterConfig objects (defaults to DEFAULT_INTERPRETER_CONFIGS)
         """
         self.window = master
         
         self.template_store = template_store
         self.close_callback = close_callback
+        self.interpreter_configs = interpreter_configs or DEFAULT_INTERPRETER_CONFIGS
         
         self._setup_window()
         self._create_widgets()
@@ -154,7 +156,7 @@ class DataSheetTemplateManagementWindow:
     def _on_create_template(self):
         """Handle create new template button click."""
         # Open template creation window
-        creator_window = TemplateCreatorWindow(self.window, self.template_store, self._on_template_saved)
+        creator_window = TemplateCreatorWindow(self.window, self.template_store, self._on_template_saved, self.interpreter_configs)
         
     def _on_edit_template(self):
         """Handle edit template button click."""
