@@ -1,7 +1,7 @@
-from interpretation.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataInterpreterBase
+from interpretation.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
 from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetScalarType
 
-class TableInterpreter(SessionDataInterpreterBase):
+class TableInterpreter(SessionDataSectionInterpreterBase):
   """
   Template implementation for data sheets containing tables with specific column structures.
 

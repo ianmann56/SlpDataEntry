@@ -10,6 +10,7 @@ import sv_ttk
 from clients.google_service import create_google_service
 from clients.aws_clients import construct_textract_client
 from collection.images.aws_image_collection import image_to_text
+from interpretation.template_manager.interpreter_configs import STUB_INTERPRETER_CONFIGS
 from interpretation.template_store import TemplateStore
 from interpretation.template_manager.template_management_window import DataSheetTemplateManagementWindow
 from storage.file_creator import create_therapy_session_sheet
@@ -26,7 +27,7 @@ def main():
     
     # Create template store and show the template management window
     template_store = TemplateStore()
-    app = DataSheetTemplateManagementWindow(template_store, root, close_callback=root.quit)
+    app = DataSheetTemplateManagementWindow(template_store, root, close_callback=root.quit, interpreter_configs=STUB_INTERPRETER_CONFIGS)
     app.show()
     
     # Start the main event loop

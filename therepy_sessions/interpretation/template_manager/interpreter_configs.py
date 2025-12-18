@@ -6,8 +6,13 @@ interpreter types injectable and extensible.
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
 from abc import ABC, abstractmethod
+from tkinter import ttk, messagebox
+
+from interpretation.student_data_sheet import DataSheetScalarType
+from interpretation.template_types.running_tally_interpreter import RunningTallyInterpreter
+from interpretation.template_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
+from interpretation.template_types.table_interpreter import TableInterpreter
 
 
 class InterpreterConfig(ABC):
@@ -35,6 +40,16 @@ class InterpreterConfig(ABC):
         """
         pass
 
+    @abstractmethod
+    def construct_interpreter(self, config_values):
+        """
+        Constructs a SessionDataInterpreterBase from the configs filled
+        out in the form for this configuration.
+        
+        :param config_values: The values filled out in the form which was
+            constructed in create_config_form(...)
+        """
+        pass
 
 class TableInterpreterConfig(InterpreterConfig):
     """Configuration for Table Interpreter - manages column names."""
@@ -74,6 +89,16 @@ class TableInterpreterConfig(InterpreterConfig):
             'entry_var': column_var,
             'get_config': lambda: {'column_names': list(columns_listbox.get(0, tk.END))}
         }
+    
+    def construct_interpreter(self, config_values):
+        """
+        Constructs a TableInterpreter from the configuration values.
+        
+        :param config_values: Dictionary containing 'column_names' list
+        :return: TableInterpreter instance configured with the specified columns
+        """
+        column_names = config_values.get('column_names', [])
+        return TableInterpreter(column_names)
     
     def _add_config_item(self, listbox, entry_var):
         """Add an item to the configuration listbox."""
@@ -137,6 +162,16 @@ class RunningTallyInterpreterConfig(InterpreterConfig):
             'get_config': lambda: {'tally_characters': list(tally_listbox.get(0, tk.END))}
         }
     
+    def construct_interpreter(self, config_values):
+        """
+        Constructs a RunningTallyInterpreter from the configuration values.
+        
+        :param config_values: Dictionary containing 'tally_characters' list
+        :return: RunningTallyInterpreter instance configured with CHOICE type and tally characters as choices
+        """
+        tally_characters = config_values.get('tally_characters', [])
+        return RunningTallyInterpreter(DataSheetScalarType.CHOICE, tally_characters)
+    
     def _add_config_item(self, listbox, entry_var):
         """Add an item to the configuration listbox."""
         item = entry_var.get().strip()
@@ -198,6 +233,23 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
             'entry_var': field_var,
             'get_config': lambda: {'field_names': list(fields_listbox.get(0, tk.END))}
         }
+    
+    def construct_interpreter(self, config_values):
+        """
+        Constructs a SimpleFormInterpreter from the configuration values.
+        
+        :param config_values: Dictionary containing 'field_names' list
+        :return: SimpleFormInterpreter instance configured with FieldConfiguration dictionary
+        """
+        field_names = config_values.get('field_names', [])
+        
+        # Create FieldConfiguration dictionary with TEXT type as default
+        field_configs = {
+            name: FieldConfiguration(name, DataSheetScalarType.TEXT)
+            for name in field_names
+        }
+        
+        return SimpleFormInterpreter(field_configs)
     
     def _add_config_item(self, listbox, entry_var):
         """Add an item to the configuration listbox."""

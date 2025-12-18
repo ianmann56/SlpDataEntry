@@ -1,9 +1,9 @@
 from functools import reduce
-from interpretation.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataInterpreterBase
+from interpretation.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
 from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetScalarType
 
 
-class RunningTallyInterpreter(SessionDataInterpreterBase):
+class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
   """
   Template implementation for data sheets containing a grid of tallys. Each tally could
   be an int, a choice or a boolean.
@@ -22,9 +22,13 @@ class RunningTallyInterpreter(SessionDataInterpreterBase):
   # The type that each tally can be interpreted as.
   _tally_type = None
 
-  def __init__(self, tally_type):
+  # The options that each tally could be. This is only applicable if the _tally_type is CHOICE.
+  _tally_choice_options = None
+
+  def __init__(self, tally_type, tally_choice_options):
     super().__init__()
     self._tally_type = tally_type
+    self._tally_choice_options = tally_choice_options
 
   def interpret_student_data_sheet_content(self, data_sheet_content):
     """
@@ -60,7 +64,7 @@ class RunningTallyInterpreter(SessionDataInterpreterBase):
     tally_column_name = 'Tally'
 
     tally_as_rows = [
-      { tally_column_name: DataSheetScalarDto(tally_column_name, letter, self._tally_type) }
+      { tally_column_name: DataSheetScalarDto(tally_column_name, letter, self._tally_type, self._tally_choice_options) }
       for letter
       in tally_string
     ]

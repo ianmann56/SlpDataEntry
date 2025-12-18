@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from interpretation.template_store import TemplateCreateDto
-from interpretation.template_manager.interpreter_configs import STUB_INTERPRETER_CONFIGS
 
 
 class TemplateCreatorWindow:
@@ -15,7 +14,7 @@ class TemplateCreatorWindow:
     - Save the new template
     """
     
-    def __init__(self, parent, template_store, save_callback, interpreter_configs=STUB_INTERPRETER_CONFIGS):
+    def __init__(self, parent, template_store, save_callback, interpreter_configs):
         """
         Initialize the template creator window.
         
@@ -233,23 +232,26 @@ class TemplateCreatorWindow:
         Create configured interpreters based on the added types and their configurations.
         
         Returns:
-            list: List of configured interpreter data with type and configuration
+            list: List of configured interpreter instances
         """
         configured_interpreters = []
         
         for interpreter_type in self.interpreters:
-            interpreter_config = {
-                'type': interpreter_type,
-                'configuration': {}
-            }
+            # Find the configuration object for this interpreter type
+            config_obj = None
+            for config in self.interpreter_configs:
+                if config.name == interpreter_type:
+                    config_obj = config
+                    break
             
-            # Get the configuration for this interpreter type
-            if interpreter_type in self.config_widgets:
+            if config_obj and interpreter_type in self.config_widgets:
+                # Get the configuration data from the form
                 config_data = self.config_widgets[interpreter_type]['get_config']()
-                interpreter_config['configuration'] = config_data
+                
+                # Use the configuration object to construct the interpreter
+                interpreter_instance = config_obj.construct_interpreter(config_data)
+                configured_interpreters.append(interpreter_instance)
                     
-            configured_interpreters.append(interpreter_config)
-            
         return configured_interpreters
         
     def _on_create(self):

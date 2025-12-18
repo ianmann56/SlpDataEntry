@@ -189,7 +189,7 @@ Properties:
 """
 DataSheetInterpretationDto = namedtuple('DataSheetInterpretationDto', ['tables', 'scalars'])
   
-class SessionDataInterpreterBase(ABC):
+class SessionDataSectionInterpreterBase(ABC):
 
   @abstractmethod
   def interpret_student_data_sheet_content(self, data_sheet_content):

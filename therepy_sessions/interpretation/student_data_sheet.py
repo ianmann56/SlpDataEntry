@@ -8,8 +8,9 @@ Properties:
   key: The name of the scalar field
   value: The value of the scalar field
   type: The type that the scalar field value takes on (like int, vs choice, vs date).
+  choice_options: The options that this scalar could be. This is only applicable if type is CHOICE.
 """
-DataSheetScalarDto = namedtuple('DataSheetScalarDto', ['key', 'value', 'type'])
+DataSheetScalarDto = namedtuple('DataSheetScalarDto', ['key', 'value', 'type', 'choice_options'])
 
 class DataSheetScalarType(Enum):
   TEXT = 'text' # For plain text
