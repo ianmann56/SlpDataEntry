@@ -29,6 +29,16 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
     super().__init__()
     self._columns = columns
 
+  @property
+  def columns(self):
+    """
+    Get the list of expected column names.
+    
+    Returns:
+        list: List of column names
+    """
+    return self._columns
+
   def interpret_student_data_sheet_content(self, data_sheet_content):
     """
     Processes multiple tables from the data sheet using column-based interpretation.

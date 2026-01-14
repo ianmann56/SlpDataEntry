@@ -2,13 +2,13 @@ class StudentDataSheetTemplate:
   _id = ""
   _name = ""
   _file_location = ""
-  _configured_interpreter = None
+  _configured_interpreters = None
 
-  def __init__(self, id, name, file_location, configured_interpreter=None):
+  def __init__(self, id, name, file_location, configured_interpreters=None):
     self._id = id
     self._name = name
     self._file_location = file_location
-    self._configured_interpreter = configured_interpreter
+    self._configured_interpreters = configured_interpreters
 
   @property
   def id(self):
@@ -32,12 +32,12 @@ class StudentDataSheetTemplate:
     return self._file_location
 
   @property
-  def interpreter(self):
+  def interpreters(self):
     """
     Loads the underlying template for this configuration which will interpret student data sheets.
     """
-    if self._configured_interpreter:
-      return self._configured_interpreter
+    if self._configured_interpreters:
+      return self._configured_interpreters
     else:
       # Need to load from store.
       raise NotImplementedError()

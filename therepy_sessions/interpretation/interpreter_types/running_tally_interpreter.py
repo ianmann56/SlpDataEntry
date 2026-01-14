@@ -30,6 +30,26 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
     self._tally_type = tally_type
     self._tally_choice_options = tally_choice_options
 
+  @property
+  def tally_type(self):
+    """
+    Get the tally type for this interpreter.
+    
+    Returns:
+        DataSheetScalarType: The type that each tally can be interpreted as
+    """
+    return self._tally_type
+
+  @property
+  def tally_choice_options(self):
+    """
+    Get the tally choice options for this interpreter.
+    
+    Returns:
+        list: The options that each tally could be (only applicable if tally_type is CHOICE)
+    """
+    return self._tally_choice_options
+
   def interpret_student_data_sheet_content(self, data_sheet_content):
     """
     Processes multiple tables from the data sheet using column-based interpretation.

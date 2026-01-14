@@ -14,11 +14,15 @@ from interpretation.template_manager.interpreter_configs import STUB_INTERPRETER
 from interpretation.template_store import TemplateStore
 from interpretation.template_manager.template_management_window import DataSheetTemplateManagementWindow
 from storage.file_creator import create_therapy_session_sheet
-from interpretation.template_types.running_tally_interpreter import RunningTallyInterpreter
+from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
 from interpretation.student_data_sheet_interpreter import StudentDataSheetInterpreter
 from interpretation.student_data_sheet import DataSheetScalarType
 
 def main():
+    # Parse command line arguments
+    args = parse_command_line_args()
+    storage_file_path = args[0]
+    
     # Create root Tkinter window
     root = tk.Tk()
 
@@ -26,12 +30,48 @@ def main():
     sv_ttk.set_theme(darkdetect.theme())
     
     # Create template store and show the template management window
-    template_store = TemplateStore()
+    template_store = TemplateStore(storage_file_path)
     app = DataSheetTemplateManagementWindow(template_store, root, close_callback=root.quit, interpreter_configs=STUB_INTERPRETER_CONFIGS)
     app.show()
     
     # Start the main event loop
     root.mainloop()
+
+def validate_storage_file_path(file_path):
+    """
+    Validate that the storage file path has a .json extension.
+    
+    Args:
+        file_path (str): The file path to validate
+        
+    Exits:
+        If the file path does not have a .json extension
+    """
+    if not file_path.lower().endswith('.json'):
+        print(f"Error: Storage file must be a JSON file (got: {file_path})")
+        print("Please provide a file path with .json extension")
+        sys.exit(1)
+
+def parse_command_line_args():
+    """
+    Parse command line arguments and return configuration.
+    
+    Returns:
+        list: The command line arguments (excluding script name)
+        
+    Exits:
+        If required arguments are missing or invalid
+    """
+    # Check if file path argument is provided
+    if len(sys.argv) < 2:
+        print("Usage: python program.py <template_storage_file_path>")
+        print("Example: python program.py templates.json")
+        sys.exit(1)
+    
+    # Validate the storage file path
+    validate_storage_file_path(sys.argv[1])
+    
+    return sys.argv[1:]
 
 def blah():
     # Construct the various clients

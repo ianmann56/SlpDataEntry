@@ -154,7 +154,7 @@ class DataSheetTemplateManagementWindow:
     def _on_create_template(self):
         """Handle create new template button click."""
         # Open template creation window
-        creator_window = TemplateCreatorWindow(self.window, self.template_store, self._on_template_saved, self.interpreter_configs)
+        creator_window = TemplateCreatorWindow(self.window, self.template_store, self._on_template_created, self.interpreter_configs)
         
     def _on_edit_template(self):
         """Handle edit template button click."""
@@ -193,14 +193,14 @@ class DataSheetTemplateManagementWindow:
             title: Window title
         """
         # Create a new window for template editing
-        editor_window = TemplateEditorWindow(self.window, template, title, self.template_store, self._on_template_saved)
+        editor_window = TemplateEditorWindow(self.window, template, title, self.template_store, self._on_template_created)
         
     def show(self):
         """Display the window and focus it."""
         self.window.focus_set()
             
-    def _on_template_saved(self):
-        """Callback method called when a template is saved from the editor."""
+    def _on_template_created(self):
+        """Callback method called when a template is created from the editor."""
         # Refresh the template list to show any changes
         self._populate_templates_list()
         

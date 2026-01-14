@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import traceback
 from interpretation.template_store import TemplateCreateDto
+from tk_utils import error_handling
 
 
 class TemplateCreatorWindow:
@@ -264,7 +266,7 @@ class TemplateCreatorWindow:
             create_dto = TemplateCreateDto(
                 name=self.name_var.get().strip(),
                 file_location=self.file_location_var.get().strip(),
-                configured_interpreter=self._create_configured_interpreters()
+                configured_interpreters=self._create_configured_interpreters()
             )
             
             # Create the template via the store
@@ -281,7 +283,7 @@ class TemplateCreatorWindow:
             self.window.destroy()
             
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to create template: {str(e)}")
+            error_handling.throw(e, "Failed to create template")
             
     def _on_cancel(self):
         """Handle cancel button click."""

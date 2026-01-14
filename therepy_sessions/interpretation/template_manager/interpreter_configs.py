@@ -10,9 +10,9 @@ from abc import ABC, abstractmethod
 from tkinter import ttk, messagebox
 
 from interpretation.student_data_sheet import DataSheetScalarType
-from interpretation.template_types.running_tally_interpreter import RunningTallyInterpreter
-from interpretation.template_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
-from interpretation.template_types.table_interpreter import TableInterpreter
+from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
+from interpretation.interpreter_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
+from interpretation.interpreter_types.table_interpreter import TableInterpreter
 
 
 class InterpreterConfig(ABC):

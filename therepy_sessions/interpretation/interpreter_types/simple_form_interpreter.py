@@ -41,6 +41,16 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
     super().__init__()
     self._fields = fields
 
+  @property
+  def fields(self):
+    """
+    Get the field configurations for this interpreter.
+    
+    Returns:
+        dict: Dictionary of field names to FieldConfiguration objects
+    """
+    return self._fields
+
   def interpret_student_data_sheet_content(self, data_sheet_content):
     """
     Processes multiple form fields from the data sheet.
