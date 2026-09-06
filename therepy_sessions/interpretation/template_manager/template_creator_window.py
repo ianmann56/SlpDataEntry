@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 import traceback
 from interpretation.template_store import TemplateCreateDto
 from tk_utils import error_handling
@@ -34,7 +34,6 @@ class TemplateCreatorWindow:
         
         # Form field variables
         self.name_var = tk.StringVar()
-        self.file_location_var = tk.StringVar()
         self.interpreters = []  # List to store multiple interpreters
         
         self._setup_window()
@@ -63,7 +62,6 @@ class TemplateCreatorWindow:
         self._create_title()
         self.form_frame = self._setup_form_container()
         self._create_template_name_field()
-        self._create_file_location_field()
         self._create_interpreters_field()
         self._create_description_field()
         self._create_buttons()
@@ -94,7 +92,7 @@ class TemplateCreatorWindow:
         
         # Configure grid
         form_frame.columnconfigure(1, weight=1)
-        form_frame.rowconfigure(3, weight=1)  # Make description field expandable
+        form_frame.rowconfigure(2, weight=1)  # Make description field expandable
         
         return form_frame
         
@@ -105,26 +103,12 @@ class TemplateCreatorWindow:
         name_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=5)
         name_entry.focus()  # Set focus to first field
         
-    def _create_file_location_field(self):
-        """Create the file location input field with browse button."""
-        ttk.Label(self.form_frame, text="File Location:").grid(row=1, column=0, sticky=tk.W, pady=5, padx=(0, 10))
-        
-        file_frame = ttk.Frame(self.form_frame)
-        file_frame.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=5)
-        file_frame.columnconfigure(0, weight=1)
-        
-        file_entry = ttk.Entry(file_frame, textvariable=self.file_location_var)
-        file_entry.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
-        
-        browse_button = ttk.Button(file_frame, text="Browse...", command=self._browse_file)
-        browse_button.grid(row=0, column=1)
-        
     def _create_interpreters_field(self):
         """Create the interpreters management field."""
-        ttk.Label(self.form_frame, text="Interpreters:").grid(row=2, column=0, sticky=(tk.W, tk.N), pady=5, padx=(0, 10))
-        
+        ttk.Label(self.form_frame, text="Interpreters:").grid(row=1, column=0, sticky=(tk.W, tk.N), pady=5, padx=(0, 10))
+
         interpreters_frame = ttk.Frame(self.form_frame)
-        interpreters_frame.grid(row=2, column=1, sticky=(tk.W, tk.E), pady=5)
+        interpreters_frame.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=5)
         interpreters_frame.columnconfigure(0, weight=1)
         
         # Listbox to show current interpreters
@@ -164,10 +148,10 @@ class TemplateCreatorWindow:
         
     def _create_description_field(self):
         """Create the description text field."""
-        ttk.Label(self.form_frame, text="Description:").grid(row=3, column=0, sticky=(tk.W, tk.N), pady=5, padx=(0, 10))
-        
+        ttk.Label(self.form_frame, text="Description:").grid(row=2, column=0, sticky=(tk.W, tk.N), pady=5, padx=(0, 10))
+
         desc_frame = ttk.Frame(self.form_frame)
-        desc_frame.grid(row=3, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        desc_frame.grid(row=2, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
         desc_frame.columnconfigure(0, weight=1)
         desc_frame.rowconfigure(0, weight=1)
         
@@ -195,34 +179,17 @@ class TemplateCreatorWindow:
         """Setup keyboard shortcuts."""
         self.window.bind('<Return>', lambda e: self._on_create())
         
-    def _browse_file(self):
-        """Open file dialog to select template file location."""
-        filename = filedialog.asksaveasfilename(
-            title="Select Template File Location",
-            defaultextension=".json",
-            filetypes=[
-                ("JSON files", "*.json"),
-                ("All files", "*.*")
-            ]
-        )
-        if filename:
-            self.file_location_var.set(filename)
-            
     def _validate_form(self):
         """
         Validate the form data.
-        
+
         Returns:
             bool: True if form is valid, False otherwise
         """
         if not self.name_var.get().strip():
             messagebox.showerror("Validation Error", "Template name is required.")
             return False
-            
-        if not self.file_location_var.get().strip():
-            messagebox.showerror("Validation Error", "File location is required.")
-            return False
-            
+
         if not self.interpreters:
             messagebox.showerror("Validation Error", "At least one interpreter must be added.")
             return False
@@ -265,7 +232,6 @@ class TemplateCreatorWindow:
             # Create the DTO
             create_dto = TemplateCreateDto(
                 name=self.name_var.get().strip(),
-                file_location=self.file_location_var.get().strip(),
                 configured_interpreters=self._create_configured_interpreters()
             )
             
@@ -289,8 +255,7 @@ class TemplateCreatorWindow:
         """Handle cancel button click."""
         # Check if there are unsaved changes
         has_changes = (
-            self.name_var.get().strip() or 
-            self.file_location_var.get().strip() or
+            self.name_var.get().strip() or
             self.description_text.get("1.0", tk.END).strip() or
             self.interpreters
         )

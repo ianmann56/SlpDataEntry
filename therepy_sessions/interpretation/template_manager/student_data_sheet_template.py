@@ -1,13 +1,11 @@
 class StudentDataSheetTemplate:
   _id = ""
   _name = ""
-  _file_location = ""
   _configured_interpreters = None
 
-  def __init__(self, id, name, file_location, configured_interpreters=None):
+  def __init__(self, id, name, configured_interpreters=None):
     self._id = id
     self._name = name
-    self._file_location = file_location
     self._configured_interpreters = configured_interpreters
 
   @property
@@ -23,13 +21,6 @@ class StudentDataSheetTemplate:
     The name of this template configuration
     """
     return self._name
-
-  @property
-  def file_location(self):
-    """
-    The location of this template configuration on the local system
-    """
-    return self._file_location
 
   @property
   def interpreters(self):
