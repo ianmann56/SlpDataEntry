@@ -48,6 +48,7 @@ class TemplateCreatorWindow:
         
         # Make window modal
         self.window.transient(self.parent)
+        self.window.wait_visibility()
         self.window.grab_set()
         
         # Center relative to parent
