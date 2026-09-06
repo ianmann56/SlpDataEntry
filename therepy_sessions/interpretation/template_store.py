@@ -1,6 +1,7 @@
 import json
 import os
 from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
+from interpretation.template_manager.storage.serialization import serialize, deserialize
 
 
 class TemplateCreateDto:
@@ -116,11 +117,14 @@ class TemplateStore:
         
         # Load existing templates and add the new one
         templates_data = self._load_templates_from_file()
+        
+        interpreters_json = [serialize(interpreter) for interpreter in new_template.interpreters]
+
         new_template_data = {
             'id': new_template.id,
             'name': new_template.name,
             'file_location': new_template.file_location,
-            'interpreters': new_template.interpreters # Use the serialization.py stuff for this.
+            'interpreters': interpreters_json
         }
         templates_data.append(new_template_data)
         
@@ -155,11 +159,13 @@ class TemplateStore:
                 )
                 
                 # Update the template data in the list
+                interpreters_json = [serialize(interpreter) for interpreter in updated_template.interpreters]
+                
                 templates_data[i] = {
                     'id': updated_template.id,
                     'name': updated_template.name,
                     'file_location': updated_template.file_location,
-                    'interpreters': updated_template.interpreters
+                    'interpreters': interpreters_json
                 }
                 
                 # Save updated list to file
@@ -225,11 +231,12 @@ class TemplateStore:
         Returns:
             StudentDataSheetTemplate: The converted template object
         """
+        interpreters = [deserialize(interpreter_data) for interpreter_data in template_data['interpreters']]
         return StudentDataSheetTemplate(
             template_data['id'],
             template_data['name'],
             template_data['file_location'],
-            template_data['interpreters']
+            interpreters
         )
     
     def _ensure_storage_file_exists(self):
