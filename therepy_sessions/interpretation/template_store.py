@@ -120,7 +120,7 @@ class TemplateStore:
             'id': new_template.id,
             'name': new_template.name,
             'file_location': new_template.file_location,
-            'interpreters': new_template.interpreters
+            'interpreters': new_template.interpreters # Use the serialization.py stuff for this.
         }
         templates_data.append(new_template_data)
         
