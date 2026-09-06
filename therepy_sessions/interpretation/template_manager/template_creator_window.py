@@ -39,8 +39,7 @@ class TemplateCreatorWindow:
         
         self._setup_window()
         self._create_form()
-        self._setup_interpreter_configs()
-        
+
     def _setup_window(self):
         """Configure the creator window properties."""
         self.window.title("Create New Template")
