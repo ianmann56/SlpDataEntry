@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import traceback
+import uuid
 from interpretation.template_store import TemplateCreateDto
 from tk_utils import error_handling
 
@@ -34,7 +35,7 @@ class TemplateCreatorWindow:
         
         # Form field variables
         self.name_var = tk.StringVar()
-        self.interpreters = []  # List to store multiple interpreters
+        self.interpreters = []  # List of constructed interpreter instances, keyed by their own title
         
         self._setup_window()
         self._create_form()
@@ -196,33 +197,6 @@ class TemplateCreatorWindow:
             
         return True
         
-    def _create_configured_interpreters(self):
-        """
-        Create configured interpreters based on the added types and their configurations.
-        
-        Returns:
-            list: List of configured interpreter instances
-        """
-        configured_interpreters = []
-        
-        for interpreter_type in self.interpreters:
-            # Find the configuration object for this interpreter type
-            config_obj = None
-            for config in self.interpreter_configs:
-                if config.name == interpreter_type:
-                    config_obj = config
-                    break
-            
-            if config_obj and interpreter_type in self.config_widgets:
-                # Get the configuration data from the form
-                config_data = self.config_widgets[interpreter_type]['get_config']()
-                
-                # Use the configuration object to construct the interpreter
-                interpreter_instance = config_obj.construct_interpreter(config_data)
-                configured_interpreters.append(interpreter_instance)
-                    
-        return configured_interpreters
-        
     def _on_create(self):
         """Handle create template button click."""
         if not self._validate_form():
@@ -232,7 +206,7 @@ class TemplateCreatorWindow:
             # Create the DTO
             create_dto = TemplateCreateDto(
                 name=self.name_var.get().strip(),
-                configured_interpreters=self._create_configured_interpreters()
+                configured_interpreters=self.interpreters
             )
             
             # Create the template via the store
@@ -297,14 +271,28 @@ class TemplateCreatorWindow:
             self.config_widgets[interpreter_type]['frame'].grid(row=0, column=0, sticky=(tk.W, tk.E))
         
     def _add_interpreter(self):
-        """Add the selected interpreter type to the list."""
+        """Construct an interpreter from the currently displayed config form and add it to the list."""
         interpreter_type = self.interpreter_type_var.get()
-        if interpreter_type and interpreter_type not in self.interpreters:
-            self.interpreters.append(interpreter_type)
-            self._update_interpreters_list()
-        elif interpreter_type in self.interpreters:
-            messagebox.showwarning("Duplicate Interpreter", f"'{interpreter_type}' is already added.")
-            
+        if not interpreter_type or interpreter_type not in self.config_widgets:
+            return
+
+        config_obj = next((config for config in self.interpreter_configs if config.name == interpreter_type), None)
+        if config_obj is None:
+            return
+
+        config_data = self.config_widgets[interpreter_type]['get_config']()
+        title = config_data.get('title', '')
+
+        if title and any(interpreter.title == title for interpreter in self.interpreters):
+            messagebox.showwarning("Duplicate Interpreter", f"An interpreter titled '{title}' has already been added.")
+            return
+
+        interpreter_instance = config_obj.construct_interpreter(str(uuid.uuid4()), config_data)
+        self.interpreters.append(interpreter_instance)
+
+        self.config_widgets[interpreter_type]['reset']()
+        self._update_interpreters_list()
+
     def _remove_interpreter(self):
         """Remove the selected interpreter from the list."""
         selection = self.interpreters_listbox.curselection()
@@ -314,9 +302,9 @@ class TemplateCreatorWindow:
             self._update_interpreters_list()
         else:
             messagebox.showwarning("No Selection", "Please select an interpreter to remove.")
-            
+
     def _update_interpreters_list(self):
-        """Update the interpreters listbox with current interpreters."""
+        """Update the interpreters listbox, keyed by each interpreter's title."""
         self.interpreters_listbox.delete(0, tk.END)
         for interpreter in self.interpreters:
-            self.interpreters_listbox.insert(tk.END, interpreter)
+            self.interpreters_listbox.insert(tk.END, interpreter.title or "(untitled)")

@@ -28,17 +28,19 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
   # Values: The FieldConfiguration that describes the field.
   _fields = {}
 
-  def __init__(self, fields):
+  def __init__(self, id, title, fields):
     """
     Initializes the template with expected field configurations for form processing.
 
     Purpose: Sets up the template to work with forms that have specific fields, allowing
     validation and proper data extraction based on the field configurations.
 
+    :param id: The unique id identifying this specific interpreter instance within a template.
+    :param title: The user-facing title identifying this interpreter within a template.
     :param fields: Dictionary of expected fields and their configurations. The keys are the field
       names, the values are the configurations as FieldConfiguration objects.
     """
-    super().__init__()
+    super().__init__(id, title)
     self._fields = fields
 
   @property

@@ -191,6 +191,28 @@ DataSheetInterpretationDto = namedtuple('DataSheetInterpretationDto', ['tables',
   
 class SessionDataSectionInterpreterBase(ABC):
 
+  def __init__(self, id, title):
+    """
+    :param id: The unique id identifying this specific interpreter instance within a template.
+    :param title: The user-facing title identifying this interpreter within a template.
+    """
+    self._id = id
+    self._title = title
+
+  @property
+  def id(self):
+    """
+    The unique id identifying this specific interpreter instance within a template.
+    """
+    return self._id
+
+  @property
+  def title(self):
+    """
+    The user-facing title identifying this interpreter within a template.
+    """
+    return self._title
+
   @abstractmethod
   def interpret_student_data_sheet_content(self, data_sheet_content):
     """

@@ -17,16 +17,18 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
   """
   _columns = []
 
-  def __init__(self, columns):
+  def __init__(self, id, title, columns):
     """
     Initializes the template with expected column names for table processing.
 
     Purpose: Sets up the template to work with tables that have specific column
     structures, allowing validation and proper data extraction based on column names.
 
+    :param id: The unique id identifying this specific interpreter instance within a template.
+    :param title: The user-facing title identifying this interpreter within a template.
     :param columns: List of expected column names that should be present in data sheet tables
     """
-    super().__init__()
+    super().__init__(id, title)
     self._columns = columns
 
   @property

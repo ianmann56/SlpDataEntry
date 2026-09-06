@@ -25,8 +25,8 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
   # The options that each tally could be. This is only applicable if the _tally_type is CHOICE.
   _tally_choice_options = None
 
-  def __init__(self, tally_type, tally_choice_options):
-    super().__init__()
+  def __init__(self, id, title, tally_type, tally_choice_options):
+    super().__init__(id, title)
     self._tally_type = tally_type
     self._tally_choice_options = tally_choice_options
 

@@ -76,11 +76,13 @@ class TableInterpreterSerializer(InterpreterSerializer):
         Returns:
             dict: Dictionary containing type and column configuration
         """
-        # Use the public property
+        # Use the public properties
         columns = interpreter.columns
-        
+
         return {
             'type': 'TableInterpreter',
+            'id': interpreter.id,
+            'title': interpreter.title,
             'config': {
                 'columns': columns
             }
@@ -89,15 +91,16 @@ class TableInterpreterSerializer(InterpreterSerializer):
     def deserialize(self, data: dict):
         """
         Deserialize a dictionary to a TableInterpreter instance.
-        
+
         Args:
             data: Dictionary representation of the interpreter
-            
+
         Returns:
             TableInterpreter: The reconstructed TableInterpreter instance
         """
         columns = data['config']['columns']
-        return TableInterpreter(columns)
+        title = data.get('title', '')
+        return TableInterpreter(data['id'], title, columns)
 
 
 class RunningTallyInterpreterSerializer(InterpreterSerializer):
@@ -127,6 +130,8 @@ class RunningTallyInterpreterSerializer(InterpreterSerializer):
         
         return {
             'type': 'RunningTallyInterpreter',
+            'id': interpreter.id,
+            'title': interpreter.title,
             'config': {
                 'tally_type': tally_type_str,
                 'tally_choice_options': tally_choice_options if tally_choice_options else []
@@ -152,8 +157,9 @@ class RunningTallyInterpreterSerializer(InterpreterSerializer):
             tally_type = getattr(DataSheetScalarType, tally_type_str, None)
         
         tally_choice_options = config.get('tally_choice_options', [])
-        
-        return RunningTallyInterpreter(tally_type, tally_choice_options)
+        title = data.get('title', '')
+
+        return RunningTallyInterpreter(data['id'], title, tally_type, tally_choice_options)
 
 
 class SimpleFormInterpreterSerializer(InterpreterSerializer):
@@ -194,6 +200,8 @@ class SimpleFormInterpreterSerializer(InterpreterSerializer):
         
         return {
             'type': 'SimpleFormInterpreter',
+            'id': interpreter.id,
+            'title': interpreter.title,
             'config': {
                 'fields': serialized_fields
             }
@@ -220,8 +228,9 @@ class SimpleFormInterpreterSerializer(InterpreterSerializer):
                 field_type = getattr(DataSheetScalarType, field_type_str, None)
             
             fields[field_name] = FieldConfiguration(field_data['name'], field_type)
-        
-        return SimpleFormInterpreter(fields)
+
+        title = data.get('title', '')
+        return SimpleFormInterpreter(data['id'], title, fields)
 
 
 class InterpreterSerializerRegistry:
