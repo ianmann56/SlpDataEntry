@@ -33,44 +33,6 @@ from interpretation.interpreter_types.running_tally_interpreter import RunningTa
 from interpretation.interpreter_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
 
 
-class InterpreterSerializerRegistry:
-    """Registry for managing interpreter serializers."""
-    
-    def __init__(self):
-        """Initialize the registry with default serializers."""
-        # Registry mapping interpreter types to their serializers
-        self._serializers = {
-            'TableInterpreter': TableInterpreterSerializer(),
-            'RunningTallyInterpreter': RunningTallyInterpreterSerializer(),
-            'SimpleFormInterpreter': SimpleFormInterpreterSerializer(),
-        }
-    
-    def get_serializer(self, interpreter):
-        """Get the appropriate serializer for an interpreter."""
-        interpreter_type = type(interpreter).__name__
-        
-        if interpreter_type in self._serializers:
-            return self._serializers[interpreter_type]
-        
-        raise ValueError(f"No serializer found for interpreter type: {interpreter_type}")
-    
-    def get_serializer_from_data(self, data: dict):
-        """Get the appropriate serializer based on dictionary content."""
-        interpreter_type = data.get('type')
-        
-        if not interpreter_type:
-            raise ValueError("JSON missing 'type' field")
-        
-        if interpreter_type in self._serializers:
-            return self._serializers[interpreter_type]
-        
-        raise ValueError(f"No serializer found for interpreter type: {interpreter_type}")
-
-
-# Default registry instance
-SERIALIZER_REGISTRY = InterpreterSerializerRegistry()
-
-
 class InterpreterSerializer(ABC):
     """Abstract base class for serializing SessionDataSectionInterpreterBase instances to JSON."""
     
@@ -260,6 +222,44 @@ class SimpleFormInterpreterSerializer(InterpreterSerializer):
             fields[field_name] = FieldConfiguration(field_data['name'], field_type)
         
         return SimpleFormInterpreter(fields)
+
+
+class InterpreterSerializerRegistry:
+    """Registry for managing interpreter serializers."""
+    
+    def __init__(self):
+        """Initialize the registry with default serializers."""
+        # Registry mapping interpreter types to their serializers
+        self._serializers = {
+            'TableInterpreter': TableInterpreterSerializer(),
+            'RunningTallyInterpreter': RunningTallyInterpreterSerializer(),
+            'SimpleFormInterpreter': SimpleFormInterpreterSerializer(),
+        }
+    
+    def get_serializer(self, interpreter):
+        """Get the appropriate serializer for an interpreter."""
+        interpreter_type = type(interpreter).__name__
+        
+        if interpreter_type in self._serializers:
+            return self._serializers[interpreter_type]
+        
+        raise ValueError(f"No serializer found for interpreter type: {interpreter_type}")
+    
+    def get_serializer_from_data(self, data: dict):
+        """Get the appropriate serializer based on dictionary content."""
+        interpreter_type = data.get('type')
+        
+        if not interpreter_type:
+            raise ValueError("JSON missing 'type' field")
+        
+        if interpreter_type in self._serializers:
+            return self._serializers[interpreter_type]
+        
+        raise ValueError(f"No serializer found for interpreter type: {interpreter_type}")
+
+
+# Default registry instance
+SERIALIZER_REGISTRY = InterpreterSerializerRegistry()
 
 
 # API convenience functions
