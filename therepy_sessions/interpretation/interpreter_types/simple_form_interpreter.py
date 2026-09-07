@@ -1,4 +1,4 @@
-from interpretation.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
+from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
 
 
 class FieldConfiguration:

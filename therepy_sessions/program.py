@@ -1,7 +1,8 @@
-#!/bin/python3
+#!../.venv/bin/python3
 
 import os
 import sys
+import ipdb
 import traceback
 import darkdetect
 import tkinter as tk
@@ -15,13 +16,17 @@ from interpretation.template_store import TemplateStore
 from interpretation.template_manager.template_management_window import DataSheetTemplateManagementWindow
 from storage.file_creator import create_therapy_session_sheet
 from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
-from interpretation.student_data_sheet_interpreter import StudentDataSheetInterpreter
+from interpretation.templates.student_data_sheet_interpreter import StudentDataSheetInterpreter
 from interpretation.student_data_sheet import DataSheetScalarType
 
 def main():
     # Parse command line arguments
     args = parse_command_line_args()
     storage_file_path = args[0]
+    file_to_import = "sample_data/simple_3_way_tally.png"
+
+    google_service = create_google_service()
+    textract_client = construct_textract_client()
     
     # Create root Tkinter window
     root = tk.Tk()
@@ -31,11 +36,20 @@ def main():
     
     # Create template store and show the template management window
     template_store = TemplateStore(storage_file_path)
-    app = DataSheetTemplateManagementWindow(template_store, root, close_callback=root.quit, interpreter_configs=STUB_INTERPRETER_CONFIGS)
-    app.show()
+
+    template = template_store.get_template_by_id("2")
+    interpreter = template.to_data_sheet_interpreter()
+
+    # app = DataSheetTemplateManagementWindow(template_store, root, close_callback=root.quit, interpreter_configs=STUB_INTERPRETER_CONFIGS)
+    # app.show()
     
-    # Start the main event loop
-    root.mainloop()
+    # # Start the main event loop
+    # root.mainloop()
+
+    data_sheet_content = image_to_text(file_to_import, lambda: textract_client)
+
+    data_sheet = interpreter.interpret_student_data_sheet(data_sheet_content)
+    data_sheet.debug()
 
 def validate_storage_file_path(file_path):
     """
@@ -93,9 +107,10 @@ def blah():
     #     TableInterpreter(["Category", "Sort Tally", "Label"])
     # ])
 
-    template = StudentDataSheetInterpreter([
-        RunningTallyInterpreter(DataSheetScalarType.CHOICE)
-    ])
+    # template = StudentDataSheetInterpreter([
+    #     RunningTallyInterpreter(DataSheetScalarType.CHOICE)
+    # ])
+    
     data_sheet = template.interpret_student_data_sheet(data_sheet_content)
 
     data_sheet.debug()

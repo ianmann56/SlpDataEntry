@@ -1,3 +1,6 @@
+from interpretation.templates.student_data_sheet_interpreter import StudentDataSheetInterpreter
+
+
 class StudentDataSheetTemplate:
   _id = ""
   _name = ""
@@ -32,3 +35,10 @@ class StudentDataSheetTemplate:
     else:
       # Need to load from store.
       raise NotImplementedError()
+
+  def to_data_sheet_interpreter(self):
+    """
+    Constructs a StudentDataSheetInterpreter from this template, using its
+    configured interpreters as the session data templates.
+    """
+    return StudentDataSheetInterpreter(self.interpreters)
