@@ -1,21 +1,19 @@
 <!--
 Sync Impact Report
-- Version change: (unratified template) → 1.0.0
-- Modified principles: all placeholders replaced (initial ratification)
-  - [PRINCIPLE_1_NAME] → I. Student Data Privacy (NON-NEGOTIABLE)
-  - [PRINCIPLE_2_NAME] → II. Domain Language Fidelity
-  - [PRINCIPLE_3_NAME] → III. Layered Pipeline
-  - [PRINCIPLE_4_NAME] → IV. Injected External Services
-  - [PRINCIPLE_5_NAME] → V. Pluggable Interpreters & Templates
-- Added sections: Technology Constraints; Development Workflow; Referenced Documents
+- Version change: 1.0.0 → 1.1.0 (MINOR: new principle added)
+- Modified principles: none renamed
+- Added principles: VI. Typed Public Interfaces
+- Added sections: none
 - Removed sections: none
-- Supporting docs created (detailed rules live here; the constitution references them):
-  - docs/domain/README.md, glossary.md, student-data-privacy.md
-  - docs/conventions/architecture/README.md, layers.md, dependency-injection.md,
-    interpreters.md
+- Supporting docs:
+  - Added docs/conventions/architecture/type-declarations.md
+  - Updated docs/conventions/architecture/README.md (index entry)
+- Other edits: Development Workflow Constitution Check now spans Principles I–VI
 - Templates requiring updates: none. plan-template.md reads the constitution at runtime
   for its "Constitution Check" gate.
 - Deferred TODOs: none
+- Prior history: 1.0.0 (2026-09-26) initial ratification with Principles I–V, domain docs,
+  and architecture docs
 -->
 
 # SlpDataEntry Constitution
@@ -83,6 +81,19 @@ Full rules: [docs/conventions/architecture/interpreters.md](../../docs/conventio
 Rationale: every student's sheet can differ. The SLP builds templates without writing
 code, and the templates they have saved must keep working.
 
+### VI. Typed Public Interfaces
+
+Public members and constructs MUST have type declarations. This covers every
+non-underscore module function, class, method, property, attribute, constant, and DTO,
+with every parameter and the return type annotated. Cross-layer DTOs MUST be typed
+records (`NamedTuple`, `dataclass`, or `TypedDict`). A change that adds or modifies a
+public member MUST annotate it in that same change.
+
+Full rules: [docs/conventions/architecture/type-declarations.md](../../docs/conventions/architecture/type-declarations.md)
+
+Rationale: the layers and plug-in points above only work as contracts if those contracts
+are explicit and checkable. Right now most of them exist only in docstrings.
+
 ## Technology Constraints
 
 - Language: Python 3, managed with `venv` at `.venv/`. Dependencies are pinned in
@@ -100,7 +111,7 @@ code, and the templates they have saved must keep working.
 
 - Features follow the Spec Kit flow: `/speckit-specify` → `/speckit-plan` →
   `/speckit-tasks` → `/speckit-implement`. Every plan MUST pass a Constitution Check
-  against Principles I–V.
+  against Principles I–VI.
 - Interpretation and collection-normalization logic SHOULD be verifiable offline with
   synthetic sample inputs under `therepy_sessions/sample_data/` (see Principle I for
   what those samples may contain).
@@ -136,4 +147,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-09-26
+**Version**: 1.1.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-09-26

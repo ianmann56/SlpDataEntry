@@ -5,6 +5,7 @@ from google_auth_oauthlib.flow import Flow, InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
 
 CLIENT_SECRET_FILE = '../../slpdataentry_3_credentials.json'
 # CLIENT_SECRET_FILE = '../../slpdataentry-client-key.json'
@@ -23,9 +24,16 @@ def create_google_service():
             cred = pickle.load(token)
 
     if not cred or not cred.valid:
+        refreshed = False
         if cred and cred.expired and cred.refresh_token:
-            cred.refresh(Request())
-        else:
+            try:
+                cred.refresh(Request())
+                refreshed = True
+            except RefreshError:
+                # Refresh token was expired or revoked, so fall back to logging in again.
+                print('Cached Google token is expired or revoked. Opening browser to log in again.')
+
+        if not refreshed:
             flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
             cred = flow.run_local_server()
 

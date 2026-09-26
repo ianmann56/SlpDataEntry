@@ -23,7 +23,8 @@ def main():
     # Parse command line arguments
     args = parse_command_line_args()
     storage_file_path = args[0]
-    file_to_import = "sample_data/simple_3_way_tally.png"
+    # file_to_import = "sample_data/simple_3_way_tally.png"
+    file_to_import = "sample_data/multiple_tables_named.png"
 
     google_service = create_google_service()
     textract_client = construct_textract_client()
@@ -37,7 +38,7 @@ def main():
     # Create template store and show the template management window
     template_store = TemplateStore(storage_file_path)
 
-    template = template_store.get_template_by_id("2")
+    template = template_store.get_template_by_id("4")
     interpreter = template.to_data_sheet_interpreter()
 
     # app = DataSheetTemplateManagementWindow(template_store, root, close_callback=root.quit, interpreter_configs=STUB_INTERPRETER_CONFIGS)
