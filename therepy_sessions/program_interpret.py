@@ -39,8 +39,11 @@ def main():
     # template = template_store.get_template_by_id("3")
     # file_to_import = "sample_data/simple_3_way_tally.png"
 
-    template = template_store.get_template_by_id("4")
-    file_to_import = "sample_data/multiple_tables_named.png"
+    # template = template_store.get_template_by_id("4")
+    # file_to_import = "sample_data/multiple_tables_named.png"
+
+    template = template_store.get_template_by_id(args[1])
+    file_to_import = args[2]
     
     interpreter = template.to_data_sheet_interpreter()
 
@@ -90,40 +93,6 @@ def parse_command_line_args():
     validate_storage_file_path(sys.argv[1])
     
     return sys.argv[1:]
-
-def blah():
-    # Construct the various clients
-    google_service = create_google_service()
-    textract_client = construct_textract_client()
-
-    data_sheet_content = image_to_text(file_to_import, lambda: textract_client)
-        
-    print(f"Successfully extracted text from: {file_to_import}")
-    print(f"Text:")
-    print(data_sheet_content.form_data)
-    print(f"Tables:")
-    print(data_sheet_content.tables)
-
-    # template = ColumnTableStudentDataSheetTemplate(["Strategy", "Cause of Emotion"])
-    # template = ColumnTableStudentDataSheetTemplate(["Category", "Sort Tally", "Label"])
-
-    # template = StudentDataSheetInterpreter([
-    #     TableInterpreter(["Category", "Sort Tally", "Label"])
-    # ])
-
-    # template = StudentDataSheetInterpreter([
-    #     RunningTallyInterpreter(DataSheetScalarType.CHOICE)
-    # ])
-    
-    data_sheet = template.interpret_student_data_sheet(data_sheet_content)
-
-    data_sheet.debug()
-    
-    # file_result = create_therapy_session_sheet(data, "Therapy Session Data", lambda: google_service)
-
-    # print(f"Successfully created spreadsheet with ID: {file_result['spreadsheet_id']}")
-    # print(f"Updated {file_result['updated_cells']} cells")
-    # print(f"Spreadsheet URL: {file_result['url']}")
 
 if __name__ == '__main__':
     try:

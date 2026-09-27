@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
+
+import ipdb
 from interpretation.student_data_sheet import StudentDataSheet
+from collection.collection_headers import StudentDataSheetImport
   
 """
 Represents the interpreted data from a data sheet.
@@ -39,7 +42,7 @@ class SessionDataSectionInterpreterBase(ABC):
     return self._title
 
   @abstractmethod
-  def interpret_student_data_sheet_content(self, data_sheet_content) -> DataSheetInterpretationDto:
+  def interpret_student_data_sheet_content(self, data_sheet_content: StudentDataSheetImport) -> DataSheetInterpretationDto:
     """
     Processes and interprets tabular data from the student data sheet.
     
@@ -119,7 +122,7 @@ class StudentDataSheetInterpreter:
     super().__init__()
     self.session_data_templates = session_data_templates
 
-  def interpret_student_data_sheet(self, data_sheet_content):
+  def interpret_student_data_sheet(self, data_sheet_content: StudentDataSheetImport):
     """
     Takes the given imported student's data sheet from an image or some other external system
     and interprets the content based on the template configured for that student.
