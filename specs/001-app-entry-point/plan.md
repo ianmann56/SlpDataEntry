@@ -43,7 +43,7 @@ Google at launch (R6).
 | --- | --- | --- |
 | I. Student Data Privacy | No student data is shown on the new screens. Validation uses only the synthetic `sample_data/templates.json`. No new external service. | ✅ Pass |
 | II. Domain Language Fidelity | Labels use glossary terms: "Student Data Sheets", "Data Sheet Templates", "Import", "Interpret". No new domain concept is introduced. "Home screen" is a UI term, not a domain term. | ✅ Pass |
-| III. Layered Pipeline | `program.py` becomes the composition root again. The new `app_shell/` imports nothing from the pipeline layers, and wiring stays in `program.py`. **Deviation**: `program_interpret.py` stays as a second, developer-only root (spec FR-014). This is recorded in Complexity Tracking. **Amendment**: `layers.md` gains an `app_shell/` entry and its import rule. This is a MINOR bump, 1.1.0 → 1.2.0, done in the same change. | ⚠️ Pass with justified deviation + amendment |
+| III. Layered Pipeline | `program.py` becomes the composition root again. The new `app_shell/` imports nothing from the pipeline layers. The new `interpretation/importing/` package follows the `interpretation` import rules (nothing from `storage/` or `clients/`) and, for now, imports only Tkinter. Wiring stays in `program.py`. **Deviation**: `program_interpret.py` stays as a second, developer-only root (spec FR-014). This is recorded in Complexity Tracking. **Amendment**: `layers.md` gains an `app_shell/` entry and its import rule, and rule 5's UI-window example adds `interpretation/importing/*_window.py`. This is a MINOR bump, 1.1.0 → 1.2.0, done in the same change. | ⚠️ Pass with justified deviation + amendment |
 | IV. Injected External Services | `program.py` no longer builds Google or Textract clients at startup (R6). The windows receive `TemplateStore` and the config list through their constructors. | ✅ Pass (improves on current `program_manage.py`) |
 | V. Pluggable Interpreters & Templates | No interpreter or serialization change. Saved templates load as before. | ✅ Pass |
 | VI. Typed Public Interfaces | The new classes and the modified `DataSheetTemplateManagementWindow.__init__` are fully annotated ([contracts/ui-windows.md](contracts/ui-windows.md)). The public helpers moved into `program.py` (`main`, `validate_storage_file_path`, `parse_command_line_args`) get annotated too. | ✅ Pass |
@@ -79,21 +79,25 @@ therepy_sessions/
 ├── program_interpret.py               # KEEP: add dev-only docstring, fix usage text (FR-014)
 ├── app_shell/                         # NEW package: navigation shell windows
 │   ├── __init__.py
-│   ├── home_window.py                 # HomeWindow
-│   └── import_placeholder_window.py   # ImportPlaceholderWindow
-└── interpretation/template_manager/
-    └── template_management_window.py  # CHANGE: optional back_callback + Back button
+│   └── home_window.py                 # HomeWindow
+└── interpretation/
+    ├── importing/                     # NEW package: import and interpret path windows
+    │   └── import_window.py           # ImportWindow (placeholder content for now)
+    └── template_manager/
+        └── template_management_window.py  # CHANGE: optional back_callback + Back button
 
 docs/conventions/architecture/
-└── layers.md                          # AMEND: add app_shell/ to layout + import rule
+└── layers.md                          # AMEND: add app_shell/ + import rule; rule 5 example
 
 .specify/memory/
 └── constitution.md                    # AMEND: Sync Impact Report, version 1.2.0
 ```
 
 **Structure Decision**: This is a single desktop project under `therepy_sessions/`,
-following the layout in `layers.md`. The navigation screens go in a new `app_shell/`
-package beside the pipeline packages (research R2). They depend only on Tkinter, and
+following the layout in `layers.md`. The home screen goes in a new `app_shell/`
+package beside the pipeline packages. The import window goes in a new
+`interpretation/importing/` package, beside `template_manager/`, because it belongs to the
+import and interpret path (research R2). Both depend only on Tkinter for now, and
 `program.py` connects them to the rest of the app.
 
 ## Complexity Tracking

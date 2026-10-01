@@ -28,7 +28,7 @@ The SLP launches the application once and lands on a single home screen. The scr
 
 **Acceptance Scenarios**:
 
-1. **Given** the application is not running, **When** the SLP launches it, **Then** the home screen appears showing an "import and interpret session data" choice and a "manage setup and configuration" choice.
+1. **Given** the application is not running, **When** the SLP launches it, **Then** the home screen appears showing an "Import & Interpret Student Data Sheets" choice and a "Manage Setup & Data Sheet Templates" choice.
 2. **Given** the home screen is showing, **When** the SLP closes it, **Then** the application exits.
 
 ---
@@ -78,7 +78,7 @@ From the home screen, the SLP picks the import and interpret path. Because this 
 ### Functional Requirements
 
 - **FR-001**: The application MUST have a single launch point that opens a home screen.
-- **FR-002**: The home screen MUST offer exactly two choices: import and interpret session data, and manage setup and configuration.
+- **FR-002**: The home screen MUST offer exactly two choices: "Import & Interpret Student Data Sheets" and "Manage Setup & Data Sheet Templates".
 - **FR-003**: Each choice MUST carry a label that uses the project's domain terms (e.g. Data Sheet, Template) so the SLP can tell what it leads to without prior instruction.
 - **FR-004**: Picking the management choice MUST open the existing Data Sheet Template management window, using the Template Store given at launch.
 - **FR-005**: The template management window MUST have a Back button that closes it and returns the SLP to the home screen.
@@ -88,10 +88,10 @@ From the home screen, the SLP picks the import and interpret path. Because this 
 - **FR-008**: The placeholder screen MUST NOT start any import, OCR, interpretation, or output action.
 - **FR-009**: Reaching the home screen, the placeholder screen, and template management MUST NOT require contacting any external service or reading any external-service credentials.
 - **FR-010**: Closing the home screen MUST exit the application.
+- **FR-011**: The home screen and placeholder screen MUST follow the system light/dark theme, matching the existing windows.
 - **FR-012**: While a path (template management or the import and interpret placeholder) is open, the home screen MUST be hidden. It MUST be shown again only when the SLP presses that path's Back button, so only one of these screens is on display at a time.
 - **FR-013**: The new entry point MUST replace the separate template management launch script, which MUST be removed.
 - **FR-014**: The existing developer-only interpretation script MAY remain temporarily. It MUST NOT be reachable from the new entry point, and the plan MUST record it as a justified deviation from the single composition root rule (Principle III), to be removed when the import and interpret path is built.
-- **FR-011**: The home screen and placeholder screen MUST follow the system light/dark theme, matching the existing windows.
 
 ## Success Criteria *(mandatory)*
 
@@ -110,3 +110,4 @@ From the home screen, the SLP picks the import and interpret path. Because this 
 - "Manage setup and configuration" means template management only for now. Other configuration areas may be added behind this path later.
 - No student data is shown or handled on the home screen or placeholder screen, so Principle I (Student Data Privacy) is not affected.
 - The existing template management window is reused as is, apart from the added Back button.
+- The placeholder screen is the import and interpret window showing placeholder content. A later feature replaces that content with the real import and interpret process in the same window.

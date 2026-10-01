@@ -78,3 +78,11 @@ On the home screen, click the title-bar ✕. **Expect**: the application exits.
 - `ls program_manage.py` → **Expect** "No such file".
 - `program_interpret.py` still runs its developer flow when given the three arguments,
   and its usage text names `program_interpret.py`.
+- `../.venv/bin/python3 program_interpret.py sample_data/templates.json` (one argument)
+  → **Expect** the usage message and exit status 1, not an `IndexError`.
+
+## V9. First-look labels (SC-003)
+
+Show the home screen to the SLP without explaining it, and ask which button leads to
+template management. **Expect**: they pick **Manage Setup & Data Sheet Templates** on the
+first try. If not, revisit the labels (FR-003) before shipping.

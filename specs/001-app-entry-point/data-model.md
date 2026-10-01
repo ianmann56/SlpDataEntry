@@ -12,7 +12,7 @@ held by the composition root (`program.py`), described here as a state machine.
 | --- | --- | --- | --- |
 | `HOME` | Home screen | shown | Start state after launch validation succeeds |
 | `MANAGING_TEMPLATES` | Data Sheet Template management (Toplevel) | withdrawn | Creator and editor windows may open modally on top |
-| `IMPORT_PLACEHOLDER` | Import and interpret placeholder (Toplevel) | withdrawn | Starts no import, OCR, or interpretation action (FR-008) |
+| `IMPORTING` | Import and interpret window (Toplevel, placeholder content for now) | withdrawn | Starts no import, OCR, or interpretation action (FR-008) |
 | `EXITED` | none | destroyed | Terminal state; `mainloop()` returns |
 
 At most one path window exists at any time. It is created on entry and destroyed on
@@ -25,12 +25,12 @@ exit from its state.
 | *(launch)* | valid `.json` path argument | `HOME` | Build root, apply theme, build `TemplateStore`, show home |
 | *(launch)* | missing / non-`.json` argument | *(process exits)* | Print existing usage message; no window shown |
 | `HOME` | pick "manage" choice | `MANAGING_TEMPLATES` | Withdraw root; create Toplevel + `DataSheetTemplateManagementWindow` |
-| `HOME` | pick "import and interpret" choice | `IMPORT_PLACEHOLDER` | Withdraw root; create Toplevel + placeholder |
+| `HOME` | pick "import and interpret" choice | `IMPORTING` | Withdraw root; create Toplevel + `ImportWindow` |
 | `HOME` | close home window | `EXITED` | `root.destroy()` |
 | `MANAGING_TEMPLATES` | Back | `HOME` | Destroy Toplevel; `root.deiconify()` |
 | `MANAGING_TEMPLATES` | Close button or title-bar close | `EXITED` | `root.destroy()` (also closes any open creator/editor) |
-| `IMPORT_PLACEHOLDER` | Back | `HOME` | Destroy Toplevel; `root.deiconify()` |
-| `IMPORT_PLACEHOLDER` | title-bar close | `EXITED` | `root.destroy()` |
+| `IMPORTING` | Back | `HOME` | Destroy Toplevel; `root.deiconify()` |
+| `IMPORTING` | title-bar close | `EXITED` | `root.destroy()` |
 
 ## Existing entities touched
 

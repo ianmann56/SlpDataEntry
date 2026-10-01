@@ -30,10 +30,10 @@ class HomeWindow:
 - It imports only `tkinter` / `tkinter.ttk`, and nothing from `clients/`, `collection/`,
   `interpretation/`, or `storage/`.
 
-## `app_shell.import_placeholder_window.ImportPlaceholderWindow` (new)
+## `interpretation.importing.import_window.ImportWindow` (new)
 
 ```python
-class ImportPlaceholderWindow:
+class ImportWindow:
     def __init__(
         self,
         master: tk.Toplevel,
@@ -49,7 +49,13 @@ class ImportPlaceholderWindow:
 - The title-bar close button → `on_exit()` (research R4).
 - It offers no other controls and starts no import, OCR, interpretation, or output work
   (FR-008).
-- It has the same import restriction as `HomeWindow`.
+- It lives in the `interpretation` layer, so it follows that layer's import rules: nothing
+  from `storage/` or `clients/` (`layers.md` rule 1). For this feature it imports only
+  `tkinter` / `tkinter.ttk`.
+- The name describes the window's role, not its current content. Showing a placeholder
+  is an implementation detail for this feature. The feature that builds the import and
+  interpret path replaces the content and keeps the module, class, and `on_back` /
+  `on_exit` callbacks (research R2).
 
 ## `interpretation.template_manager.template_management_window.DataSheetTemplateManagementWindow` (changed)
 
@@ -80,5 +86,5 @@ class DataSheetTemplateManagementWindow:
 | Callback | Wired to |
 | --- | --- |
 | `HomeWindow.on_manage` | withdraw root → new `tk.Toplevel(root)` → `DataSheetTemplateManagementWindow(store, top, close_callback=root.destroy, interpreter_configs=STUB_INTERPRETER_CONFIGS, back_callback=<destroy top + deiconify root>)` |
-| `HomeWindow.on_import` | withdraw root → new `tk.Toplevel(root)` → `ImportPlaceholderWindow(top, on_back=<destroy top + deiconify root>, on_exit=root.destroy)` |
+| `HomeWindow.on_import` | withdraw root → new `tk.Toplevel(root)` → `ImportWindow(top, on_back=<destroy top + deiconify root>, on_exit=root.destroy)` |
 | every `on_exit` / `close_callback` | `root.destroy` |

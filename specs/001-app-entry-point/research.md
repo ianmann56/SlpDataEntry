@@ -23,20 +23,31 @@ the spec left open, resolved against the existing code.
     reused as is apart from Back.
   - *Keep the root visible and disable its buttons.* Rejected in clarification (Q2).
 
-## R2. Where the home screen and placeholder code lives
+## R2. Where the home screen and import window code lives
 
-- **Decision**: A new package `therepy_sessions/app_shell/` with `home_window.py` and
-  `import_placeholder_window.py`. These windows know nothing about templates, stores, or
-  clients. They take plain callbacks (`on_manage`, `on_import`, `on_back`, `on_exit`).
+- **Decision**: A new package `therepy_sessions/app_shell/` with `home_window.py`, and a
+  new package `therepy_sessions/interpretation/importing/` with `import_window.py`. These
+  windows know nothing about templates, stores, or clients. They take plain callbacks (`on_manage`, `on_import`, `on_back`, `on_exit`).
   `program.py` wires those callbacks to the real windows.
+  The import window is named for its role (`import_window.py` / `ImportWindow`), not
+  for its current placeholder content, so the import and interpret feature can fill it in
+  without renaming it or changing the wiring in `program.py`.
 - **Rationale**: Principle III says UI is a shell and `program.py` is the only
   composition root. Callback injection keeps `app_shell` free of imports from the pipeline
   layers, and keeps "which window opens for which path" in the composition root.
-  `interpretation/template_manager/` is the wrong home, because the home screen is not part
-  of interpretation. `tk_utils/` is for shared helpers, not screens.
+  `interpretation/template_manager/` is the wrong home for the home screen, because the
+  home screen is not part of interpretation. `tk_utils/` is for shared helpers, not screens.
+  The import window is different: it is the entry to the import and interpret path, so it
+  sits in `interpretation/importing/`, beside the template management windows (the same
+  pattern as `template_manager/*_window.py`, `layers.md` rule 5). When the real flow is
+  built, the window takes its collection and interpretation work through callbacks or
+  constructor arguments wired in `program.py`. It does not build clients itself.
 - **Alternatives considered**:
   - *Put the window classes in `program.py`.* Rejected: it mixes wiring with widget code and
     keeps growing as real paths arrive.
+  - *Keep `import_window.py` in `app_shell/`.* Rejected: the window belongs to the import
+    and interpret path, not to navigation, and the later feature fills it with
+    interpretation UI.
   - *Have `HomeWindow` import `DataSheetTemplateManagementWindow` directly.* Rejected: it
     couples the shell to interpretation and hides wiring outside the composition root.
 - **Constitution impact**: `docs/conventions/architecture/layers.md` lists the packages
@@ -97,8 +108,10 @@ the spec left open, resolved against the existing code.
   `<template_storage_file_path>` argument, `.json` validation, and usage message (the
   existing `validate_storage_file_path` and `parse_command_line_args` logic moves over from
   `program_manage.py`). `program_manage.py` is deleted (FR-013). `program_interpret.py`
-  stays as a developer-only script. It gets a module docstring saying so, and its usage
-  text is corrected to name itself instead of `program.py` (FR-014).
+  stays as a developer-only script. It gets a module docstring saying so, its usage text
+  is corrected to name itself and its three arguments instead of `program.py`, and its
+  argument-count check is corrected to require all three, so a missing argument prints
+  usage instead of raising `IndexError` (FR-014).
 - **Rationale**: The launch command stays unchanged for the SLP (per the spec's
   Assumptions). The interpretation script is kept on purpose, as decided in clarification
   Q3.

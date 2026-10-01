@@ -29,6 +29,8 @@ Templates**.
 ## `program_interpret.py` (kept, developer-only)
 
 It works the same as today:
-`program_interpret.py <template_storage_file_path> <template_id> <image_path>`. Two
-things change: a module docstring marks it as a temporary developer-only script, and its
-usage text names `program_interpret.py`. `program.py` never reaches it (FR-014).
+`program_interpret.py <template_storage_file_path> <template_id> <image_path>`. Three
+things change: a module docstring marks it as a temporary developer-only script, its
+usage text names `program_interpret.py` and its three arguments, and the argument-count
+check requires all three, so a missing argument prints usage instead of raising
+`IndexError`. `program.py` never reaches it (FR-014).
