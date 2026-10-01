@@ -1,7 +1,15 @@
+from __future__ import annotations
+
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import ttk, messagebox
+from typing import TYPE_CHECKING
 from interpretation.template_manager.template_editor_window import TemplateEditorWindow
 from interpretation.template_manager.template_creator_window import TemplateCreatorWindow
+
+if TYPE_CHECKING:
+    from interpretation.template_store import TemplateStore
+    from interpretation.template_manager.interpreter_configs import InterpreterConfig
 
 
 class DataSheetTemplateManagementWindow:
@@ -14,7 +22,14 @@ class DataSheetTemplateManagementWindow:
     - Edit existing templates (opens separate windows)
     """
     
-    def __init__(self, template_store, master, close_callback=None, interpreter_configs=None):
+    def __init__(
+        self,
+        template_store: TemplateStore,
+        master: tk.Misc,
+        close_callback: Callable[[], None] | None = None,
+        interpreter_configs: list[InterpreterConfig] | None = None,
+        back_callback: Callable[[], None] | None = None,
+    ) -> None:
         """
         Initialize the template management window.
         
@@ -23,12 +38,15 @@ class DataSheetTemplateManagementWindow:
             master: Parent tkinter window
             close_callback: Optional callback function to call when window is closed
             interpreter_configs: List of InterpreterConfig objects (defaults to DEFAULT_INTERPRETER_CONFIGS)
+            back_callback: Optional callback function to call when Back is pressed. When given,
+                a Back button is shown to the left of Close.
         """
         self.window = master
         
         self.template_store = template_store
         self.close_callback = close_callback
         self.interpreter_configs = interpreter_configs
+        self._back_callback = back_callback
         
         self._setup_window()
         self._create_widgets()
@@ -117,6 +135,12 @@ class DataSheetTemplateManagementWindow:
         close_button = ttk.Button(button_frame, text="Close", 
                                  command=self._on_close)
         close_button.pack(side=tk.RIGHT)
+        
+        # Back button (only when the window was opened from somewhere to go back to)
+        if self._back_callback is not None:
+            back_button = ttk.Button(button_frame, text="Back", 
+                                    command=self._on_back)
+            back_button.pack(side=tk.RIGHT, padx=(0, 10))
         
     def _populate_templates_list(self):
         """Populate the treeview with available templates."""
@@ -207,5 +231,9 @@ class DataSheetTemplateManagementWindow:
     def _on_close(self):
         """Handle window close button click."""
         self.close_callback()
+        
+    def _on_back(self) -> None:
+        """Handle back button click."""
+        self._back_callback()
             
 

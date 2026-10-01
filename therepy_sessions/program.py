@@ -1,48 +1,67 @@
 #!../.venv/bin/python3
 
-import os
 import sys
-import ipdb
 import traceback
 import darkdetect
 import tkinter as tk
 
 import sv_ttk
-from clients.google_service import create_google_service
-from clients.aws_clients import construct_textract_client
-from collection.images.aws_image_collection import image_to_text
+from app_shell.home_window import HomeWindow
+from interpretation.importing.import_window import ImportWindow
 from interpretation.template_manager.interpreter_configs import STUB_INTERPRETER_CONFIGS
-from interpretation.template_store import TemplateStore
 from interpretation.template_manager.template_management_window import DataSheetTemplateManagementWindow
-from storage.file_creator import create_therapy_session_sheet
-from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
-from interpretation.templates.student_data_sheet_interpreter import StudentDataSheetInterpreter
-from interpretation.student_data_sheet import DataSheetScalarType
+from interpretation.template_store import TemplateStore
 
-def main():
+def main() -> None:
     # Parse command line arguments
     args = parse_command_line_args()
     storage_file_path = args[0]
 
-    google_service = create_google_service()
-    textract_client = construct_textract_client()
-    
     # Create root Tkinter window
     root = tk.Tk()
 
     # Set theme to light or dark based on system.
     sv_ttk.set_theme(darkdetect.theme())
-    
-    # Create template store and show the template management window
+
+    # Create the template store shared by every visit to template management
     template_store = TemplateStore(storage_file_path)
 
-    app = DataSheetTemplateManagementWindow(template_store, root, close_callback=root.quit, interpreter_configs=STUB_INTERPRETER_CONFIGS)
-    app.show()
-    
+    def open_import_path() -> None:
+        path_window = _open_path_window(root)
+        ImportWindow(
+            path_window,
+            on_back=lambda: _return_home(root, path_window),
+            on_exit=root.destroy,
+        )
+
+    def open_management_path() -> None:
+        path_window = _open_path_window(root)
+        app = DataSheetTemplateManagementWindow(
+            template_store,
+            path_window,
+            close_callback=root.destroy,
+            interpreter_configs=STUB_INTERPRETER_CONFIGS,
+            back_callback=lambda: _return_home(root, path_window),
+        )
+        app.show()
+
+    # Show the home screen; each choice opens its path
+    HomeWindow(root, on_import=open_import_path, on_manage=open_management_path, on_exit=root.destroy)
+
     # Start the main event loop
     root.mainloop()
 
-def validate_storage_file_path(file_path):
+def _open_path_window(root: tk.Tk) -> tk.Toplevel:
+    """Hide the home screen and create a fresh window for a path."""
+    root.withdraw()
+    return tk.Toplevel(root)
+
+def _return_home(root: tk.Tk, path_window: tk.Toplevel) -> None:
+    """Close a path's window and show the home screen again."""
+    path_window.destroy()
+    root.deiconify()
+
+def validate_storage_file_path(file_path: str) -> None:
     """
     Validate that the storage file path has a .json extension.
     
@@ -57,7 +76,7 @@ def validate_storage_file_path(file_path):
         print("Please provide a file path with .json extension")
         sys.exit(1)
 
-def parse_command_line_args():
+def parse_command_line_args() -> list[str]:
     """
     Parse command line arguments and return configuration.
     
@@ -82,5 +101,5 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as e:
-        print(f"An unahandled exception occurred: {e}")
+        print(f"An unhandled exception occurred: {e}")
         traceback.print_exc()

@@ -1,5 +1,24 @@
 <!--
 Sync Impact Report
+- Version change: 1.1.0 → 1.2.0 (MINOR: new layer rule in a referenced doc)
+- Modified principles: none
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/conventions/architecture/layers.md: adds `app_shell/` to the package
+    layout and rule 7 (the app shell imports only Tkinter, and gets what it opens through
+    callbacks wired in `program.py`). Rule 5's UI-window example now also covers
+    `interpretation/importing/*_window.py`.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.1.0 (2026-09-26) added Principle VI. Typed Public Interfaces, with
+    docs/conventions/architecture/type-declarations.md
+  - 1.0.0 (2026-09-26) initial ratification with Principles I–V, domain docs, and
+    architecture docs
+
+Previous report (1.1.0):
 - Version change: 1.0.0 → 1.1.0 (MINOR: new principle added)
 - Modified principles: none renamed
 - Added principles: VI. Typed Public Interfaces
@@ -147,4 +166,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-09-26
+**Version**: 1.2.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-09-30

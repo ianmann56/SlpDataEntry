@@ -1,4 +1,13 @@
 #!../.venv/bin/python3
+"""
+Temporary developer-only script for checking interpreters against sample sheets.
+
+It runs one image through Textract OCR and a saved template's interpreter, then prints
+the result. It is not part of the SLP-facing application and is not reachable from
+`program.py`. Keeping it is a recorded Principle III deviation (second composition root,
+see specs/001-app-entry-point/plan.md Complexity Tracking). Delete it when the import and
+interpret path is built.
+"""
 
 import os
 import sys
@@ -84,9 +93,9 @@ def parse_command_line_args():
         If required arguments are missing or invalid
     """
     # Check if file path argument is provided
-    if len(sys.argv) < 2:
-        print("Usage: python program.py <template_storage_file_path>")
-        print("Example: python program.py templates.json")
+    if len(sys.argv) < 4:
+        print("Usage: python program_interpret.py <template_storage_file_path> <template_id> <image_path>")
+        print("Example: python program_interpret.py templates.json 3 sample_data/simple_3_way_tally.png")
         sys.exit(1)
     
     # Validate the storage file path

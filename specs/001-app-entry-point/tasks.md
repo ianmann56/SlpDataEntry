@@ -42,7 +42,7 @@ on its own.
 
 **Purpose**: Create the new package that the home screen lives in.
 
-- [ ] T001 Create the `app_shell` package by adding an empty `therepy_sessions/app_shell/__init__.py` (plan.md Project Structure, research R2).
+- [X] T001 Create the `app_shell` package by adding an empty `therepy_sessions/app_shell/__init__.py` (plan.md Project Structure, research R2).
 
 ---
 
@@ -52,7 +52,7 @@ on its own.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 Create `therepy_sessions/program.py` as the single entry point and composition root, following [contracts/cli.md](contracts/cli.md) and research R5–R7:
+- [X] T002 Create `therepy_sessions/program.py` as the single entry point and composition root, following [contracts/cli.md](contracts/cli.md) and research R5–R7:
   - Shebang `#!../.venv/bin/python3`. Make the file executable (`chmod +x therepy_sessions/program.py`).
   - Move `validate_storage_file_path(file_path: str) -> None` and `parse_command_line_args() -> list[str]` over from `therepy_sessions/program_manage.py`. Keep the exact messages: `Usage: python program.py <template_storage_file_path>`, `Example: python program.py templates.json`, `Error: Storage file must be a JSON file (got: <path>)`, `Please provide a file path with .json extension`, each followed by `sys.exit(1)`. Add full type annotations and keep the docstrings.
   - `main() -> None`: parse the args, create `root = tk.Tk()`, call `sv_ttk.set_theme(darkdetect.theme())`, build one `TemplateStore(storage_file_path)` (from `interpretation.template_store`), then call `root.mainloop()`. Leave a clearly marked spot after the store is built where US1 attaches the home screen.
@@ -71,7 +71,7 @@ on its own.
 
 ### Implementation for User Story 1
 
-- [ ] T003 [P] [US1] Create `HomeWindow` in `therepy_sessions/app_shell/home_window.py` per [contracts/ui-windows.md](contracts/ui-windows.md) `app_shell.home_window.HomeWindow`:
+- [X] T003 [P] [US1] Create `HomeWindow` in `therepy_sessions/app_shell/home_window.py` per [contracts/ui-windows.md](contracts/ui-windows.md) `app_shell.home_window.HomeWindow`:
   - `__init__(self, master: tk.Tk, on_import: Callable[[], None], on_manage: Callable[[], None], on_exit: Callable[[], None]) -> None`.
   - Set `master.title("SLP Data Entry")`, and register `master.protocol("WM_DELETE_WINDOW", on_exit)`.
   - Inside a padded `ttk.Frame` packed into `master` with `pack(fill=tk.BOTH, expand=True)` (so the themed frame covers the whole window, FR-011), show exactly two `ttk.Button`s stacked vertically: **Import & Interpret Student Data Sheets** → `on_import`, then **Manage Setup & Data Sheet Templates** → `on_manage` (FR-002, FR-003).
@@ -79,7 +79,7 @@ on its own.
   - Store any callbacks as `_`-prefixed attributes (e.g. `self._on_exit`), and add no public attributes.
   - Imports are limited to `tkinter`, `tkinter.ttk`, and `collections.abc.Callable`. Nothing from `clients/`, `collection/`, `interpretation/`, or `storage/`.
   - Add a class docstring saying it is the navigation home screen and holds no business logic.
-- [ ] T004 [US1] Attach the home screen in `therepy_sessions/program.py` (depends on T002, T003): import `HomeWindow` from `app_shell.home_window`, and construct `HomeWindow(root, on_import=..., on_manage=..., on_exit=root.destroy)` before `root.mainloop()`. Until US2 and US3 land, `on_import` and `on_manage` are private no-op functions in `program.py` (`def _open_import_path() -> None: pass` and `def _open_management_path() -> None: pass`, or closures inside `main`) so the buttons can be clicked without error.
+- [X] T004 [US1] Attach the home screen in `therepy_sessions/program.py` (depends on T002, T003): import `HomeWindow` from `app_shell.home_window`, and construct `HomeWindow(root, on_import=..., on_manage=..., on_exit=root.destroy)` before `root.mainloop()`. Until US2 and US3 land, `on_import` and `on_manage` are private no-op functions in `program.py` (`def _open_import_path() -> None: pass` and `def _open_management_path() -> None: pass`, or closures inside `main`) so the buttons can be clicked without error.
 
 **Checkpoint**: Quickstart V1 (all rows), V2, and V7 pass. Both buttons are present and do nothing yet.
 
@@ -93,18 +93,18 @@ on its own.
 
 ### Implementation for User Story 2
 
-- [ ] T005 [P] [US2] Add the Back button to `DataSheetTemplateManagementWindow` in `therepy_sessions/interpretation/template_manager/template_management_window.py` per [contracts/ui-windows.md](contracts/ui-windows.md) and research R3:
+- [X] T005 [P] [US2] Add the Back button to `DataSheetTemplateManagementWindow` in `therepy_sessions/interpretation/template_manager/template_management_window.py` per [contracts/ui-windows.md](contracts/ui-windows.md) and research R3:
   - Change the signature to `__init__(self, template_store: TemplateStore, master: tk.Misc, close_callback: Callable[[], None] | None = None, interpreter_configs: list[InterpreterConfig] | None = None, back_callback: Callable[[], None] | None = None) -> None`, and store it as the private attribute `self._back_callback = back_callback` (no new public attribute).
   - Import `Callable` from `collections.abc`. Import `TemplateStore` (from `interpretation.template_store`) and `InterpreterConfig` (from `interpretation.template_manager.interpreter_configs`) under `if TYPE_CHECKING:` with `from __future__ import annotations`, so no new runtime import cycle appears.
   - In `_create_widgets`, when `self._back_callback is not None`, add `ttk.Button(button_frame, text="Back", command=self._on_back)` packed `side=tk.RIGHT, padx=(0, 10)`, created *after* the Close button so it sits to the left of Close. Add `_on_back(self) -> None`, which calls `self._back_callback()`.
   - When `back_callback` is `None`, the window MUST look and behave exactly as before. Do not change the list, create, edit, delete, or Close behavior.
   - Update the `__init__` docstring's Args to list `back_callback`.
-- [ ] T006 [US2] Wire the management path in `therepy_sessions/program.py` (depends on T004, T005), replacing the `on_manage` no-op per the composition-root table in [contracts/ui-windows.md](contracts/ui-windows.md) and [data-model.md](data-model.md) (`HOME` → `MANAGING_TEMPLATES`):
+- [X] T006 [US2] Wire the management path in `therepy_sessions/program.py` (depends on T004, T005), replacing the `on_manage` no-op per the composition-root table in [contracts/ui-windows.md](contracts/ui-windows.md) and [data-model.md](data-model.md) (`HOME` → `MANAGING_TEMPLATES`):
   - On pick: `root.withdraw()`, then `top = tk.Toplevel(root)`, then `DataSheetTemplateManagementWindow(template_store, top, close_callback=root.destroy, interpreter_configs=STUB_INTERPRETER_CONFIGS, back_callback=<back>)`, then `.show()`.
   - `<back>` destroys `top` and calls `root.deiconify()`.
   - Import `DataSheetTemplateManagementWindow` and `STUB_INTERPRETER_CONFIGS` from `interpretation.template_manager.*`.
   - Put the "withdraw root, make Toplevel" and "destroy Toplevel, deiconify root" steps in small private helpers so US3 reuses them. Each visit makes a fresh Toplevel, so the store is re-read and no second copy can exist (research R1, SC-004).
-- [ ] T007 [US2] Delete `therepy_sessions/program_manage.py` (FR-013, contracts/cli.md). Run `grep -rn "program_manage" --exclude-dir=.git --exclude-dir=specs .` from the repo root and remove any remaining references outside `specs/`.
+- [X] T007 [US2] Delete `therepy_sessions/program_manage.py` (FR-013, contracts/cli.md). Run `grep -rn "program_manage" --exclude-dir=.git --exclude-dir=specs .` from the repo root and remove any remaining references outside `specs/`.
 
 **Checkpoint**: Quickstart V3 and V5 (management path) pass. V8's first bullet (`ls program_manage.py` → "No such file") passes.
 
@@ -118,14 +118,14 @@ on its own.
 
 ### Implementation for User Story 3
 
-- [ ] T008 [P] [US3] Create `ImportWindow` in `therepy_sessions/interpretation/importing/import_window.py` (new directory `interpretation/importing/`, with no `__init__.py`, matching `template_manager/`), per [contracts/ui-windows.md](contracts/ui-windows.md) `interpretation.importing.import_window.ImportWindow` and research R2 and R4:
+- [X] T008 [P] [US3] Create `ImportWindow` in `therepy_sessions/interpretation/importing/import_window.py` (new directory `interpretation/importing/`, with no `__init__.py`, matching `template_manager/`), per [contracts/ui-windows.md](contracts/ui-windows.md) `interpretation.importing.import_window.ImportWindow` and research R2 and R4:
   - `__init__(self, master: tk.Toplevel, on_back: Callable[[], None], on_exit: Callable[[], None]) -> None`.
   - Set `master.title("Import & Interpret Student Data Sheets")`, and register `master.protocol("WM_DELETE_WINDOW", on_exit)`.
   - Inside a padded `ttk.Frame` packed into `master` with `pack(fill=tk.BOTH, expand=True)` (so the themed frame covers the whole window, FR-011), show a `ttk.Label` saying the import and interpret process is not available yet (FR-006), and a single **Back** `ttk.Button` → `on_back` (FR-007). There are no other controls, and nothing starts import, OCR, interpretation, or output (FR-008).
   - Imports are limited to `tkinter`, `tkinter.ttk`, and `collections.abc.Callable`. Nothing from `storage/` or `clients/`, as required for the `interpretation` layer.
   - Store any callbacks as `_`-prefixed attributes (e.g. `self._on_back`), and add no public attributes.
   - The class docstring describes it as the window for the import and interpret path, and notes that its current content is a placeholder to be replaced when that path is built. The module and class names MUST NOT mention "placeholder".
-- [ ] T009 [US3] Wire the import path in `therepy_sessions/program.py` (depends on T004, T008, and T006's helpers if present), replacing the `on_import` no-op per [contracts/ui-windows.md](contracts/ui-windows.md) and [data-model.md](data-model.md) (`HOME` → `IMPORTING`):
+- [X] T009 [US3] Wire the import path in `therepy_sessions/program.py` (depends on T004, T008, and T006's helpers if present), replacing the `on_import` no-op per [contracts/ui-windows.md](contracts/ui-windows.md) and [data-model.md](data-model.md) (`HOME` → `IMPORTING`):
   - On pick: `root.withdraw()`, then `top = tk.Toplevel(root)`, then `ImportWindow(top, on_back=<destroy top + root.deiconify()>, on_exit=root.destroy)`.
   - Import `ImportWindow` from `interpretation.importing.import_window`.
   - If US2 has not landed, add the same withdraw/Toplevel and destroy/deiconify private helpers described in T006.
@@ -138,18 +138,18 @@ on its own.
 
 **Purpose**: Developer script cleanup, constitution amendment, and full validation.
 
-- [ ] T010 [P] Mark `therepy_sessions/program_interpret.py` as developer-only (FR-014, research R7, contracts/cli.md):
+- [X] T010 [P] Mark `therepy_sessions/program_interpret.py` as developer-only (FR-014, research R7, contracts/cli.md):
   - Add a module docstring right after the shebang. It says this is a temporary developer-only script for checking interpreters against sample sheets, that it is not reachable from `program.py`, that it is a recorded Principle III deviation (see `specs/001-app-entry-point/plan.md` Complexity Tracking), and that it is to be deleted when the import and interpret path is built.
   - Change its usage lines to `Usage: python program_interpret.py <template_storage_file_path> <template_id> <image_path>` and `Example: python program_interpret.py templates.json 3 sample_data/simple_3_way_tally.png`, and change the `len(sys.argv) < 2` check to `< 4` to match the three required arguments.
   - Apart from the argument-count check, do not change its runtime flow.
-- [ ] T011 [P] Amend `docs/conventions/architecture/layers.md` (research R2, plan Constitution Check III):
+- [X] T011 [P] Amend `docs/conventions/architecture/layers.md` (research R2, plan Constitution Check III):
   - Add an `app_shell/` line to the package layout block: `app_shell/       navigation shell windows (home screen); Tkinter only`.
   - Add a rule saying `app_shell/` MUST NOT import from `clients/`, `collection/`, `interpretation/`, or `storage/`, and gets everything it opens through callbacks wired in `program.py`.
   - Update rule 5's example of UI windows to cover both `interpretation/template_manager/*_window.py` and `interpretation/importing/*_window.py`.
-- [ ] T012 Amend `.specify/memory/constitution.md` per its Governance procedure (depends on T011):
+- [X] T012 Amend `.specify/memory/constitution.md` per its Governance procedure (depends on T011):
   - Prepend a new Sync Impact Report: version 1.1.0 → 1.2.0 (MINOR: new layer rule in a referenced doc). Modified principles: none. Supporting docs: updated `docs/conventions/architecture/layers.md` (adds `app_shell/` and its import rule, and adds `interpretation/importing/` to the UI-window example). Prior history keeps the 1.1.0 and 1.0.0 entries.
   - Set the footer to `**Version**: 1.2.0`, with `**Last Amended**:` set to the date of the change (YYYY-MM-DD).
-- [ ] T013 Verify the import boundaries from the repo root:
+- [X] T013 Verify the import boundaries from the repo root:
   - `grep -nE "^(from|import) (clients|collection|storage)([. ]|$)" therepy_sessions/program.py` → no matches.
   - `grep -nE "create_google_service|construct_textract_client" therepy_sessions/program.py` → no matches.
   - `grep -nE "^(from|import) " therepy_sessions/app_shell/home_window.py therepy_sessions/interpretation/importing/import_window.py` → only `tkinter`, `collections.abc`, and `__future__` imports.
