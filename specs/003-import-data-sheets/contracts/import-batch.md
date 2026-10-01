@@ -92,5 +92,5 @@ check lives in the window (see [ui-windows.md](ui-windows.md)).
 
 | Module | Change |
 | --- | --- |
-| `interpretation/student_data_sheet.py` | `_tables`/`_scalars` are created in `__init__` (R6). Changed public members gain annotations. |
+| `interpretation/student_data_sheet.py` | `_tables`/`_scalars` are created in `__init__` (R6). Adds `class DataSheetTable(TypedDict)` with `columns: list[object]` (a `ColumnDefinition` from `TableInterpreter`, or a `str` from `RunningTallyInterpreter`) and `data: list[dict[str, DataSheetScalarDto]]`. `tables` and `register_table` use it (type-declarations rule 4). Changed public members gain annotations. |
 | `interpretation/template_store.py` | Adds `check_readable(self) -> None`, which raises `UnreadableTemplatesError(file_path: str, reason: str)` when the file exists and is not valid JSON (R7). |

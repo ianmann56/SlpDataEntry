@@ -97,12 +97,12 @@ Some sheets in a batch will not import cleanly: the photo is blurry, the Student
 - **FR-004**: The list MUST NOT contain the same file twice.
 - **FR-005**: The SLP MUST be able to remove one or more selected files from the list.
 - **FR-006**: The list MUST show each file so the SLP can tell the files apart (at least the file name).
-- **FR-007**: The Import action MUST be available only when the list has at least one file and no import is running.
+- **FR-007**: The Import action MUST be available only when the list has at least one file that has not yet succeeded and no import is running.
 
 **Import and interpretation**
 
 - **FR-008**: When the SLP presses Import, the application MUST process every file in the list that has not yet succeeded. A file with no reading yet MUST be read with the existing image reading step, producing one Import per file.
-- **FR-008a**: A file MUST be sent to the reading service at most once per successful reading while the Import window is open. A later Import press MUST reuse a file's earlier Import and MUST skip files that already succeeded. Only files whose reading failed, or whose file changed on disk since it was read (its last-modified time differs), are read again.
+- **FR-008a**: An unchanged file that was read successfully MUST NOT be sent to the reading service again while the Import window is open. A later Import press MUST reuse a file's earlier Import and MUST skip files that already succeeded. Only files whose reading failed, or whose file changed on disk since it was read (its last-modified time differs), are read again.
 - **FR-009**: For each Import, the application MUST take the Student Key read from the sheet and find the saved student whose key matches it, ignoring letter case and surrounding spaces.
 - **FR-010**: For each matched student, the application MUST load that student's Current Template and interpret the sheet with it. The template MUST be chosen per sheet, never once for the whole batch.
 - **FR-011**: For each sheet interpreted successfully, the application MUST print the interpreted Data Sheet's debug output to the developer console, as the existing developer interpretation script does.
@@ -130,7 +130,8 @@ Some sheets in a batch will not import cleanly: the photo is blurry, the Student
 - **Student** and **Current Template**: Existing concepts from the Students feature. The Student Key on the sheet selects the Student; the Student's Current Template selects the Data Sheet Template.
 - **Data Sheet Template**: Existing concept. Turned into an interpreter to produce the Data Sheet.
 - **Interpretation** (`StudentDataSheet`): The interpreted result for one sheet. In this feature it is only printed; it is not stored or sent onward.
-- **Import Batch**: The set of Selected Files processed by one press of Import (all files not yet succeeded), with per-file outcomes and this run's success/failure count. The window also keeps totals across the whole list.
+- **Import Batch**: The list of Selected Files in the Import window and the rules for importing them, with totals across the whole list.
+- **Import Run**: The Selected Files processed by one press of Import (all files not yet succeeded), with this run's success/failure count.
 
 ## Success Criteria *(mandatory)*
 
@@ -150,5 +151,5 @@ Some sheets in a batch will not import cleanly: the photo is blurry, the Student
 - Successful sheets stay in the list after the import, with their outcome shown. The SLP can remove them or go Back; the list is not kept after leaving the window.
 - PDF and other non-image files are out of scope, even though the reading service could accept some of them.
 - The Import window uses the same student records and templates the Setup path manages, and the same approved reading service the developer script uses today.
-- Once this path works, the temporary developer-only interpretation script (`program_interpret.py`) is no longer needed. Removing it may be done in this feature or later, as decided in planning.
+- Once this path works, the temporary developer-only interpretation script (`program_interpret.py`) is no longer needed. It is removed in this feature (plan research R9).
 - Only one SLP uses the application at a time on one computer; there is no concurrent editing of students or templates during an import.

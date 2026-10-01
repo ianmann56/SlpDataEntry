@@ -110,11 +110,13 @@ the fix. The Student Key is the only student detail shown (FR-019).
 | `UNKNOWN_STUDENT` | `student_store.get_student(key)` returns `None` | "No student has the Student Key \"{key}\". Add the student in Setup, or retake the photo." |
 | `NO_CURRENT_TEMPLATE` | the student's `current_template_id` is `None` | "Student {key} has no Current Template. Choose one in Setup → Students." |
 | `TEMPLATE_MISSING` | `get_template(id)` returns `None` or raises | "Student {key}'s Current Template no longer exists or could not be loaded. Choose another in Setup → Students." |
-| `TEMPLATE_MISMATCH` | interpretation raises (`KeyError` for a missing header field, or an interpreter's mismatch exception) | "The sheet does not match template \"{name}\": {detail}. Fix the template, or retake the photo." |
+| `TEMPLATE_MISMATCH` | interpretation raises (a `KeyError` for a header label, or an interpreter's mismatch exception) | "The sheet does not match template \"{name}\": {detail}. Fix the template, or retake the photo." |
 | `STUDENT_RECORDS_UNREADABLE` | `UnreadableStudentRecordsError` during the run (the file broke after the R7 check) | "The student records could not be read. Fix them in Setup → Students." |
 
-`KeyError` from the header fields is turned into the detail "the sheet has no 'Date'
-field". Each underlying exception is also printed to the console with its traceback, as
+A `KeyError` whose key is one of the header labels (`Date`, `Time IN`, `Time OUT`,
+`Goal`, `Measure`) is turned into the detail "the sheet has no 'Date' field". Any other
+`KeyError` (for example, a bug inside a section interpreter) is shown as `str(e)`, so
+it is not mislabeled as a missing field. Each underlying exception is also printed to the console with its traceback, as
 `tk_utils.error_handling.throw` does for other errors.
 
 **Rationale**: SC-004 requires the SLP to pick the fix from the window alone. A fixed
@@ -197,7 +199,10 @@ in. These are the image types Textract's `AnalyzeDocument` accepts.
 
 **Decision**: Same approach as feature 002: a manual [quickstart.md](quickstart.md)
 plus `python -c` checks of `sheet_import_batch` that use a fake `read_sheet`, an
-in-memory `StudentStore` fake, and inline synthetic `StudentDataSheetImport`s. These
+in-memory `StudentStore` fake, and synthetic Imports. The Imports are committed as JSON
+fixtures (`{"form_data": {...}, "tables": [...]}`) under
+`therepy_sessions/sample_data/imports/`, using placeholder keys only, so the checks can be
+re-run (constitution, Development Workflow). These
 checks make no Textract calls and need no credentials. The quickstart has one optional
 live step that uses the synthetic images in `sample_data/`.
 

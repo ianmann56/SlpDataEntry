@@ -73,9 +73,14 @@ display-only and is not a stored status.
 The template is loaded fresh for each file (FR-010). Templates are never cached across
 files or presses.
 
-## ImportRun (the spec's Import Batch)
+## ImportRun (the spec's Import Run)
 
-The files processed by one press of Import.
+The files processed by one press of Import. The whole list and its rules are the
+**Import Batch** (`SheetImportBatch`).
+
+ImportRun is not a class. The Import window keeps it as state for the duration of a
+run: the identities passed to the worker, the counts of `finished` events by status,
+and whether Cancel was pressed.
 
 | Field | Type | Meaning |
 | --- | --- | --- |

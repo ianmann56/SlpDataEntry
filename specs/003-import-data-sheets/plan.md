@@ -32,7 +32,7 @@ and gaps are fixed along the way: `StudentDataSheet` shares tables across instan
 
 **Storage**: None new. It reads the existing student records JSON and templates JSON. Nothing from an import is saved (the spec puts storage out of scope).
 
-**Testing**: Offline `python -c`/scratch-script checks of `SheetImportBatch` with fakes, plus a manual [quickstart.md](quickstart.md). One step uses live Textract on synthetic samples. No test framework (R11).
+**Testing**: Offline `python -c`/scratch-script checks of `SheetImportBatch` with fakes and committed synthetic Import fixtures in `sample_data/imports/`, plus a manual [quickstart.md](quickstart.md). One step uses live Textract on synthetic samples. No test framework (R11).
 
 **Target Platform**: Desktop (Linux primary; any Tkinter-capable OS with a display)
 
@@ -51,12 +51,13 @@ and gaps are fixed along the way: `StudentDataSheet` shares tables across instan
 | Principle | Assessment | Status |
 | --- | --- | --- |
 | I. Student Data Privacy | Images go only to Textract, through the existing `image_to_text`. Debug output goes to the console only, with no log file (FR-018). Window messages name students only by Student Key (FR-019, R5). Validation uses synthetic samples and placeholder keys. Scratch scripts are not committed. | ✅ Pass |
-| II. Domain Language Fidelity | Code and UI use **Import**, **Student Key**, **Current Template**, **Data Sheet Template**, and **Interpretation**. New concepts **Selected File**, **Import Batch**, and **Sheet Outcome** are added to `docs/domain/glossary.md` in this change. | ✅ Pass (glossary update in scope) |
+| II. Domain Language Fidelity | Code and UI use **Import**, **Student Key**, **Current Template**, **Data Sheet Template**, and **Interpretation**. New concepts **Selected File**, **Import Batch**, **Import Run**, and **Sheet Outcome** are added to `docs/domain/glossary.md` in this change. | ✅ Pass (glossary update in scope) |
 | III. Layered Pipeline | `SheetImportBatch` gets its Import through an injected `read_sheet`. It never imports `image_to_text` or `clients/`, so only `StudentDataSheetImport` crosses collection → interpretation (R2). Rules are in the batch, not widget callbacks (R1). Printing is an injected sink. `program.py` stays the only composition root, and deleting `program_interpret.py` removes feature 001's recorded deviation (R9). **Amendment**: `layers.md` rule 9 lets `interpretation/importing/` use `students/` only through the injected `StudentStore` and `Student`. MINOR, 1.3.0 → 1.4.0. | ✅ Pass + amendment |
 | IV. Injected External Services | The Textract client is built lazily in `program.py` through `construct_textract_client()`, behind `inject_textract_client` (R8). No module-level clients. `image_to_text` already translates `ClientError`, and the batch turns every read error into `READING_FAILED`. **Amendment**: `dependency-injection.md` rule 6 adds that `ImportWindow`/`SheetImportBatch` receive `StudentStore`, a template lookup, a sheet reader, and a result sink. | ✅ Pass + amendment |
 | V. Pluggable Interpreters & Templates | No interpreter or serializer changes. Templates are loaded per sheet through `to_data_sheet_interpreter()`. A mismatched sheet fails loudly as `TEMPLATE_MISMATCH`, and nothing partial is printed (FR-014). R6 fixes per-instance state in `StudentDataSheet` (interpreters rule 3). | ✅ Pass |
-| VI. Typed Public Interfaces | All new types are `Enum`/`NamedTuple`/`@dataclass` and fully annotated ([contracts/import-batch.md](contracts/import-batch.md)). Touched public members of `StudentDataSheet` and `TemplateStore` gain annotations. | ✅ Pass |
+| VI. Typed Public Interfaces | All new types are `Enum`/`NamedTuple`/`@dataclass` and fully annotated ([contracts/import-batch.md](contracts/import-batch.md)). Touched public members of `StudentDataSheet` and `TemplateStore` gain annotations. The table shape that crosses to Storage becomes the `DataSheetTable` `TypedDict` (type-declarations rule 4). | ✅ Pass |
 | Tech constraints | Tkinter + `sv-ttk`. Textract `FORMS`+`TABLES` through the existing collector. Dependency files are unchanged (`ipdb` stays because `student_data_sheet_interpreter.py` still imports it). | ✅ Pass |
+| Development Workflow (debug scaffolding) | Printing with `StudentDataSheet.debug()` is the output the spec requires (FR-011, Assumptions), not leftover scaffolding. It is wired code in `program.py`, passed in as `on_sheet_interpreted`, not a commented-out experiment. The Storage feature replaces it by changing that one callback. The import path itself (window → batch → interpreter) is real code that ships. | ✅ Pass |
 
 **Post-design re-check (after Phase 1)**: No change. The contracts add no dependency,
 no external service, and no cross-layer import beyond the `students/` use covered by
@@ -86,6 +87,7 @@ specs/003-import-data-sheets/
 therepy_sessions/
 ├── program.py                              # CHANGE: inject_textract_client, check_records_readable, ImportWindow wiring
 ├── program_interpret.py                    # DELETE (R9)
+├── sample_data/imports/                    # NEW: synthetic Import fixtures (JSON) for offline checks
 └── interpretation/
     ├── student_data_sheet.py               # CHANGE: per-instance _tables/_scalars (R6)
     ├── template_store.py                   # CHANGE: check_readable() + UnreadableTemplatesError (R7)
@@ -98,7 +100,7 @@ docs/
 │   ├── layers.md                           # AMEND: rule 9 (importing → students via StudentStore)
 │   └── dependency-injection.md             # AMEND: rule 6 lists import injections
 └── domain/
-    └── glossary.md                         # AMEND: Selected File, Import Batch, Sheet Outcome
+    └── glossary.md                         # AMEND: Selected File, Import Batch, Import Run, Sheet Outcome
 
 .specify/memory/
 └── constitution.md                         # AMEND: Sync Impact Report, version 1.4.0

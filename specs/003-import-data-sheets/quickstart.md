@@ -8,7 +8,7 @@ This is a manual validation guide (research R11). The behavior it checks is defi
 ## Prerequisites
 
 - `.venv` set up per the project README, and a desktop session.
-- **Synthetic data only** (Principle I): placeholder keys such as `JA`, `BK`, `ZZ`, and
+- **Synthetic data only** (Principle I): placeholder keys such as `AG`, `JA`, `BK`, `ZZ`, and
   the images in `therepy_sessions/sample_data/`.
 - Work from `therepy_sessions/` on scratch copies:
 
@@ -26,11 +26,12 @@ cp sample_data/students.json  "$SCRATCH/students.json"
 
 Write a scratch script, not committed, that builds a `SheetImportBatch` with:
 
-- a fake `read_sheet` that counts calls per path and returns inline synthetic
-  `StudentDataSheetImport`s;
-- an in-memory `StudentStore` fake with `JA` → a valid template id, `BK` → `None`, and
-  `ZZ` → a deleted id;
-- `get_template` backed by a scratch `TemplateStore`;
+- a fake `read_sheet` that counts calls per path and returns the synthetic Imports in
+  `sample_data/imports/` (each JSON file loaded as
+  `StudentDataSheetImport(d["form_data"], d["tables"])`);
+- an in-memory `StudentStore` fake with `AG` → `"4"` (template "Blah", which the
+  fixtures are built for), `BK` → `None`, and `ZZ` → a deleted id;
+- `get_template` backed by a `TemplateStore` on the scratch copy of `templates.json`;
 - a fake `stat_mtime_ns` whose value the script can change.
 
 **Expect**:
@@ -38,16 +39,18 @@ Write a scratch script, not committed, that builds a `SheetImportBatch` with:
 | Check | Expected |
 | --- | --- |
 | `add_files` with `a.png`, `a.png`, `./a.png`, `b.PDF` | One file added. `b.PDF` is skipped. |
-| Sheet keyed ` ja ` | `SUCCEEDED`, `student_key == "ja"`, template name set |
+| Sheet keyed `AG` | `SUCCEEDED`, `student_key == "AG"`, `template_name == "Blah"` |
+| Sheet keyed ` ag ` | `SUCCEEDED`, `student_key == "ag"`, template name set |
 | Sheet with no `Student Key` | `FAILED` / `NO_STUDENT_KEY` |
 | Sheet keyed `QQ` | `FAILED` / `UNKNOWN_STUDENT`, and the message names `QQ` |
 | Sheet keyed `BK` | `FAILED` / `NO_CURRENT_TEMPLATE` |
 | Sheet keyed `ZZ` | `FAILED` / `TEMPLATE_MISSING` |
-| `JA` sheet missing the `Date` field | `FAILED` / `TEMPLATE_MISMATCH`, and the detail names `Date`; no `data_sheet` returned |
+| `AG` sheet missing the `Date` field | `FAILED` / `TEMPLATE_MISMATCH`, and the detail names `Date`; no `data_sheet` returned |
 | `read_sheet` raises | `FAILED` / `READING_FAILED`; the next `process_file` reads again |
 | Second pass over `files_to_process()` | Succeeded files are absent. Failed files reuse their Import (`read_sheet` call count unchanged). |
+| `AG` sheet with `Body` removed from one table | `FAILED` / `TEMPLATE_MISMATCH`, and the detail names `Body`; no `data_sheet` returned |
 | Change the fake mtime of one failed file, then process again | Only that file is read again |
-| Two `JA` sheets interpreted in a row | Each `StudentDataSheet.tables` has only its own tables (R6) |
+| Two `AG` sheets interpreted in a row | Each `StudentDataSheet.tables` has the same number of tables as when that sheet is interpreted alone, and neither includes the other's rows (R6) |
 
 ## V2. Records-file check (edge case, R7)
 
@@ -117,4 +120,4 @@ With the window open, write `{` into `"$SCRATCH/students.json"` and press Import
 - **Expect**: no new files under the repo or `$SCRATCH` after V4–V6, and console output
   only.
 - **Expect**: window text names students only by Student Key.
-- `git status` shows no images, Imports, or scratch scripts staged.
+- `git status` shows no real sheet images or Imports, and no scratch scripts, staged. The synthetic fixtures in `sample_data/imports/` are the only Imports committed.

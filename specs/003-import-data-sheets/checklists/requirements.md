@@ -33,4 +33,3 @@
 
 - Glossary code names (`StudentDataSheetImport`, `StudentDataSheet`) and `program_interpret.py` appear on purpose: Principle II requires glossary terms, and the user asked for parity with that script's debug output.
 - "Developer console" output is the user-requested temporary stand-in for the Storage step, not an implementation choice.
-- Left to planning: whether Back/close during a running import stops or finishes in-progress work (edge case states the required guarantees either way).
