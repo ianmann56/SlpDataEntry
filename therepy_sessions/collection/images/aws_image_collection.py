@@ -4,7 +4,7 @@ from botocore.exceptions import ClientError, NoCredentialsError
 
 from collection.collection_headers import StudentDataSheetImport
 
-def image_to_text(image_path, inject_textract_client):
+def image_to_text(image_path, inject_textract_client) -> StudentDataSheetImport:
     """
     Converts an image to text using AWS Textract with table detection.
     
