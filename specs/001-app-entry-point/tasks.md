@@ -154,7 +154,7 @@ on its own.
   - `grep -nE "create_google_service|construct_textract_client" therepy_sessions/program.py` → no matches.
   - `grep -nE "^(from|import) " therepy_sessions/app_shell/home_window.py therepy_sessions/interpretation/importing/import_window.py` → only `tkinter`, `collections.abc`, and `__future__` imports.
   - Check the type annotations on every public signature and public attribute added or changed in T002–T009 against [type-declarations.md](../../docs/conventions/architecture/type-declarations.md).
-- [ ] T014 Run the full manual validation in [quickstart.md](quickstart.md) V1–V9 from `therepy_sessions/` using only `sample_data/templates.json` (Principle I), and fix any failure in the file responsible.
+- [X] T014 Run the full manual validation in [quickstart.md](quickstart.md) V1–V9 from `therepy_sessions/` using only `sample_data/templates.json` (Principle I), and fix any failure in the file responsible.
 
 ---
 
