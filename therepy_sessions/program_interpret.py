@@ -1,0 +1,111 @@
+#!../.venv/bin/python3
+"""
+Temporary developer-only script for checking interpreters against sample sheets.
+
+It runs one image through Textract OCR and a saved template's interpreter, then prints
+the result. It is not part of the SLP-facing application and is not reachable from
+`program.py`. Keeping it is a recorded Principle III deviation (second composition root,
+see specs/001-app-entry-point/plan.md Complexity Tracking). Delete it when the import and
+interpret path is built.
+"""
+
+import os
+import sys
+import ipdb
+import traceback
+import darkdetect
+import tkinter as tk
+
+import sv_ttk
+from clients.google_service import create_google_service
+from clients.aws_clients import construct_textract_client
+from collection.images.aws_image_collection import image_to_text
+from interpretation.template_manager.interpreter_configs import STUB_INTERPRETER_CONFIGS
+from interpretation.template_store import TemplateStore
+from interpretation.template_manager.template_management_window import DataSheetTemplateManagementWindow
+from storage.file_creator import create_therapy_session_sheet
+from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
+from interpretation.templates.student_data_sheet_interpreter import StudentDataSheetInterpreter
+from interpretation.student_data_sheet import DataSheetScalarType
+
+def main():
+    # Parse command line arguments
+    args = parse_command_line_args()
+    storage_file_path = args[0]
+
+    google_service = create_google_service()
+    textract_client = construct_textract_client()
+    
+    # Create root Tkinter window
+    root = tk.Tk()
+
+    # Set theme to light or dark based on system.
+    sv_ttk.set_theme(darkdetect.theme())
+    
+    # Create template store and show the template management window
+    template_store = TemplateStore(storage_file_path)
+
+    # template = template_store.get_template_by_id("3")
+    # file_to_import = "sample_data/simple_3_way_tally.png"
+
+    # template = template_store.get_template_by_id("4")
+    # file_to_import = "sample_data/multiple_tables_named.png"
+
+    template = template_store.get_template_by_id(args[1])
+    file_to_import = args[2]
+    
+    interpreter = template.to_data_sheet_interpreter()
+
+    # app = DataSheetTemplateManagementWindow(template_store, root, close_callback=root.quit, interpreter_configs=STUB_INTERPRETER_CONFIGS)
+    # app.show()
+    
+    # # Start the main event loop
+    # root.mainloop()
+
+    data_sheet_content = image_to_text(file_to_import, lambda: textract_client)
+
+    data_sheet = interpreter.interpret_student_data_sheet(data_sheet_content)
+    data_sheet.debug()
+
+def validate_storage_file_path(file_path):
+    """
+    Validate that the storage file path has a .json extension.
+    
+    Args:
+        file_path (str): The file path to validate
+        
+    Exits:
+        If the file path does not have a .json extension
+    """
+    if not file_path.lower().endswith('.json'):
+        print(f"Error: Storage file must be a JSON file (got: {file_path})")
+        print("Please provide a file path with .json extension")
+        sys.exit(1)
+
+def parse_command_line_args():
+    """
+    Parse command line arguments and return configuration.
+    
+    Returns:
+        list: The command line arguments (excluding script name)
+        
+    Exits:
+        If required arguments are missing or invalid
+    """
+    # Check if file path argument is provided
+    if len(sys.argv) < 4:
+        print("Usage: python program_interpret.py <template_storage_file_path> <template_id> <image_path>")
+        print("Example: python program_interpret.py templates.json 3 sample_data/simple_3_way_tally.png")
+        sys.exit(1)
+    
+    # Validate the storage file path
+    validate_storage_file_path(sys.argv[1])
+    
+    return sys.argv[1:]
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as e:
+        print(f"An unahandled exception occurred: {e}")
+        traceback.print_exc()

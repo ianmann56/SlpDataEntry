@@ -12,7 +12,7 @@ from tkinter import ttk, messagebox
 from interpretation.student_data_sheet import DataSheetScalarType
 from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
 from interpretation.interpreter_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
-from interpretation.interpreter_types.table_interpreter import TableInterpreter
+from interpretation.interpreter_types.table_interpreter import ColumnDefinition, TableInterpreter
 
 
 class InterpreterConfig(ABC):
@@ -100,7 +100,11 @@ class TableInterpreterConfig(InterpreterConfig):
             'entry_var': column_var,
             'get_config': lambda: {
                 'title': title_var.get().strip(),
-                'column_names': list(columns_listbox.get(0, tk.END))
+                'columns': [
+                    ColumnDefinition(column_name, [])
+                    for column_name
+                    in columns_listbox.get(0, tk.END)
+                ]
             },
             'reset': reset
         }
@@ -110,12 +114,12 @@ class TableInterpreterConfig(InterpreterConfig):
         Constructs a TableInterpreter from the configuration values.
 
         :param id: The unique id to assign to the constructed interpreter.
-        :param config_values: Dictionary containing 'title' and 'column_names' list
+        :param config_values: Dictionary containing 'title' and 'columns' list
         :return: TableInterpreter instance configured with the specified columns
         """
         title = config_values.get('title', '')
-        column_names = config_values.get('column_names', [])
-        return TableInterpreter(id, title, column_names)
+        column_defs: list[ColumnDefinition] = config_values.get('columns', [])
+        return TableInterpreter(id, title, column_defs)
     
     def _add_config_item(self, listbox, entry_var):
         """Add an item to the configuration listbox."""

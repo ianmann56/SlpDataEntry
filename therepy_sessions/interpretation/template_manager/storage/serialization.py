@@ -28,7 +28,7 @@ Usage:
 import json
 from abc import ABC, abstractmethod
 from interpretation.student_data_sheet import DataSheetScalarType
-from interpretation.interpreter_types.table_interpreter import TableInterpreter
+from interpretation.interpreter_types.table_interpreter import ColumnDefinition, TableInterpreter
 from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
 from interpretation.interpreter_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
 
@@ -98,9 +98,16 @@ class TableInterpreterSerializer(InterpreterSerializer):
         Returns:
             TableInterpreter: The reconstructed TableInterpreter instance
         """
-        columns = data['config']['columns']
+        column_defs_json: list[any] = data['config']['columns']
+
+        column_defs: list[ColumnDefinition] = [
+            ColumnDefinition(col["column_name"], col["column_choices"])
+            for col
+            in column_defs_json
+        ]
+        
         title = data.get('title', '')
-        return TableInterpreter(data['id'], title, columns)
+        return TableInterpreter(data['id'], title, column_defs)
 
 
 class RunningTallyInterpreterSerializer(InterpreterSerializer):

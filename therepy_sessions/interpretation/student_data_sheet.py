@@ -1,5 +1,6 @@
 from collections import namedtuple
 from enum import Enum
+import json
 
 """
 Represents a scalar in a student session data sheet.
@@ -91,5 +92,5 @@ class StudentDataSheet:
     print('=================================\nOther Scalars:')
     print(self.scalars)
     print('=================================\nTables:')
-    print(self.tables)
+    print(json.dumps(self.tables, indent=4, default=lambda o: o.to_json() if 'to_json' in dir(o) else o.value))
     print('======== End Data Sheet =========')

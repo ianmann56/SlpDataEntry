@@ -1,5 +1,22 @@
+import ipdb
+
 from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
 from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetScalarType
+from collection.collection_headers import StudentDataSheetImport
+
+class ColumnDefinition:
+  column_name: str
+  column_choices: list[str]
+
+  def __init__(self, column_name: str, column_choices: list[str]):
+    self.column_name = column_name
+    self.column_choices = column_choices
+
+  def to_json(self):
+    return {
+      "column_name": self.column_name,
+      "column_choices": self.column_choices
+    }
 
 class TableInterpreter(SessionDataSectionInterpreterBase):
   """
@@ -15,9 +32,9 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
   Use case: Therapy session data sheets with consistent column layouts like 'Word',
   'Times w/Prompting', 'Times w/o Prompting', etc.
   """
-  _columns = []
+  _columns: list[ColumnDefinition] = []
 
-  def __init__(self, id, title, columns):
+  def __init__(self, id: str, title: str, columns: list[ColumnDefinition]):
     """
     Initializes the template with expected column names for table processing.
 
@@ -26,13 +43,13 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
 
     :param id: The unique id identifying this specific interpreter instance within a template.
     :param title: The user-facing title identifying this interpreter within a template.
-    :param columns: List of expected column names that should be present in data sheet tables
+    :param columns: List of expected column definitons that should be present in data sheet tables
     """
     super().__init__(id, title)
     self._columns = columns
 
   @property
-  def columns(self):
+  def columns(self) -> list[ColumnDefinition]:
     """
     Get the list of expected column names.
     
@@ -41,7 +58,7 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
     """
     return self._columns
 
-  def interpret_student_data_sheet_content(self, data_sheet_content):
+  def interpret_student_data_sheet_content(self, data_sheet_content: StudentDataSheetImport):
     """
     Processes multiple tables from the data sheet using column-based interpretation.
 
@@ -65,7 +82,7 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
 
     return DataSheetInterpretationDto(tables, {})
 
-  def _interpret_single_student_data_sheet_table(self, data_sheet_table):
+  def _interpret_single_student_data_sheet_table(self, data_sheet_table: list[list[str]]):
     """
     Processes a single table by mapping data rows to expected column structure.
 
@@ -80,11 +97,11 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
     columns_in_data_sheet = data_sheet_table[0]
 
     for expected_col in self._columns:
-      if expected_col not in columns_in_data_sheet:
-        raise Exception(f"Expected to see column {expected_col} in data sheet but could not find it. Got columns: {columns_in_data_sheet}")
+      if expected_col.column_name not in columns_in_data_sheet:
+        raise Exception(f"Expected to see column {expected_col.column_name} in data sheet but could not find it. Got columns: {columns_in_data_sheet}")
 
     col_index_by_col_name = {
-      expected_col: columns_in_data_sheet.index(expected_col)
+      expected_col.column_name: (columns_in_data_sheet.index(expected_col.column_name), expected_col)
       for expected_col
       in self._columns
     }
@@ -93,9 +110,10 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
 
     for row_data in data_sheet_table[1:]:
       row_dto = {}
-      for column_name, column_index in col_index_by_col_name.items():
+      for column_name, (column_index, column_def) in col_index_by_col_name.items():
+        column_choices = column_def.column_choices
         cell_data = row_data[column_index]
-        cell_data_dto = DataSheetScalarDto(column_name, cell_data, DataSheetScalarType.TEXT)
+        cell_data_dto = DataSheetScalarDto(column_name, cell_data, DataSheetScalarType.TEXT, column_choices)
         row_dto[column_name] = cell_data_dto
 
       data.append(row_dto)

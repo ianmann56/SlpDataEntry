@@ -1,5 +1,5 @@
 class StudentDataSheetImport:
-  form_data = ""
+  form_data = {}
   tables = []
 
   def __init__(self, form_data, tables):

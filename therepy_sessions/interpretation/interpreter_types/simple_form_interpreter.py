@@ -66,10 +66,10 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
     :return: a DataSheetInterpretationDto representing the interpreted data
     """
     scalars = {
-      kv.key: kv.value
-      for kv
+      field_key: data_sheet_content.form_data[field_key]
+      for field_key
       in data_sheet_content.form_data
-      if kv.key in self._fields.keys()
+      if field_key in self._fields.keys()
     }
 
     return DataSheetInterpretationDto([], scalars)
