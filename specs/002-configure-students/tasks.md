@@ -83,7 +83,7 @@ starts by opening the window.
 - [ ] T005 Update the launch contract in `therepy_sessions/program.py` per [contracts/cli.md](contracts/cli.md) and research R9 (depends on T004):
   - `parse_command_line_args() -> list[str]` now requires `len(sys.argv) >= 3`. Otherwise it prints `Usage: python program.py <template_storage_file_path> <student_storage_file_path>` and `Example: python program.py templates.json students.json`, then `sys.exit(1)`.
   - It calls `validate_storage_file_path` on `sys.argv[1]` and then on `sys.argv[2]`.
-  - It adds `validate_distinct_storage_files(template_path: str, student_path: str) -> None`. When `os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))`, it prints `Error: The template file and student records file must be different files` and calls `sys.exit(1)`. `parse_command_line_args` calls it. It has full annotations and a docstring.
+  - It adds `validate_distinct_storage_files(template_path: str, student_path: str) -> None`. When `os.path.normcase(os.path.realpath(template_path)) == os.path.normcase(os.path.realpath(student_path))`, it prints `Error: The template file and student records file must be different files` and calls `sys.exit(1)`. `parse_command_line_args` calls it. It has full annotations and a docstring.
   - In `main()`: `template_storage_file_path, student_storage_file_path = args[0], args[1]`, then `student_store: StudentStore = JsonStudentStore(student_storage_file_path)`, created right after `template_store`. This is the only place it is constructed (research R2).
   - It adds the imports `os`, `students.json_student_store.JsonStudentStore`, and `students.student_store.StudentStore`.
 
@@ -175,7 +175,7 @@ except DuplicateStudentKeyError as e: print(e)
   - Wrap the body of `refresh` so that an `UnreadableStudentRecordsError` raised there (for example, if the file is damaged while the window is open) goes to `tk_utils.error_handling.throw(e, "Could not load students")`.
 - [ ] T013 [US1] Add the damaged-file recovery (FR-020, research R5):
   - Add the module function `ask_to_start_fresh(parent: tk.Misc, error: UnreadableStudentRecordsError) -> bool` to `therepy_sessions/students/students_window.py`. It returns `messagebox.askyesno("Student Records Could Not Be Loaded", f"The student records in {error.file_path} could not be loaded.\n\nStart with an empty student list? The unreadable file will be kept as a backup.", parent=parent)`.
-  - In `therepy_sessions/program.py`, `open_students(setup)` first runs `try: student_store.list_students()`. On `except UnreadableStudentRecordsError as e:`, if `not ask_to_start_fresh(setup, e)` it returns, leaving Setup visible. Otherwise it calls `student_store.recover_unreadable_records()`. Only then does it call `_open_child_window` and create the `StudentsWindow`.
+  - In `therepy_sessions/program.py`, `open_students(setup)` first runs `try: student_store.list_students()`. On `except UnreadableStudentRecordsError as e:`, if `not ask_to_start_fresh(setup, e)` it returns, leaving Setup visible. Otherwise it calls `student_store.recover_unreadable_records()` inside `try`/`except OSError as e:`. On `OSError` it calls `tk_utils.error_handling.throw(e, "Could not back up the student records")` and returns, leaving Setup visible and the file untouched (FR-020: the backup comes before the empty list). Only then does it call `_open_child_window` and create the `StudentsWindow`.
 
 **Checkpoint**: Quickstart V3 and V7 pass. US4 and US1 together are the MVP.
 
@@ -206,7 +206,7 @@ except DuplicateStudentKeyError as e: print(e)
 
 **Independent Test**: Quickstart V5 (steps 1–2).
 
-- [ ] T016 [US3] Add **Remove Selected** to `StudentsWindow` in `therepy_sessions/students/students_window.py` (depends on T012), after Edit:
+- [ ] T016 [US3] Add **Remove Selected** to `StudentsWindow` in `therepy_sessions/students/students_window.py` (depends on T015), after Edit:
   - `_on_remove` handles no selection with a "No Selection" warning ("Please select a student to remove.").
   - Otherwise it asks `messagebox.askyesno("Confirm Remove", f'Remove the student "{key}"?', parent=self._window)`. On yes it calls `self._student_store.delete_student(key)` and then `refresh()`. Any exception from the store (including `UnreadableStudentRecordsError` and `StudentNotFoundError`) goes to `tk_utils.error_handling.throw(e, "Could not remove the student")`.
 
@@ -243,7 +243,7 @@ except DuplicateStudentKeyError as e: print(e)
 
 - **Setup (T001)** → **Foundational (T002–T005)** → all stories.
 - **US4 (T006–T009)** → **US1 (T010–T013)**. US1's test opens the window through the Setup menu, and T012 extends the window from T008.
-- **US2 (T014–T015)** and **US3 (T016)** both need US1. They are independent of each other, but both edit `students_window.py`, so do T015 and T016 one after the other.
+- **US2 (T014–T015)** and **US3 (T016)** both need US1. T016 places Remove after the Edit button that T015 adds, so do T015 before T016.
 - **Polish**: T017–T019 can start any time after Phase 2. T020 needs T017–T019. T021 and T022 come last.
 
 ### Same-file sequencing

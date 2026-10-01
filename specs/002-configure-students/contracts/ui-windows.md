@@ -137,6 +137,6 @@ class StudentFieldEditor(ABC):
 | --- | --- |
 | `HomeWindow.on_manage` | `setup = _open_child_window(root)` → `SetupWindow(setup, on_templates, on_students, on_back=lambda: _return_to(root, setup), on_exit=root.destroy)` |
 | `SetupWindow.on_templates` | `top = _open_child_window(setup)` → `DataSheetTemplateManagementWindow(template_store, top, close_callback=root.destroy, interpreter_configs=STUB_INTERPRETER_CONFIGS, back_callback=lambda: _return_to(setup, top))` |
-| `SetupWindow.on_students` | `try: student_store.list_students()`, `except UnreadableStudentRecordsError as e:` if `not ask_to_start_fresh(setup, e)`: `return`, otherwise `student_store.recover_unreadable_records()`. Then `top = _open_child_window(setup)` → `StudentsWindow(top, student_store, list_template_choices, on_back=lambda: _return_to(setup, top), on_exit=root.destroy)` |
+| `SetupWindow.on_students` | `try: student_store.list_students()`, `except UnreadableStudentRecordsError as e:` if `not ask_to_start_fresh(setup, e)`: `return`, otherwise `student_store.recover_unreadable_records()`. An `OSError` from that is shown with `throw(e, "Could not back up the student records")`, and the handler returns, leaving Setup showing. Then `top = _open_child_window(setup)` → `StudentsWindow(top, student_store, list_template_choices, on_back=lambda: _return_to(setup, top), on_exit=root.destroy)` |
 | `list_template_choices` | `lambda: [TemplateChoice(t.id, t.name) for t in template_store.get_all_templates()]` |
 | `HomeWindow.on_import` | Unchanged from feature 001 |
