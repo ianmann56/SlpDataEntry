@@ -9,7 +9,8 @@ collection/      source → StudentDataSheetImport         (OCR, image handling)
 interpretation/  StudentDataSheetImport → StudentDataSheet (templates, interpreters)
 storage/         StudentDataSheet → output destination   (Google Sheets)
 tk_utils/        shared Tkinter helpers
-app_shell/       navigation shell windows (home screen); Tkinter only
+app_shell/       navigation shell windows (home screen, Setup menu); Tkinter only
+students/        student setup records, student store, and windows; no pipeline imports
 program.py       composition root: parses args, builds clients, wires the layers
 ```
 
@@ -29,13 +30,17 @@ program.py       composition root: parses args, builds clients, wires the layers
 4. **Vendor details stay in their layer.** Textract response shapes belong in
    `collection/`. Sheets API request bodies belong in `storage/`. Nothing else references them.
 5. **UI is a shell.** Tkinter windows (`interpretation/template_manager/*_window.py`,
-   `interpretation/importing/*_window.py`) collect input and
+   `interpretation/importing/*_window.py`, `students/*_window.py`) collect input and
    call into stores and interpreters. Business rules MUST NOT live in widget callbacks.
 6. **Wiring happens in `program.py`.** Only the composition root decides which concrete
    clients, stores, and templates run together.
 7. **The app shell knows only Tkinter.** `app_shell/` MUST NOT import from `clients/`,
    `collection/`, `interpretation/`, or `storage/`. It gets everything it opens through
    callbacks wired in `program.py`.
+8. **Students stand apart from the pipeline.** `students/` MUST NOT import from
+   `clients/`, `collection/`, `interpretation/`, or `storage/`. It reaches templates only
+   through the `TemplateChoice` provider wired in `program.py`, and its data only through
+   the injected `StudentStore`.
 
 ## Adding a new source or destination
 

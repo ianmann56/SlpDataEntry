@@ -24,7 +24,7 @@ class HomeWindow:
         Args:
             master: Root window the home screen is built in
             on_import: Called when the import and interpret choice is picked
-            on_manage: Called when the setup and template management choice is picked
+            on_manage: Called when the setup and configuration choice is picked
             on_exit: Called when the window is closed from its title bar
         """
         self._window = master
@@ -49,6 +49,6 @@ class HomeWindow:
                                    command=self._on_import)
         import_button.pack(fill=tk.X, pady=(0, 10))
 
-        manage_button = ttk.Button(main_frame, text="Manage Setup & Data Sheet Templates",
+        manage_button = ttk.Button(main_frame, text="Manage Setup & Configuration",
                                    command=self._on_manage)
         manage_button.pack(fill=tk.X)
