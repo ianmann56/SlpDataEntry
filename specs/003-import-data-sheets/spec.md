@@ -8,6 +8,16 @@
 
 **Input**: User description: "We're gonna implement the import window. The window should let the user select multiple files (image files only). They should be able to add or remove more files before they submit this list. The user will click "Import" after they've selected all the files they want. Once they click "Import", each file will get read, parsed with the image_to_text method. The result of that read will yield an object that contains some parsed fields from the data sheet. One of those fields will be the student's initials (their Student Key). This Student Key will be used to load their current template. Then, the template will be used to interpret the parsed student data sheet. Some assumptions that should be taken into consideration: The list of files selected by the SLP will be from a variety of students, not all from the same student. The list of files selected by the SLP will, therefore, not all have the same applicable template. Load the template for each sheet depending on the student for that sheet. Once the student data sheet is interpreted, for now, just print out the debug method from the sheet (see how program_interpretation.py does it)"
 
+## Clarifications
+
+### Session 2026-10-01
+
+- Q: When the SLP presses Import a second time on the same list, should sheets that already succeeded be read again by the reading service? → A: No. Succeeded sheets are skipped, and failed sheets reuse their earlier reading; only files that could not be read are sent to the reading service again.
+- Q: What should happen if the SLP presses Back or closes the window while an import is still running? → A: A Cancel button stops the import after the current sheet; Back is unavailable until the import stops or finishes.
+- Q: When a sheet is interpreted successfully, should its row in the Import window show the Student Key that was read from it? → A: Yes. A succeeded row shows the Student Key and the name of the template used.
+- Q: If the SLP overwrites a photo with a retake under the same file name, should the next Import press read the new photo or reuse the earlier reading? → A: Re-read the file automatically if it changed on disk since it was read.
+- Q: After the SLP presses Import a second time, should the summary count every file in the list, or only the files processed in that run? → A: Both: this run's counts plus totals for the whole list.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Import a batch of sheets from several students (Priority: P1)
@@ -24,7 +34,7 @@ After a day of sessions, the SLP has photographed the Student Data Sheets of sev
 2. **Given** the Import window is open, **When** the SLP adds files, **Then** the file picker lets them choose several image files at once and offers only image files.
 3. **Given** files for students `JA` and `BK` are selected and each student has a Current Template, **When** the SLP presses Import, **Then** each sheet is interpreted with the Current Template of the student whose Student Key is on that sheet.
 4. **Given** a sheet has been interpreted, **When** interpretation completes, **Then** the interpreted Data Sheet is printed to the developer console in the same format the existing debug output uses (Student Key, Date, Time In, Time Out, Goal, Measure, other scalars, tables).
-5. **Given** the import has finished, **When** the SLP looks at the Import window, **Then** each selected file shows whether it was interpreted successfully or why it failed.
+5. **Given** the import has finished, **When** the SLP looks at the Import window, **Then** each selected file shows whether it was interpreted successfully (with the Student Key read and the name of the template used) or why it failed.
 
 ---
 
@@ -66,11 +76,13 @@ Some sheets in a batch will not import cleanly: the photo is blurry, the Student
 
 ### Edge Cases
 
+- The reading service misreads a Student Key as another real student's key (e.g. `JA` read as `JB`): if the sheet fits that student's template, it succeeds. The SLP catches the mismatch from the Student Key shown on the succeeded row (FR-015).
 - A Student Key on the sheet differs from the saved key only in letter case or surrounding spaces (e.g. ` ja ` vs `JA`): it matches, using the same rule the Students window uses.
 - Several sheets in one batch belong to the same student: each is interpreted with that student's Current Template.
 - A selected file is moved or deleted after it was added but before Import: that file is marked failed and the rest continue.
-- The SLP presses Back or closes the window while an import is running: the application does not leave the window unresponsive or crash. Whether in-progress work finishes or stops is decided in planning, but no partial result is printed for a sheet whose interpretation did not complete.
-- The SLP presses Import again after a batch finishes: the same list is imported again (statuses reset), so a sheet that failed because of setup can be retried after fixing that setup.
+- The SLP wants to leave while an import is running: Back is unavailable, so they press Cancel first. Cancel lets the sheet being processed finish, then stops. Sheets not reached keep the "not yet imported" outcome and are processed on the next Import press. The title-bar close still exits the application; no partial result is printed for a sheet whose interpretation did not complete.
+- The SLP presses Import again after a batch finishes: sheets that succeeded are skipped and keep their outcome. Failed sheets are processed again so a sheet that failed because of setup can be retried after fixing that setup. A failed sheet that was already read reuses that reading; only a file whose reading failed is sent to the reading service again. Newly added files are read as usual.
+- The SLP saves a retaken photo over a failed file under the same name: on the next Import press the file's change is detected, so it is read again instead of reusing the old reading.
 - The student records or templates file cannot be read when Import is pressed: the import does not start and the SLP is told why.
 
 ## Requirements *(mandatory)*
@@ -89,19 +101,22 @@ Some sheets in a batch will not import cleanly: the photo is blurry, the Student
 
 **Import and interpretation**
 
-- **FR-008**: When the SLP presses Import, the application MUST read every file in the list with the existing image reading step, producing one Import per file.
+- **FR-008**: When the SLP presses Import, the application MUST process every file in the list that has not yet succeeded. A file with no reading yet MUST be read with the existing image reading step, producing one Import per file.
+- **FR-008a**: A file MUST be sent to the reading service at most once per successful reading while the Import window is open. A later Import press MUST reuse a file's earlier Import and MUST skip files that already succeeded. Only files whose reading failed, or whose file changed on disk since it was read (its last-modified time differs), are read again.
 - **FR-009**: For each Import, the application MUST take the Student Key read from the sheet and find the saved student whose key matches it, ignoring letter case and surrounding spaces.
 - **FR-010**: For each matched student, the application MUST load that student's Current Template and interpret the sheet with it. The template MUST be chosen per sheet, never once for the whole batch.
 - **FR-011**: For each sheet interpreted successfully, the application MUST print the interpreted Data Sheet's debug output to the developer console, as the existing developer interpretation script does.
 - **FR-012**: A failure on one sheet MUST NOT stop the other sheets from being processed.
 - **FR-013**: A sheet MUST be marked failed, with a reason the SLP can understand, when: the file cannot be read; no Student Key is found on it; its Student Key matches no saved student; the student has no Current Template; the Current Template no longer exists; or the sheet does not match the template.
 - **FR-014**: A sheet that does not match its template MUST fail loudly. No partial interpretation is printed for it.
-- **FR-015**: After the import finishes, the Import window MUST show each file's outcome (succeeded or failed with its reason), and a summary of how many succeeded and failed.
+- **FR-015**: After the import finishes, the Import window MUST show each file's outcome (succeeded or failed with its reason), and a summary with two parts: how many succeeded and failed in this run, and totals for the whole list (succeeded, failed, not yet imported). A succeeded file MUST show the Student Key read from it and the name of the template used, so the SLP can spot a sheet matched to the wrong student.
 - **FR-016**: While the import is running, the window MUST show that work is in progress and MUST stay responsive enough to repaint and show progress.
+- **FR-016a**: While the import is running, the window MUST offer a Cancel action. Cancel MUST let the sheet currently being processed finish, then stop. The remaining sheets MUST keep the "not yet imported" outcome, and the whole-list totals MUST count them as not imported.
+- **FR-016b**: While the import is running, Back and the add/remove file actions MUST be unavailable. They become available again once the import finishes or is cancelled.
 
 **Navigation**
 
-- **FR-017**: The Import window MUST replace the current placeholder reached from the home screen's Import choice, and MUST keep its Back button returning to the home screen and its title-bar close exiting the application.
+- **FR-017**: The Import window MUST replace the current placeholder reached from the home screen's Import choice, and MUST keep its Back button returning to the home screen (when no import is running, per FR-016b) and its title-bar close exiting the application.
 
 **Privacy**
 
@@ -110,12 +125,12 @@ Some sheets in a batch will not import cleanly: the photo is blurry, the Student
 
 ### Key Entities *(include if feature involves data)*
 
-- **Selected File**: An image file the SLP has added to the list, identified by its location on disk. Has an outcome after an import: not yet imported, succeeded, or failed with a reason.
+- **Selected File**: An image file the SLP has added to the list, identified by its location on disk. Has an outcome after an import: not yet imported, succeeded, or failed with a reason. Once read, it keeps its Import, and the file's last-modified time at reading, for the rest of the window session, so a retry does not read it again unless the file has changed. Removing the file from the list discards its Import.
 - **Import** (`StudentDataSheetImport`): Raw reading of one sheet, including the Student Key written on it. Existing concept.
 - **Student** and **Current Template**: Existing concepts from the Students feature. The Student Key on the sheet selects the Student; the Student's Current Template selects the Data Sheet Template.
 - **Data Sheet Template**: Existing concept. Turned into an interpreter to produce the Data Sheet.
 - **Interpretation** (`StudentDataSheet`): The interpreted result for one sheet. In this feature it is only printed; it is not stored or sent onward.
-- **Import Batch**: The set of Selected Files processed by one press of Import, with per-file outcomes and a success/failure count.
+- **Import Batch**: The set of Selected Files processed by one press of Import (all files not yet succeeded), with per-file outcomes and this run's success/failure count. The window also keeps totals across the whole list.
 
 ## Success Criteria *(mandatory)*
 
