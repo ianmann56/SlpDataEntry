@@ -42,6 +42,14 @@ class TemplateEditDto:
         self.configured_interpreters = configured_interpreters
 
 
+class UnreadableTemplatesError(Exception):
+    """The templates file exists but cannot be read."""
+
+    def __init__(self, file_path: str, reason: str) -> None:
+        super().__init__(f"Could not read templates from {file_path}: {reason}")
+        self.file_path: str = file_path
+
+
 class TemplateStore:
     """
     Repository for managing Student Data Sheet Templates.
@@ -59,6 +67,27 @@ class TemplateStore:
         """
         self.storage_file_path = storage_file_path
         self._ensure_storage_file_exists()
+
+    def check_readable(self) -> None:
+        """
+        Check that the templates file can be read.
+
+        A missing file is fine, because the store treats it as empty. Other reads
+        turn an unreadable file into an empty list, so callers that must tell the two
+        apart call this first.
+
+        Raises:
+            UnreadableTemplatesError: If the file exists but is not a valid templates list
+        """
+        if not os.path.exists(self.storage_file_path):
+            return
+        try:
+            with open(self.storage_file_path, 'r', encoding='utf-8') as file:
+                templates_data = json.load(file)
+        except (OSError, json.JSONDecodeError) as e:
+            raise UnreadableTemplatesError(self.storage_file_path, str(e)) from e
+        if not isinstance(templates_data, list):
+            raise UnreadableTemplatesError(self.storage_file_path, "expected a list of templates")
 
     def get_all_templates(self):
         """

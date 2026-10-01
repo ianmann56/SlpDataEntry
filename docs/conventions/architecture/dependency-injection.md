@@ -34,3 +34,7 @@ can run without network access or credentials.
    `StudentStore`, their `InterpreterConfig` list, and providers such as
    `list_template_choices` through their constructors. They MUST NOT create their own.
    `program.py` builds the one `JsonStudentStore`.
+   `ImportWindow` and `SheetImportBatch` receive the `StudentStore`, a template lookup,
+   a sheet reader wrapping `image_to_text`, and a result sink through their
+   constructors. `program.py` builds the Textract client lazily, on the first sheet
+   read, so the app launches and runs Setup without AWS credentials.

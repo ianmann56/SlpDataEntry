@@ -1,5 +1,29 @@
 <!--
 Sync Impact Report
+- Version change: 1.3.0 → 1.4.0 (MINOR: new layer rule, an expanded injection rule, and
+  glossary additions in referenced docs)
+- Modified principles: none
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/conventions/architecture/layers.md: adds rule 9 (interpretation/importing/
+    uses students/ only through the injected StudentStore and the Student record, and gets
+    Imports only through an injected sheet reader).
+  - Updated docs/conventions/architecture/dependency-injection.md rule 6: ImportWindow and
+    SheetImportBatch receive the StudentStore, a template lookup, a sheet reader, and a
+    result sink; program.py builds the Textract client lazily.
+  - Updated docs/domain/glossary.md: adds Selected File, Import Batch, Import Run, and
+    Sheet Outcome.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.3.0 (2026-09-30) added `students/` and rule 8 to layers.md
+  - 1.2.0 (2026-09-30) added `app_shell/` and rule 7 to layers.md
+  - 1.1.0 (2026-09-26) added Principle VI. Typed Public Interfaces
+  - 1.0.0 (2026-09-26) initial ratification with Principles I–V
+
+Previous report (1.3.0):
 - Version change: 1.2.0 → 1.3.0 (MINOR: new layer rule and an expanded injection rule in referenced docs)
 - Modified principles: none
 - Added principles: none
@@ -188,4 +212,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.3.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-09-30
+**Version**: 1.4.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-01

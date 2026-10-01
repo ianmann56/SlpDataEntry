@@ -2,14 +2,19 @@
 
 import os
 import sys
+import threading
 import traceback
 import darkdetect
 import tkinter as tk
+from typing import Any
 
 import sv_ttk
 from app_shell.home_window import HomeWindow
 from app_shell.setup_window import SetupWindow
+from clients.aws_clients import construct_textract_client
+from collection.images.aws_image_collection import image_to_text
 from interpretation.importing.import_window import ImportWindow
+from interpretation.importing.sheet_import_batch import SheetImportBatch
 from interpretation.template_manager.interpreter_configs import STUB_INTERPRETER_CONFIGS
 from interpretation.template_manager.template_management_window import DataSheetTemplateManagementWindow
 from interpretation.template_store import TemplateStore
@@ -39,10 +44,33 @@ def main() -> None:
     def list_template_choices() -> list[TemplateChoice]:
         return [TemplateChoice(template.id, template.name) for template in template_store.get_all_templates()]
 
+    # Build the Textract client on the first sheet read, so launching and Setup need no AWS credentials
+    textract_lock = threading.Lock()
+    textract_client: Any = None  # boto3 Textract client
+
+    def inject_textract_client() -> Any:
+        nonlocal textract_client
+        with textract_lock:
+            if textract_client is None:
+                textract_client = construct_textract_client()
+            return textract_client
+
+    def check_records_readable() -> None:
+        student_store.list_students()
+        template_store.check_readable()
+
     def open_import_path() -> None:
         path_window = _open_child_window(root, root)
         ImportWindow(
             path_window,
+            SheetImportBatch(
+                read_sheet=lambda path: image_to_text(path, inject_textract_client),
+                student_store=student_store,
+                get_template=template_store.get_template_by_id,
+            ),
+            check_records_readable,
+            # Printing stands in for the Storage step until it is built
+            on_sheet_interpreted=lambda sheet: sheet.debug(),
             on_back=lambda: _return_to(root, path_window),
             on_exit=root.destroy,
         )

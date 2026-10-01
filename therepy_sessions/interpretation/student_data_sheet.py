@@ -1,6 +1,7 @@
 from collections import namedtuple
 from enum import Enum
 import json
+from typing import TypedDict
 
 """
 Represents a scalar in a student session data sheet.
@@ -20,63 +21,69 @@ class DataSheetScalarType(Enum):
   DATE = 'date'
   BOOLEAN = 'boolean'
 
-class StudentDataSheet:
-  _student_key = ""
-  _student_goal = ""
-  _date = ""
-  _time_in = ""
-  _time_out = ""
-  _measure = ""
-  _tables = []
-  _scalars = {}
+class DataSheetTable(TypedDict):
+  """
+  One interpreted table in a StudentDataSheet.
 
-  def __init__(self, student_key, student_goal, date, time_in, time_out, measure):
+  Properties:
+    columns: The table's columns, in order.
+    data: One mapping per row, from column name to that cell's scalar.
+  """
+  columns: list[object]  # ColumnDefinition (TableInterpreter) or str (RunningTallyInterpreter)
+  data: list[dict[str, DataSheetScalarDto]]
+
+class StudentDataSheet:
+
+  def __init__(self, student_key: str, student_goal: str, date: str, time_in: str, time_out: str, measure: str) -> None:
     self._student_key = student_key
     self._student_goal = student_goal
     self._date = date
     self._time_in = time_in
     self._time_out = time_out
     self._measure = measure
+    # Created per instance so sheets never share tables or scalars
+    self._tables: list[DataSheetTable] = []
+    self._scalars: dict[str, DataSheetScalarDto | str] = {}  # SimpleFormInterpreter stores the raw form text
 
   @property
-  def student_key(self):
+  def student_key(self) -> str:
     return self._student_key
 
   @property
-  def student_goal(self):
+  def student_goal(self) -> str:
     return self._student_goal
 
   @property
-  def date(self):
+  def date(self) -> str:
     return self._date
   
   @property
-  def time_in(self):
+  def time_in(self) -> str:
     return self._time_in
   
   @property
-  def time_out(self):
+  def time_out(self) -> str:
     return self._time_out
 
   @property
-  def measure(self):
+  def measure(self) -> str:
     return self._measure
   
   @property
-  def tables(self):
+  def tables(self) -> list[DataSheetTable]:
     return self._tables
   
-  def register_table(self, table):
+  def register_table(self, table: DataSheetTable) -> None:
     self._tables.append(table)
   
   @property
-  def scalars(self):
+  def scalars(self) -> dict[str, DataSheetScalarDto | str]:
     return self._scalars
   
-  def register_scalar(self, scalar_name, scalar_dto):
+  def register_scalar(self, scalar_name: str, scalar_dto: DataSheetScalarDto | str) -> None:  # SimpleFormInterpreter stores the raw form text
     self._scalars[scalar_name] = scalar_dto
 
-  def debug(self):
+  def debug(self) -> None:
     print('========== Data Sheet ===========\nStudent Key:')
     print(self.student_key)
     print('=================================\nDate:')
