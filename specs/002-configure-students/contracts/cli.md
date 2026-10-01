@@ -17,7 +17,7 @@ This replaces feature 001's single-argument contract
 | Both arguments resolve to the same file | Prints `Error: The template file and student records file must be different files`, then exits with status 1. No window opens. |
 | Two valid, different `.json` paths, whether or not the files exist | Opens the home screen. A missing student file gives an empty list, and the file is created on the first save. |
 
-- Constructing the repository does no file I/O, so a damaged student file never blocks
+- Constructing the student store does no file I/O, so a damaged student file never blocks
   launch. It is handled when the Students window is opened (FR-020).
 - No network access, OAuth prompt, or credential read happens (FR-017).
 - `program_interpret.py` is unchanged.

@@ -11,7 +11,6 @@ A frozen `@dataclass` (Principle VI: typed record). Edits make a new copy with
 | --- | --- | --- | --- |
 | `student_key` | `str` | — (required) | Trimmed. 1–5 characters, any characters. Unique across all students, ignoring letter case (FR-006). Stored as typed after trimming. |
 | `current_template_id` | `str \| None` | `None` | `None` means "None selected". Otherwise the id of a Data Sheet Template, which may no longer exist (FR-007, FR-008). |
-| `extra_fields` | `dict[str, Any]` | empty dict | Keys from the file that this version doesn't know about, kept so they are written back unchanged (research R4). Not shown in the UI. |
 
 - **Identity**: a student is identified by `student_key`. Two keys are the same key when
   `student_keys_match(a, b)` is true: equal after trimming, ignoring case.
@@ -59,8 +58,9 @@ The format is UTF-8 JSON with `indent=2`:
 | File missing | Empty list. The file is created on the first add. |
 | Not JSON, not an object, `students` not a list, or an entry without a string `student_key` | `UnreadableStudentRecordsError` |
 | Entry missing `current_template_id` (or any later field) | That field's default |
-| Unknown keys in an entry | Kept in `extra_fields` and written back |
-| `format_version` higher than 1 | Loaded best effort, with unknown keys kept. No error. |
+| Unknown keys in an entry | Ignored, and dropped on the next save (research R4) |
+| `format_version` missing | Treated as 1 |
+| `format_version` not an integer, or higher than 1 | `UnreadableStudentRecordsError` ("written by a newer version of the app" when it is higher), which offers the backup and fresh start (FR-020). This stops a save from overwriting fields a newer version wrote. |
 
 Writes go to a temporary file in the same folder, which then replaces the real file with
 `os.replace` (research R4).

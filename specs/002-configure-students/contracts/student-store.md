@@ -1,4 +1,4 @@
-# Contract: Student Repository
+# Contract: Student Store
 
 **Feature**: [../spec.md](../spec.md) | **Date**: 2026-09-30
 
@@ -6,10 +6,10 @@ Data access for students goes only through this interface (research R2). Every s
 is fully annotated (Principle VI). The types it uses are defined in
 [../data-model.md](../data-model.md).
 
-## `students.student_repository.StudentRepository` (ABC)
+## `students.student_store.StudentStore` (ABC)
 
 ```python
-class StudentRepository(ABC):
+class StudentStore(ABC):
     @abstractmethod
     def list_students(self) -> list[Student]: ...
     @abstractmethod
@@ -31,17 +31,17 @@ class StudentRepository(ABC):
 | `add_student` | Validates the key, then saves. Returns the saved student, with its key normalized. | `StudentKeyError`, `DuplicateStudentKeyError`, `UnreadableStudentRecordsError` |
 | `update_student` | Replaces the student matching `original_key`. A new key must not match any *other* student. Changing only letter case or spaces is allowed. | `StudentKeyError`, `DuplicateStudentKeyError`, `StudentNotFoundError`, `UnreadableStudentRecordsError` |
 | `delete_student` | Removes the matching student | `StudentNotFoundError`, `UnreadableStudentRecordsError` |
-| `recover_unreadable_records` | Moves the damaged file to a new backup name beside it and returns that path. Afterwards the repository is empty. If the file is missing or readable, it does nothing and returns `""`. | `OSError` if the move fails |
+| `recover_unreadable_records` | Moves the damaged file to a new backup name beside it and returns that path. Afterwards the store is empty. If the file is missing or readable, it does nothing and returns `""`. | `OSError` if the move fails |
 
-- The repository is the only place that knows records are stored in a file.
+- The store is the only place that knows records are stored in a file.
 - It never calls Tkinter and never contacts an external service (FR-017).
-- The key-change warning (FR-004a) is a UI decision. The repository only enforces
+- The key-change warning (FR-004a) is a UI decision. The store only enforces
   validity and uniqueness.
 
-## `students.json_student_repository.JsonStudentRepository` (concrete)
+## `students.json_student_store.JsonStudentStore` (concrete)
 
 ```python
-class JsonStudentRepository(StudentRepository):
+class JsonStudentStore(StudentStore):
     def __init__(self, file_path: str) -> None: ...
 ```
 
@@ -56,6 +56,6 @@ class JsonStudentRepository(StudentRepository):
 
 | Consumer | How | Notes |
 | --- | --- | --- |
-| `program.py` | Builds one `JsonStudentRepository(student_storage_file_path)` | The only place it is constructed (layers.md rule 6) |
-| `StudentsWindow` | Constructor parameter `student_repository: StudentRepository` | Typed as the interface |
+| `program.py` | Builds one `JsonStudentStore(student_storage_file_path)` | The only place it is constructed (layers.md rule 6) |
+| `StudentsWindow` | Constructor parameter `student_store: StudentStore` | Typed as the interface |
 | `StudentEditorWindow` | Constructor parameter from `StudentsWindow` | The same instance |

@@ -10,14 +10,14 @@ Add a **Students** window where the SLP adds, views, edits, and removes students
 student is identified only by a unique Student Key and has a Current Template. All
 student code lives in a new `therepy_sessions/students/` package:
 - a frozen `Student` dataclass and pure key rules;
-- a `StudentRepository` interface, with a `JsonStudentRepository` that is injected into
+- a `StudentStore` interface, with a `JsonStudentStore` that is injected into
   the windows that need it;
 - the Students window and a modal editor whose form is built from pluggable field
   editors, so later settings slot in.
 
 The home screen's setup button opens a new **Setup** menu in `app_shell/` with *Data
 Sheet Templates* and *Students*. `program.py` takes the student records file as a
-second launch argument, builds the one repository, and wires everything (research R1,
+second launch argument, builds the one student store, and wires everything (research R1,
 R2, R8, R9).
 
 ## Technical Context
@@ -28,7 +28,7 @@ R2, R8, R9).
 
 **Storage**: New local JSON file for student records (path from the second launch argument). It is versioned and written atomically (research R4). The existing Template Store JSON is unchanged.
 
-**Testing**: Manual validation through [quickstart.md](quickstart.md), plus `python -c` checks of the pure rules and the repository. No test framework (research R11).
+**Testing**: Manual validation through [quickstart.md](quickstart.md), plus `python -c` checks of the pure rules and the student store. No test framework (research R11).
 
 **Target Platform**: Desktop (Linux primary; any Tkinter-capable OS with a display)
 
@@ -46,10 +46,10 @@ R2, R8, R9).
 
 | Principle | Assessment | Status |
 | --- | --- | --- |
-| I. Student Data Privacy | A record holds only the Student Key, the template id, and unknown future keys. Names were dropped in clarification. The records file is local, chosen by the SLP, and never sent anywhere. Validation uses placeholder keys in scratch files only. | ✅ Pass |
-| II. Domain Language Fidelity | The UI and code use **Student**, **Student Key**, and **Data Sheet Template**. New concepts, **Current Template** and **Student Repository**, are added to `docs/domain/glossary.md` in this change. | ✅ Pass (glossary update in scope) |
-| III. Layered Pipeline | `students/` is a new setup package beside the pipeline. It imports none of `clients/`, `collection/`, `interpretation/`, or `storage/`, and gets template choices through an injected provider (R6). Rules live in pure functions and the repository, not widget callbacks (R3). `program.py` is still the only composition root. **Amendment**: `layers.md` gains `students/` and its import rule, and `app_shell/` gains the Setup menu. This is a MINOR bump, 1.2.0 → 1.3.0. | ✅ Pass + amendment |
-| IV. Injected External Services | No clients. `JsonStudentRepository` is built once in `program.py` and injected as the `StudentRepository` interface into `StudentsWindow` and `StudentEditorWindow` (R2). **Amendment**: `dependency-injection.md` rule 6 names the student repository and the template-choices provider. | ✅ Pass + amendment |
+| I. Student Data Privacy | A record holds only the Student Key and the template id. Names were dropped in clarification. The records file is local, chosen by the SLP, and never sent anywhere. Validation uses placeholder keys in scratch files only. | ✅ Pass |
+| II. Domain Language Fidelity | The UI and code use **Student**, **Student Key**, and **Data Sheet Template**. New concepts, **Current Template** and **Student Store**, are added to `docs/domain/glossary.md` in this change. | ✅ Pass (glossary update in scope) |
+| III. Layered Pipeline | `students/` is a new setup package beside the pipeline. It imports none of `clients/`, `collection/`, `interpretation/`, or `storage/`, and gets template choices through an injected provider (R6). Rules live in pure functions and the student store, not widget callbacks (R3). `program.py` is still the only composition root. **Amendment**: `layers.md` gains `students/` and its import rule, and `app_shell/` gains the Setup menu. This is a MINOR bump, 1.2.0 → 1.3.0. | ✅ Pass + amendment |
+| IV. Injected External Services | No clients. `JsonStudentStore` is built once in `program.py` and injected as the `StudentStore` interface into `StudentsWindow` and `StudentEditorWindow` (R2). **Amendment**: `dependency-injection.md` rule 6 names the student store and the template-choices provider. | ✅ Pass + amendment |
 | V. Pluggable Interpreters & Templates | Interpreters are untouched. Templates are referenced only by their stable id. Deleting a template still works, and the student shows `Missing template` (FR-008). | ✅ Pass |
 | VI. Typed Public Interfaces | Every new class and function is fully annotated ([contracts/](contracts/)). `Student` is a frozen dataclass, and `TemplateChoice` is a `NamedTuple`. The changed public helpers in `program.py` stay annotated. | ✅ Pass |
 | Tech constraints | Tkinter + `sv-ttk` + `darkdetect`. JSON is UTF-8 with `indent=2`. Dependency files are unchanged. | ✅ Pass |
@@ -69,7 +69,7 @@ specs/002-configure-students/
 ├── quickstart.md                # Manual validation V1–V9
 ├── contracts/
 │   ├── cli.md                   # Two-argument launch command
-│   ├── student-repository.md    # StudentRepository interface + JSON implementation
+│   ├── student-store.md    # StudentStore interface + JSON implementation
 │   └── ui-windows.md            # Setup, Students, editor, field editors, wiring
 ├── checklists/
 │   └── requirements.md          # Spec quality checklist
@@ -80,15 +80,15 @@ specs/002-configure-students/
 
 ```text
 therepy_sessions/
-├── program.py                         # CHANGE: second argument, repository, Setup wiring
+├── program.py                         # CHANGE: second argument, student store, Setup wiring
 ├── app_shell/
 │   ├── home_window.py                 # CHANGE: label "Manage Setup & Configuration"
 │   └── setup_window.py                # NEW: SetupWindow
 └── students/                          # NEW package: everything about students
     ├── __init__.py
     ├── student.py                     # Student, TemplateChoice, key rules, exceptions
-    ├── student_repository.py          # StudentRepository (ABC)
-    ├── json_student_repository.py     # JsonStudentRepository
+    ├── student_store.py          # StudentStore (ABC)
+    ├── json_student_store.py     # JsonStudentStore
     ├── student_field_editors.py       # StudentFieldEditor (ABC) + key and template editors
     ├── students_window.py             # StudentsWindow + ask_to_start_fresh
     └── student_editor_window.py       # StudentEditorWindow (modal)
@@ -96,9 +96,9 @@ therepy_sessions/
 docs/
 ├── conventions/architecture/
 │   ├── layers.md                      # AMEND: students/ entry + rule; Setup menu in app_shell
-│   └── dependency-injection.md        # AMEND: rule 6 covers StudentRepository + providers
+│   └── dependency-injection.md        # AMEND: rule 6 covers StudentStore + providers
 └── domain/
-    └── glossary.md                    # AMEND: Current Template, Student Repository
+    └── glossary.md                    # AMEND: Current Template, Student Store
 
 .specify/memory/
 └── constitution.md                    # AMEND: Sync Impact Report, version 1.3.0

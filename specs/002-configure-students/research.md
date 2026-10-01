@@ -9,7 +9,7 @@ decisions the spec and the planning request left open, resolved against the exis
 ## R1. Where the student code lives
 
 - **Decision**: A new top-level package, `therepy_sessions/students/`, holds everything
-  about students: the `Student` record and its rules, the repository interface and its
+  about students: the `Student` record and its rules, the store interface and its
   JSON implementation, and the Students window and its editor dialog. The Setup menu
   goes in `app_shell/`, beside the home screen, because it is navigation only.
 - **Rationale**: This was asked for directly. Students are setup data, not a pipeline
@@ -18,25 +18,25 @@ decisions the spec and the planning request left open, resolved against the exis
   are added in one place.
 - **Alternatives considered**:
   - *`interpretation/students/`*. Rejected: students aren't part of turning an Import
-    into a StudentDataSheet, and it would put a file-writing repository inside the layer
+    into a StudentDataSheet, and it would put a file-writing store inside the layer
     that layers.md rule 3 keeps pure.
   - *Put `SetupWindow` in `students/`*. Rejected: the Setup menu also opens template
     management, so it is navigation, which is what `app_shell/` is for.
 - **Constitution impact**: `layers.md` gains a `students/` entry and an import rule.
-  `dependency-injection.md` rule 6 extends to the student repository. Both are MINOR
+  `dependency-injection.md` rule 6 extends to the student store. Both are MINOR
   amendments (1.2.0 → 1.3.0), made in the same change.
 
-## R2. Repository interface, injected
+## R2. Student store interface, injected (repository pattern)
 
-- **Decision**: `students/student_repository.py` defines `StudentRepository`, an abstract
+- **Decision**: `students/student_store.py` defines `StudentStore`, an abstract
   base class (`abc.ABC`) with the operations the UI needs: list, get by key, add, update
   (by the original key), delete, and recover from an unreadable file. A concrete
-  `JsonStudentRepository` in `students/json_student_repository.py` stores records in the
-  file given at launch. `program.py` builds exactly one `JsonStudentRepository` and passes
-  it, typed as `StudentRepository`, into `StudentsWindow`. `StudentsWindow` passes the
-  same instance to `StudentEditorWindow`. No window constructs a repository or knows
+  `JsonStudentStore` in `students/json_student_store.py` stores records in the
+  file given at launch. `program.py` builds exactly one `JsonStudentStore` and passes
+  it, typed as `StudentStore`, into `StudentsWindow`. `StudentsWindow` passes the
+  same instance to `StudentEditorWindow`. No window constructs a store or knows
   about files.
-- **Rationale**: This was asked for directly ("use a repository … dependency injected").
+- **Rationale**: This was asked for directly ("use a repository … dependency injected"). It is the repository pattern, named *Store* to match `TemplateStore` and the glossary.
   It matches dependency-injection.md rule 6 for `TemplateStore`, and goes one step
   further: the windows depend on an interface rather than a concrete class, so an
   in-memory fake can stand in for checks and later features can swap the storage.
@@ -59,7 +59,7 @@ decisions the spec and the planning request left open, resolved against the exis
   - `student_keys_match(a: str, b: str) -> bool` compares trimmed keys without regard
     to letter case (FR-006; edge case "changes only letter case").
 
-  The repository enforces uniqueness. It raises `DuplicateStudentKeyError` on `add` or
+  The store enforces uniqueness. It raises `DuplicateStudentKeyError` on `add` or
   `update` when another student already has the key. The windows only call these
   functions and show the messages.
 - **Rationale**: layers.md rule 5 says business rules MUST NOT live in widget callbacks.
@@ -75,8 +75,9 @@ decisions the spec and the planning request left open, resolved against the exis
   Constraints), shaped `{"format_version": 1, "students": [ {...}, ... ]}`. Each student
   is an object whose keys are the `Student` dataclass field names. Loading builds a
   `Student` from the known keys and gives any missing key its dataclass default
-  (FR-010). Unknown keys are kept and written back unchanged on save, so a record
-  written by a newer version isn't stripped by an older one. Writes go to a temporary
+  (FR-010). Unknown keys are ignored and dropped on the next save. A file with a
+  `format_version` above 1 is treated as unreadable (FR-020's backup and fresh-start
+  path), so this version never overwrites a newer file's data. Writes go to a temporary
   file in the same folder, which then replaces the real file with `os.replace`, so a
   crash mid-save can't leave a half-written file.
 - **Rationale**: A top-level object with a version gives later features a clean place to
@@ -85,17 +86,18 @@ decisions the spec and the planning request left open, resolved against the exis
 - **Alternatives considered**:
   - *A bare JSON list, like `templates.json`*. Rejected: it has no place for a format
     version.
-  - *Drop unknown keys*. Rejected: it would silently lose data when someone switches
-    between versions.
+  - *Keep unknown keys and write them back*. Rejected during analysis: it needs an
+    untyped catch-all field on `Student`. Only one version of the app is in use, so there
+    is no newer version whose fields could be lost.
 
 ## R5. A file that can't be read (FR-020)
 
-- **Decision**: `JsonStudentRepository` raises `UnreadableStudentRecordsError` from
+- **Decision**: `JsonStudentStore` raises `UnreadableStudentRecordsError` from
   `list_students()` when the file exists but is not valid JSON or is not in the expected
   shape. A missing file is not an error. It reads as an empty list, and the file is
   created on the first save (spec edge case). `recover_unreadable_records() -> str`
   renames the damaged file to `<name>.unreadable-<YYYYmmdd-HHMMSS>.json` beside it, adding
-  `-1`, `-2`, … if that name is taken. It returns the backup path, and the repository
+  `-1`, `-2`, … if that name is taken. It returns the backup path, and the store
   then behaves as empty.
 
   `program.py`'s "open Students" handler does the check. It calls `list_students()`
@@ -121,7 +123,7 @@ decisions the spec and the planning request left open, resolved against the exis
   A student stores only `current_template_id: str | None`. The window resolves the
   display name through the provider on every refresh, so a deleted template shows as
   missing (FR-008) and a renamed one shows its new name.
-- **Rationale**: It keeps `students/` decoupled the same way the repository does, and
+- **Rationale**: It keeps `students/` decoupled the same way the store does, and
   follows dependency-injection.md rule 2 (accept a provider, call it when needed).
   Template ids are already stable strings in `TemplateStore`.
 - **Alternatives considered**: *Inject `TemplateStore` itself*. Rejected: `students/`
@@ -193,7 +195,7 @@ decisions the spec and the planning request left open, resolved against the exis
 ## R11. Verification approach
 
 - **Decision**: Manual validation through [quickstart.md](quickstart.md), plus a few
-  `python -c` checks of `students/student.py` and `JsonStudentRepository` against a
+  `python -c` checks of `students/student.py` and `JsonStudentStore` against a
   scratch file. No test framework is added, the same as feature 001's research R8.
 - **Rationale**: The repository still has no test dependency. The interface-plus-pure-
   rules design means a test suite can be added later without restructuring.

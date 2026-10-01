@@ -40,7 +40,7 @@ class StudentsWindow:
     def __init__(
         self,
         master: tk.Toplevel,
-        student_repository: StudentRepository,
+        student_store: StudentStore,
         list_template_choices: Callable[[], list[TemplateChoice]],
         on_back: Callable[[], None],
         on_exit: Callable[[], None],
@@ -63,7 +63,7 @@ class StudentsWindow:
   template management.
 - Title-bar close → `on_exit()` (FR-016).
 - After the editor saves, the list refreshes.
-- Errors from the repository are shown through `tk_utils.error_handling.throw` (except
+- Errors from the student store are shown through `tk_utils.error_handling.throw` (except
   the expected key errors, which the editor shows).
 
 ### Module helper: `ask_to_start_fresh`
@@ -83,7 +83,7 @@ class StudentEditorWindow:
     def __init__(
         self,
         parent: tk.Misc,
-        student_repository: StudentRepository,
+        student_store: StudentStore,
         template_choices: list[TemplateChoice],
         student: Student | None,
         on_saved: Callable[[], None],
@@ -137,6 +137,6 @@ class StudentFieldEditor(ABC):
 | --- | --- |
 | `HomeWindow.on_manage` | `setup = _open_child_window(root)` → `SetupWindow(setup, on_templates, on_students, on_back=lambda: _return_to(root, setup), on_exit=root.destroy)` |
 | `SetupWindow.on_templates` | `top = _open_child_window(setup)` → `DataSheetTemplateManagementWindow(template_store, top, close_callback=root.destroy, interpreter_configs=STUB_INTERPRETER_CONFIGS, back_callback=lambda: _return_to(setup, top))` |
-| `SetupWindow.on_students` | `try: student_repository.list_students()`, `except UnreadableStudentRecordsError as e:` if `not ask_to_start_fresh(setup, e)`: `return`, otherwise `student_repository.recover_unreadable_records()`. Then `top = _open_child_window(setup)` → `StudentsWindow(top, student_repository, list_template_choices, on_back=lambda: _return_to(setup, top), on_exit=root.destroy)` |
+| `SetupWindow.on_students` | `try: student_store.list_students()`, `except UnreadableStudentRecordsError as e:` if `not ask_to_start_fresh(setup, e)`: `return`, otherwise `student_store.recover_unreadable_records()`. Then `top = _open_child_window(setup)` → `StudentsWindow(top, student_store, list_template_choices, on_back=lambda: _return_to(setup, top), on_exit=root.destroy)` |
 | `list_template_choices` | `lambda: [TemplateChoice(t.id, t.name) for t in template_store.get_all_templates()]` |
 | `HomeWindow.on_import` | Unchanged from feature 001 |

@@ -90,13 +90,13 @@ cp sample_data/templates.json "$SCRATCH/templates.json"
 
 Write `{"format_version": 1, "students": [{"student_key": "ZZ", "future_setting": 7}]}`
 to the records file and relaunch. **Expect**: `ZZ` is listed with `None selected`. After
-editing `ZZ`'s template, the file still contains `"future_setting": 7`.
+editing `ZZ`'s template and saving, the file holds only the known fields for `ZZ`.
 
 ## V9. Boundaries and theme
 
 - `grep -rnE "^(from|import) (interpretation|clients|collection|storage)" students/` →
   **Expect** no matches (research R1, R6).
-- `grep -rn "JsonStudentRepository(" --include=*.py .` → **Expect** only `program.py`
+- `grep -rn "JsonStudentStore(" --include=*.py .` → **Expect** only `program.py`
   (research R2).
 - Switch the OS between light and dark and relaunch. **Expect**: Setup, Students, and
   the editor match the theme (FR-018).
