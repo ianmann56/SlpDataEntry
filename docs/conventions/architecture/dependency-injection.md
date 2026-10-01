@@ -30,5 +30,7 @@ can run without network access or credentials.
    (`ClientError`, `NoCredentialsError`) and re-raise them with a message that explains
    what failed, e.g. "AWS Textract error: ...". UI code reports errors through
    `tk_utils.error_handling.throw`.
-6. **Inject stores and config lists too.** Windows receive `TemplateStore` and their
-   `InterpreterConfig` list through their constructors. They MUST NOT create their own.
+6. **Inject stores and config lists too.** Windows receive `TemplateStore`,
+   `StudentStore`, their `InterpreterConfig` list, and providers such as
+   `list_template_choices` through their constructors. They MUST NOT create their own.
+   `program.py` builds the one `JsonStudentStore`.

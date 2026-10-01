@@ -1,5 +1,27 @@
 <!--
 Sync Impact Report
+- Version change: 1.2.0 → 1.3.0 (MINOR: new layer rule and an expanded injection rule in referenced docs)
+- Modified principles: none
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/conventions/architecture/layers.md: adds `students/` to the package layout
+    and rule 8 (students/ imports no pipeline package; it reaches templates through the
+    TemplateChoice provider and its data through the injected StudentStore). Rule 5 now
+    lists `students/*_window.py`, and `app_shell/` covers the Setup menu.
+  - Updated docs/conventions/architecture/dependency-injection.md rule 6: windows receive
+    `StudentStore` and providers such as `list_template_choices` by injection;
+    `program.py` builds the one `JsonStudentStore`.
+  - Updated docs/domain/glossary.md: adds Current Template and Student Store.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.2.0 (2026-09-30) added `app_shell/` and rule 7 to layers.md
+  - 1.1.0 (2026-09-26) added Principle VI. Typed Public Interfaces
+  - 1.0.0 (2026-09-26) initial ratification with Principles I–V
+
+Previous report (1.2.0):
 - Version change: 1.1.0 → 1.2.0 (MINOR: new layer rule in a referenced doc)
 - Modified principles: none
 - Added principles: none
@@ -166,4 +188,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-09-30
+**Version**: 1.3.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-09-30

@@ -37,6 +37,8 @@ use the same name.
 | **Data Sheet Template** | `StudentDataSheetTemplate` | A named, saved set of configured section interpreters describing one sheet layout. An SLP reuses it for every sheet with that layout. |
 | **Interpreter Config** | `InterpreterConfig` | The UI form that lets the SLP configure a section interpreter while building a template. |
 | **Template Store** | `TemplateStore` | Saves templates to and loads them from a local JSON file. |
+| **Current Template** | `Student.current_template_id` | The Data Sheet Template used to interpret a student's data sheets. It is optional, and may refer to a template that has since been deleted. |
+| **Student Store** | `StudentStore` | Saves and loads Students, identified by Student Key. The current implementation, `JsonStudentStore`, keeps them in a local JSON file given at launch. |
 | **Session Sheet** | `create_therapy_session_sheet` | The Google Sheet the tool writes as output, with summary text and charts. |
 
 ## Pipeline in one line

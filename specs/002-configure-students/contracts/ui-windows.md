@@ -102,7 +102,7 @@ class StudentEditorWindow:
   1. Builds the student by calling each editor's `apply` on a copy of the student, or
      on `Student(student_key="")` when adding. A `StudentKeyError` is shown with
      `messagebox.showerror` and the dialog stays open.
-  2. When editing, if `not student_keys_match(old_key, new_key)`, it asks:
+  2. When editing, if `not student_keys_match(old_key, new_key)`, it first checks `get_student(new_key)`. If another student already has the key, it shows the "already in use" error and stops, so the SLP is never asked to confirm a change that can't be saved. Otherwise it asks:
      `The Student Key is the student's identifying key in the system. Change it from "<old>" to "<new>"? New data sheets for this student must use the new key "<new>".`
      If the SLP says no, nothing is saved and the dialog stays open (FR-004a).
   3. Calls `add_student` or `update_student(old_key, …)`. A `DuplicateStudentKeyError`

@@ -43,7 +43,7 @@ starts by opening the window.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Create the `students` package by adding an empty `therepy_sessions/students/__init__.py` (plan.md Project Structure, research R1).
+- [X] T001 Create the `students` package by adding an empty `therepy_sessions/students/__init__.py` (plan.md Project Structure, research R1).
 
 ---
 
@@ -53,15 +53,15 @@ starts by opening the window.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 [P] Create `therepy_sessions/students/student.py` per [data-model.md](data-model.md):
+- [X] T002 [P] Create `therepy_sessions/students/student.py` per [data-model.md](data-model.md):
   - A `@dataclass(frozen=True) class Student` with `student_key: str` and `current_template_id: str | None = None`. It has no catch-all field for unknown keys (research R4).
   - `class TemplateChoice(NamedTuple)` with `template_id: str` and `name: str`.
   - The functions `normalize_student_key(raw: str) -> str`, `validate_student_key(raw: str) -> str`, and `student_keys_match(a: str, b: str) -> bool`, with the exact behavior and messages in the data-model "Rules and exceptions" table. The length limit is the module constant `MAX_STUDENT_KEY_LENGTH: int = 5`.
   - The exceptions `StudentKeyError(ValueError)`, `DuplicateStudentKeyError(StudentKeyError)` (its `__init__(self, student_key: str) -> None` builds the message `The Student Key "<key>" is already in use.`), `StudentNotFoundError(LookupError)`, and `UnreadableStudentRecordsError(Exception)` (its `__init__(self, file_path: str, reason: str) -> None` stores `self.file_path: str`, with the message `Could not read student records from <file_path>: <reason>`).
   - Imports are standard library only.
   - The module docstring notes that a Student holds no names or other direct identifiers (Principle I).
-- [ ] T003 [P] Create the `StudentStore` ABC in `therepy_sessions/students/student_store.py`, with the six abstract methods and the exact signatures and docstrings (behavior plus raised exceptions) from [contracts/student-store.md](contracts/student-store.md). Imports: `abc` and `students.student`.
-- [ ] T004 Create `JsonStudentStore(StudentStore)` in `therepy_sessions/students/json_student_store.py` (depends on T002, T003), per [contracts/student-store.md](contracts/student-store.md), [data-model.md](data-model.md) "Student records file", and research R4/R5:
+- [X] T003 [P] Create the `StudentStore` ABC in `therepy_sessions/students/student_store.py`, with the six abstract methods and the exact signatures and docstrings (behavior plus raised exceptions) from [contracts/student-store.md](contracts/student-store.md). Imports: `abc` and `students.student`.
+- [X] T004 Create `JsonStudentStore(StudentStore)` in `therepy_sessions/students/json_student_store.py` (depends on T002, T003), per [contracts/student-store.md](contracts/student-store.md), [data-model.md](data-model.md) "Student records file", and research R4/R5:
   - `__init__(self, file_path: str) -> None` stores `self._file_path` and does no file I/O.
   - `_load() -> list[Student]`:
     - A missing file returns `[]`.
@@ -80,7 +80,7 @@ starts by opening the window.
     - If the file is missing, or `_load()` succeeds, it returns `""`.
     - Otherwise it builds `<dir>/<stem>.unreadable-<time.strftime('%Y%m%d-%H%M%S')>.json`, adding `-1`, `-2`, … before `.json` while that path exists. It then calls `os.replace(self._file_path, backup)` and returns `backup`.
   - It does no Tkinter and no network I/O.
-- [ ] T005 Update the launch contract in `therepy_sessions/program.py` per [contracts/cli.md](contracts/cli.md) and research R9 (depends on T004):
+- [X] T005 Update the launch contract in `therepy_sessions/program.py` per [contracts/cli.md](contracts/cli.md) and research R9 (depends on T004):
   - `parse_command_line_args() -> list[str]` now requires `len(sys.argv) >= 3`. Otherwise it prints `Usage: python program.py <template_storage_file_path> <student_storage_file_path>` and `Example: python program.py templates.json students.json`, then `sys.exit(1)`.
   - It calls `validate_storage_file_path` on `sys.argv[1]` and then on `sys.argv[2]`.
   - It adds `validate_distinct_storage_files(template_path: str, student_path: str) -> None`. When `os.path.normcase(os.path.realpath(template_path)) == os.path.normcase(os.path.realpath(student_path))`, it prints `Error: The template file and student records file must be different files` and calls `sys.exit(1)`. `parse_command_line_args` calls it. It has full annotations and a docstring.
@@ -110,21 +110,21 @@ except DuplicateStudentKeyError as e: print(e)
 
 **Independent Test**: Quickstart V2 (steps 1–6). At this point the Students window shows an empty list and a Back button.
 
-- [ ] T006 [P] [US4] Relabel the second button in `therepy_sessions/app_shell/home_window.py` from `Manage Setup & Data Sheet Templates` to `Manage Setup & Configuration` (FR-012). Update its docstring wording for `on_manage` to "setup and configuration choice". Nothing else changes.
-- [ ] T007 [P] [US4] Create `SetupWindow` in `therepy_sessions/app_shell/setup_window.py` per [contracts/ui-windows.md](contracts/ui-windows.md), following the structure of `app_shell/home_window.py`:
+- [X] T006 [P] [US4] Relabel the second button in `therepy_sessions/app_shell/home_window.py` from `Manage Setup & Data Sheet Templates` to `Manage Setup & Configuration` (FR-012). Update its docstring wording for `on_manage` to "setup and configuration choice". Nothing else changes.
+- [X] T007 [P] [US4] Create `SetupWindow` in `therepy_sessions/app_shell/setup_window.py` per [contracts/ui-windows.md](contracts/ui-windows.md), following the structure of `app_shell/home_window.py`:
   - `__init__(self, master: tk.Toplevel, on_templates: Callable[[], None], on_students: Callable[[], None], on_back: Callable[[], None], on_exit: Callable[[], None]) -> None`.
   - The title is `Setup`, and `WM_DELETE_WINDOW` calls `on_exit`.
   - It stacks three `ttk.Button`s with `fill=tk.X`: **Data Sheet Templates**, **Students**, then **Back** (with `pady=(20, 0)` above it).
   - Imports: only `tkinter`, `tkinter.ttk`, and `collections.abc.Callable`.
   - The class docstring describes it as a navigation menu that holds no business logic.
-- [ ] T008 [P] [US4] Create the first version of `StudentsWindow` in `therepy_sessions/students/students_window.py` (depends on T002, T003), with the signature from [contracts/ui-windows.md](contracts/ui-windows.md):
+- [X] T008 [P] [US4] Create the first version of `StudentsWindow` in `therepy_sessions/students/students_window.py` (depends on T002, T003), with the signature from [contracts/ui-windows.md](contracts/ui-windows.md):
   - `__init__(self, master: tk.Toplevel, student_store: StudentStore, list_template_choices: Callable[[], list[TemplateChoice]], on_back: Callable[[], None], on_exit: Callable[[], None]) -> None`.
   - It stores everything as `_` attributes. The title is `Students`, and `WM_DELETE_WINDOW` calls `on_exit`.
   - It has a `ttk.Treeview` (`show="headings"`, height 10, with a vertical scrollbar) with the columns `key` ("Student Key") and `template` ("Current Template").
   - It has a button row with **Back** → `on_back`, packed `side=tk.RIGHT`.
   - It adds `refresh(self) -> None`, which clears the tree and inserts one row per `self._student_store.list_students()` (`iid` = student key), with the template text from `_template_label(student, choices)`. `choices` is `self._list_template_choices()`, called once per refresh. `_template_label` returns the matching choice's name, `None selected` for `None`, or `Missing template` (research R10). `__init__` calls `refresh()` at the end.
   - The class docstring states that it receives its student store and template provider by injection, and never builds them.
-- [ ] T009 [US4] Wire the Setup menu in `therepy_sessions/program.py` (depends on T005, T006, T007, T008), per the wiring table in [contracts/ui-windows.md](contracts/ui-windows.md) and the navigation tables in [data-model.md](data-model.md):
+- [X] T009 [US4] Wire the Setup menu in `therepy_sessions/program.py` (depends on T005, T006, T007, T008), per the wiring table in [contracts/ui-windows.md](contracts/ui-windows.md) and the navigation tables in [data-model.md](data-model.md):
   - Replace the helpers. `_open_path_window(root)` becomes `_open_child_window(root: tk.Tk, parent: tk.Misc) -> tk.Toplevel`, which calls `parent.withdraw()` and returns `tk.Toplevel(root)`. `_return_home` becomes `_return_to(parent: tk.Misc, child: tk.Toplevel) -> None`, which destroys `child` and calls `parent.deiconify()`. Update `open_import_path` to use `_open_child_window(root, root)` and `_return_to(root, path_window)`.
   - `open_management_path` now creates `setup = _open_child_window(root, root)` and `SetupWindow(setup, on_templates=lambda: open_templates(setup), on_students=lambda: open_students(setup), on_back=lambda: _return_to(root, setup), on_exit=root.destroy)`.
   - `open_templates(setup: tk.Toplevel) -> None` is the old management body with `top = _open_child_window(root, setup)` and `back_callback=lambda: _return_to(setup, top)`. `close_callback` is still `root.destroy`.
@@ -142,7 +142,7 @@ except DuplicateStudentKeyError as e: print(e)
 
 **Independent Test**: Quickstart V3 (steps 1–7) and V7.
 
-- [ ] T010 [P] [US1] Create `therepy_sessions/students/student_field_editors.py` per [contracts/ui-windows.md](contracts/ui-windows.md) "student_field_editors" and research R7/R10:
+- [X] T010 [P] [US1] Create `therepy_sessions/students/student_field_editors.py` per [contracts/ui-windows.md](contracts/ui-windows.md) "student_field_editors" and research R7/R10:
   - It defines `StudentFieldEditor(ABC)` with the abstract `build(self, parent: ttk.Frame, row: int) -> None`, `load(self, student: Student) -> None`, and `apply(self, student: Student) -> Student`.
   - `StudentKeyFieldEditor`:
     - `build` puts a `ttk.Label(text="Student Key")` in column 0 and a `ttk.Entry` (width 10, `textvariable` a `tk.StringVar`) in column 1 of `row`. Column 1 has `sticky="ew"`.
@@ -158,7 +158,7 @@ except DuplicateStudentKeyError as e: print(e)
       - `Missing template` → the original id it was loaded with (kept, research R10).
     - Map by index, not by name, so duplicate template names work.
   - Imports: `tkinter`, `tkinter.ttk`, `abc`, `dataclasses.replace`, and `students.student`.
-- [ ] T011 [US1] Create `StudentEditorWindow` in `therepy_sessions/students/student_editor_window.py`, in add mode (depends on T010), per [contracts/ui-windows.md](contracts/ui-windows.md):
+- [X] T011 [US1] Create `StudentEditorWindow` in `therepy_sessions/students/student_editor_window.py`, in add mode (depends on T010), per [contracts/ui-windows.md](contracts/ui-windows.md):
   - `__init__(self, parent: tk.Misc, student_store: StudentStore, template_choices: list[TemplateChoice], student: Student | None, on_saved: Callable[[], None]) -> None`.
   - It stores `self._original: Student | None = student`, along with the student store and callback as `_` attributes. It creates `self._window = tk.Toplevel(parent)`, then `transient(parent)`, `wait_visibility()`, and `grab_set()`, the same as `interpretation/template_manager/template_creator_window.py`. The title is `Add Student` when `student is None`, otherwise `Edit Student: <key>`.
   - `self._field_editors: list[StudentFieldEditor] = [StudentKeyFieldEditor(), CurrentTemplateFieldEditor(template_choices)]`. Build each one into a grid frame (rows 0..n-1, column 1 with weight 1), then `load(student or Student(student_key=""))`, and focus the key entry.
@@ -170,10 +170,10 @@ except DuplicateStudentKeyError as e: print(e)
     - On success it calls `self._on_saved()` and then `self._window.destroy()`.
     - Any other exception goes to `tk_utils.error_handling.throw(e, "Could not save the student")`.
   - Leave a clearly marked spot in `_on_save` for the edit path (US2).
-- [ ] T012 [US1] Add **Add Student** to `StudentsWindow` in `therepy_sessions/students/students_window.py` (depends on T008, T011):
+- [X] T012 [US1] Add **Add Student** to `StudentsWindow` in `therepy_sessions/students/students_window.py` (depends on T008, T011):
   - Add a **Add Student** button on the left of the button row. It opens `StudentEditorWindow(self._window, self._student_store, self._list_template_choices(), None, on_saved=self.refresh)`.
   - Wrap the body of `refresh` so that an `UnreadableStudentRecordsError` raised there (for example, if the file is damaged while the window is open) goes to `tk_utils.error_handling.throw(e, "Could not load students")`.
-- [ ] T013 [US1] Add the damaged-file recovery (FR-020, research R5):
+- [X] T013 [US1] Add the damaged-file recovery (FR-020, research R5):
   - Add the module function `ask_to_start_fresh(parent: tk.Misc, error: UnreadableStudentRecordsError) -> bool` to `therepy_sessions/students/students_window.py`. It returns `messagebox.askyesno("Student Records Could Not Be Loaded", f"The student records in {error.file_path} could not be loaded.\n\nStart with an empty student list? The unreadable file will be kept as a backup.", parent=parent)`.
   - In `therepy_sessions/program.py`, `open_students(setup)` first runs `try: student_store.list_students()`. On `except UnreadableStudentRecordsError as e:`, if `not ask_to_start_fresh(setup, e)` it returns, leaving Setup visible. Otherwise it calls `student_store.recover_unreadable_records()` inside `try`/`except OSError as e:`. On `OSError` it calls `tk_utils.error_handling.throw(e, "Could not back up the student records")` and returns, leaving Setup visible and the file untouched (FR-020: the backup comes before the empty list). Only then does it call `_open_child_window` and create the `StudentsWindow`.
 
@@ -187,11 +187,11 @@ except DuplicateStudentKeyError as e: print(e)
 
 **Independent Test**: Quickstart V4 (steps 1–5), V6, and V8.
 
-- [ ] T014 [US2] Add the edit path to `therepy_sessions/students/student_editor_window.py` (depends on T011), per [contracts/ui-windows.md](contracts/ui-windows.md) Save steps 2–4:
+- [X] T014 [US2] Add the edit path to `therepy_sessions/students/student_editor_window.py` (depends on T011), per [contracts/ui-windows.md](contracts/ui-windows.md) Save steps 2–4:
   - When `self._original` is not `None` and `not student_keys_match(self._original.student_key, draft.student_key)`, ask `messagebox.askyesno("Change Student Key", f'The Student Key is the student\'s identifying key in the system. Change it from "{old}" to "{new}"?\n\nNew data sheets for this student must use the new key "{new}".', parent=self._window)`. On no, return with nothing saved and the dialog left open (FR-004a).
   - Then call `update_student(self._original.student_key, draft)`. `DuplicateStudentKeyError` is shown and returns, and `StudentNotFoundError` goes to `throw`.
   - Changes to letter case or surrounding spaces skip the prompt.
-- [ ] T015 [US2] Add editing to `StudentsWindow` in `therepy_sessions/students/students_window.py` (depends on T012, T014):
+- [X] T015 [US2] Add editing to `StudentsWindow` in `therepy_sessions/students/students_window.py` (depends on T012, T014):
   - Add **Edit Selected** next to Add, plus `<Double-Button-1>` on the tree. Both call `_on_edit`.
   - `_on_edit` reads the selected `iid` and calls `self._student_store.get_student(iid)`. With nothing selected it shows `messagebox.showwarning("No Selection", "Please select a student to edit.", parent=self._window)`. It then opens `StudentEditorWindow(self._window, self._student_store, self._list_template_choices(), student, on_saved=self.refresh)`.
   - Wrap the `get_student` call in `try`/`except Exception as e`, and send any error to `tk_utils.error_handling.throw(e, "Could not open the student")` before returning. This covers a records file that becomes unreadable while the window is open.
@@ -206,7 +206,7 @@ except DuplicateStudentKeyError as e: print(e)
 
 **Independent Test**: Quickstart V5 (steps 1–2).
 
-- [ ] T016 [US3] Add **Remove Selected** to `StudentsWindow` in `therepy_sessions/students/students_window.py` (depends on T015), after Edit:
+- [X] T016 [US3] Add **Remove Selected** to `StudentsWindow` in `therepy_sessions/students/students_window.py` (depends on T015), after Edit:
   - `_on_remove` handles no selection with a "No Selection" warning ("Please select a student to remove.").
   - Otherwise it asks `messagebox.askyesno("Confirm Remove", f'Remove the student "{key}"?', parent=self._window)`. On yes it calls `self._student_store.delete_student(key)` and then `refresh()`. Any exception from the store (including `UnreadableStudentRecordsError` and `StudentNotFoundError`) goes to `tk_utils.error_handling.throw(e, "Could not remove the student")`.
 
@@ -216,24 +216,24 @@ except DuplicateStudentKeyError as e: print(e)
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T017 [P] Amend `docs/conventions/architecture/layers.md` (plan Constitution Check III, research R1/R6):
+- [X] T017 [P] Amend `docs/conventions/architecture/layers.md` (plan Constitution Check III, research R1/R6):
   - Add `students/        student setup records, student store, and windows; no pipeline imports` to the layout block.
   - Change the `app_shell/` line to `navigation shell windows (home screen, Setup menu); Tkinter only`.
   - Extend rule 5's list of UI windows to `(`interpretation/template_manager/*_window.py`, `interpretation/importing/*_window.py`, `students/*_window.py`)`.
   - Add rule 8: **Students stand apart from the pipeline.** `students/` MUST NOT import from `clients/`, `collection/`, `interpretation/`, or `storage/`. It reaches templates only through the `TemplateChoice` provider wired in `program.py`, and its data only through the injected `StudentStore`.
-- [ ] T018 [P] Amend rule 6 in `docs/conventions/architecture/dependency-injection.md` to read: "**Inject stores and config lists too.** Windows receive `TemplateStore`, `StudentStore`, their `InterpreterConfig` list, and providers such as `list_template_choices` through their constructors. They MUST NOT create their own. `program.py` builds the one `JsonStudentStore`."
-- [ ] T019 [P] Add rows to the "Software concepts" table in `docs/domain/glossary.md` (Principle II):
+- [X] T018 [P] Amend rule 6 in `docs/conventions/architecture/dependency-injection.md` to read: "**Inject stores and config lists too.** Windows receive `TemplateStore`, `StudentStore`, their `InterpreterConfig` list, and providers such as `list_template_choices` through their constructors. They MUST NOT create their own. `program.py` builds the one `JsonStudentStore`."
+- [X] T019 [P] Add rows to the "Software concepts" table in `docs/domain/glossary.md` (Principle II):
   - `| **Current Template** | `Student.current_template_id` | The Data Sheet Template used to interpret a student's data sheets. It is optional, and may refer to a template that has since been deleted. |`
   - `| **Student Store** | `StudentStore` | Saves and loads Students, identified by Student Key. The current implementation, `JsonStudentStore`, keeps them in a local JSON file given at launch. |`
-- [ ] T020 Amend `.specify/memory/constitution.md` per its Governance procedure (depends on T017, T018, T019):
+- [X] T020 Amend `.specify/memory/constitution.md` per its Governance procedure (depends on T017, T018, T019):
   - Prepend a new Sync Impact Report: version 1.2.0 → 1.3.0 (MINOR: new layer rule and an expanded injection rule in referenced docs). Modified principles: none. Supporting docs: `layers.md` (`students/` and rule 8; `students/*_window.py` in rule 5; Setup menu in `app_shell/`), `dependency-injection.md` (rule 6), and `glossary.md` (Current Template, Student Store). Keep the prior history.
   - Set the footer to `**Version**: 1.3.0` and `**Last Amended**:` to the date of the change.
-- [ ] T021 Run the boundary checks from quickstart V9 from `therepy_sessions/`:
+- [X] T021 Run the boundary checks from quickstart V9 from `therepy_sessions/`:
   - `grep -rnE "^(from|import) (interpretation|clients|collection|storage)" students/` → no matches.
   - `grep -rn "JsonStudentStore(" --include=*.py .` → only `program.py`.
   - `grep -rnE "^(from|import) " app_shell/setup_window.py` → only `tkinter` and `collections.abc`.
   - Check that every public signature and attribute added in T002–T016 is annotated.
-- [ ] T022 Run the full manual validation in [quickstart.md](quickstart.md) V1–V9 with scratch files and placeholder keys only, and fix any failure in the file responsible.
+- [X] T022 Run the full manual validation in [quickstart.md](quickstart.md) V1–V9 with scratch files and placeholder keys only, and fix any failure in the file responsible.
 
 ---
 
