@@ -39,6 +39,10 @@ use the same name.
 | **Template Store** | `TemplateStore` | Saves templates to and loads them from a local JSON file. |
 | **Current Template** | `Student.current_template_id` | The Data Sheet Template used to interpret a student's data sheets. It is optional, and may refer to a template that has since been deleted. |
 | **Student Store** | `StudentStore` | Saves and loads Students, identified by Student Key. The current implementation, `JsonStudentStore`, keeps them in a local JSON file given at launch. |
+| **Selected File** | `SelectedFile` | An image in the Import window's list. It keeps its Import while the window is open, so a retry does not read it again unless the file changed. |
+| **Import Batch** | `SheetImportBatch` | The list of Selected Files and the rules for importing them. |
+| **Import Run** | | The Selected Files processed by one press of Import (those not yet succeeded). |
+| **Sheet Outcome** | `SheetOutcome` | One file's result: *not imported*, *succeeded*, or *failed* with a reason that names the fix. |
 | **Session Sheet** | `create_therapy_session_sheet` | The Google Sheet the tool writes as output, with summary text and charts. |
 
 ## Pipeline in one line

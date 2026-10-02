@@ -41,6 +41,12 @@ program.py       composition root: parses args, builds clients, wires the layers
    `clients/`, `collection/`, `interpretation/`, or `storage/`. It reaches templates only
    through the `TemplateChoice` provider wired in `program.py`, and its data only through
    the injected `StudentStore`.
+9. **Importing reaches students through the store.** `interpretation/importing/` may use
+   `students/` only through an injected `StudentStore` and the `Student` record and its
+   exceptions. It MUST NOT import student windows. It receives Imports only through an
+   injected sheet reader, never by importing `collection.images`, so the only thing
+   crossing collection → interpretation is still `StudentDataSheetImport`. This rule is
+   one-way: rule 8 still keeps `students/` free of pipeline imports.
 
 ## Adding a new source or destination
 
