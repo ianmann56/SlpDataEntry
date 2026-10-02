@@ -300,3 +300,20 @@ is also used inside the form's text and list fields.
 **Alternatives considered**: a base window class with the persistence in subclasses.
 This was rejected because inheritance would still mix widgets and persistence in one
 object. Composition keeps the form free of any saving.
+
+## R14. Saving Table interpreters (bug found during implementation)
+
+**Decision**: `TableInterpreterSerializer.serialize` writes each column as
+`column.to_json()`, a `{"column_name", "column_choices"}` dict. Before this fix it put
+the `ColumnDefinition` objects themselves into the saved data, so `json` couldn't save it
+and every save of a template holding a Table interpreter failed. While making this
+change, the public members of `storage/serialization.py` were annotated (Principle VI).
+
+**Rationale**: Saving an edited template (FR-006, FR-010) and keeping it loadable
+(FR-012) both depend on it. `deserialize` already reads exactly this shape, so files
+saved before and after the fix are the same, and interpreters rule 4 (backward
+compatibility) holds.
+
+**Alternatives considered**: Passing a custom `default=` encoder to `json.dump`. This was
+rejected because it would hide the serializer's real output shape from anything else
+that reads it.

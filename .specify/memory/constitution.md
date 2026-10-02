@@ -17,7 +17,7 @@ Sync Impact Report
     are never given out again. New rule 7: an interpreter the SLP did not change is saved
     as loaded, never rebuilt from its form.
   - Updated docs/domain/glossary.md: adds Template Description, Template Usage, Template
-    Details, and Template Draft, and updates Current Template.
+    Details, Template Draft, and Template Form, and updates Current Template.
 - Templates requiring updates: none
 - Deferred TODOs: none
 - Prior history:

@@ -108,7 +108,7 @@ class DataSheetTemplateManagementWindow:
 
         # Create treeview for template list
         columns = ("id", "students")
-        self.templates_treeview = ttk.Treeview(treeview_frame, columns=columns, show="tree headings", height=10)
+        self.templates_treeview: ttk.Treeview = ttk.Treeview(treeview_frame, columns=columns, show="tree headings", height=10)
         self.templates_treeview.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
         # Configure column headers

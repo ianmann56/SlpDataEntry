@@ -106,6 +106,7 @@ therepy_sessions/
 │       ├── template_editor_window.py               # DELETE: stub replaced by template_details_window.py
 │       ├── template_management_window.py           # CHANGE: Students column, View/Edit/Delete flows
 │       ├── template_creator_window.py              # REWRITE: create window around TemplateForm (R13)
+│       ├── storage/serialization.py                # CHANGE: Table columns saved as dicts (bug fix, R14), annotations
 │       ├── interpreter_configs.py                  # CHANGE: ConfigForm, interpreter_type, load, describe, find_config (R3, R5)
 │       └── student_data_sheet_template.py          # CHANGE: description, annotations
 ├── tk_utils/

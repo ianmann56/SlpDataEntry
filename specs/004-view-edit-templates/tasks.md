@@ -351,3 +351,11 @@ Task: "T023 delete_confirmation + delete_template_and_clear_students in template
 - Commit after each task or logical group. Don't commit scratch scripts.
 - The templates file is rewritten in format 2 on the first save. Test only on scratch
   copies, so the format 1 sample stays available for V2.
+
+---
+
+## Phase 9: Convergence
+
+- [X] T037 CRITICAL: Add a **Template Form** (`TemplateForm`) row to the "Software concepts" table in `docs/domain/glossary.md`, described as the fields of one template (name, description, interpreters) shared by the Create and Template Details windows, which shows a Template Draft and lets the SLP change it without saving. Then list the addition under Supporting docs in the 1.5.0 Sync Impact Report in `.specify/memory/constitution.md` per Constitution II (contradicts)
+- [X] T038 CRITICAL: Annotate the public attribute `self.templates_treeview: ttk.Treeview` in `therepy_sessions/interpretation/template_manager/template_management_window.py` per Constitution VI (contradicts)
+- [X] T039 Record the `TableInterpreterSerializer` fix (columns written as `{column_name, column_choices}` dicts instead of `ColumnDefinition` objects; the saved shape is unchanged) and the annotations on `therepy_sessions/interpretation/template_manager/storage/serialization.py`. Add a short decision to `specs/004-view-edit-templates/research.md` and a CHANGE line for `serialization.py` in the plan's Source Code tree in `specs/004-view-edit-templates/plan.md`, per plan: Source Code tree (unrequested)
