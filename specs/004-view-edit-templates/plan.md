@@ -101,12 +101,15 @@ therepy_sessions/
 │   ├── template_store.py                           # CHANGE: typed DTOs + description, format 2 + last_template_id, atomic save (R6, R10)
 │   └── template_manager/
 │       ├── template_rules.py                       # NEW: validation, TemplateDraft, TemplateUsage, confirmations, delete flow (R1, R2, R8, R9)
-│       ├── template_details_window.py              # NEW: view/edit window (R7)
+│       ├── template_form.py                        # NEW: shared template fields and interpreter editing (R13)
+│       ├── template_details_window.py              # NEW: view/edit window around TemplateForm (R7)
 │       ├── template_editor_window.py               # DELETE: stub replaced by template_details_window.py
 │       ├── template_management_window.py           # CHANGE: Students column, View/Edit/Delete flows
-│       ├── template_creator_window.py              # CHANGE: saves description, uses template_rules
+│       ├── template_creator_window.py              # REWRITE: create window around TemplateForm (R13)
 │       ├── interpreter_configs.py                  # CHANGE: ConfigForm, interpreter_type, load, describe, find_config (R3, R5)
 │       └── student_data_sheet_template.py          # CHANGE: description, annotations
+├── tk_utils/
+│   └── scrollable.py                               # NEW: scrolling area shared by both windows
 └── students/
     ├── student_store.py                            # CHANGE: clear_current_template (abstract)
     └── json_student_store.py                       # CHANGE: clear_current_template (one atomic save)

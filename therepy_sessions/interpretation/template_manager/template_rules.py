@@ -13,7 +13,7 @@ from typing import Any, NamedTuple
 
 from interpretation.template_manager.storage.serialization import serialize
 from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
-from interpretation.template_store import TemplateEditDto
+from interpretation.template_store import TemplateCreateDto, TemplateEditDto
 from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
 
 # Shown beside every editable Template Description (Principle I)
@@ -116,20 +116,21 @@ def group_usage(pairs: list[tuple[str, str | None]]) -> TemplateUsage:
 
 class TemplateDraft:
     """
-    The working copy of a saved template that edit mode changes before Save.
+    The working copy of a template that the template form changes before it is saved.
 
-    An interpreter the SLP does not change stays the same object it was loaded as, so it
-    is saved exactly as it was (interpreters rule 7).
+    It is either a saved template being edited, or a new template being created
+    (`template_id` is None). An interpreter the SLP does not change stays the same object
+    it was loaded as, so it is saved exactly as it was (interpreters rule 7).
     """
 
     def __init__(
         self,
-        template_id: str,
+        template_id: str | None,
         name: str,
         description: str,
         interpreters: list[SessionDataSectionInterpreterBase],
     ) -> None:
-        self.template_id: str = template_id
+        self.template_id: str | None = template_id
         self.name: str = name
         self.description: str = description
         self.interpreters: list[SessionDataSectionInterpreterBase] = list(interpreters)
@@ -138,6 +139,11 @@ class TemplateDraft:
     def from_template(cls, template: StudentDataSheetTemplate) -> "TemplateDraft":
         """Start a draft from a saved template."""
         return cls(template.id, template.name, template.description, list(template.interpreters))
+
+    @classmethod
+    def new(cls) -> "TemplateDraft":
+        """Start an empty draft for a template that has not been saved yet."""
+        return cls(None, "", "", [])
 
     def add(self, interpreter: SessionDataSectionInterpreterBase) -> None:
         """
@@ -186,8 +192,13 @@ class TemplateDraft:
         """Return every problem that stops the draft from being saved, or [] when it can be saved."""
         return validate_template(self.name, self.interpreters)
 
-    def has_changes_from(self, template: StudentDataSheetTemplate) -> bool:
-        """Return whether the draft differs from the saved template."""
+    def has_changes_from(self, template: StudentDataSheetTemplate | None) -> bool:
+        """
+        Return whether the draft differs from the saved template, or, for a new template
+        (None), whether anything has been entered at all.
+        """
+        if template is None:
+            return bool(self.name.strip() or self.description.strip() or self.interpreters)
         return (
             self.name.strip() != template.name.strip()
             or self.description != template.description
@@ -195,8 +206,12 @@ class TemplateDraft:
         )
 
     def to_edit_dto(self) -> TemplateEditDto:
-        """Return the values to save."""
+        """Return the values to save over the saved template."""
         return TemplateEditDto(self.name.strip(), list(self.interpreters), self.description)
+
+    def to_create_dto(self) -> TemplateCreateDto:
+        """Return the values to save as a new template."""
+        return TemplateCreateDto(self.name.strip(), list(self.interpreters), self.description)
 
 
 def _serialized(interpreters: list[SessionDataSectionInterpreterBase]) -> list[dict[str, Any]]:

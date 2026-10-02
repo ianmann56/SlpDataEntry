@@ -76,15 +76,17 @@ This is the working copy that edit mode changes. It is never saved directly.
 
 | Member | Meaning |
 | --- | --- |
-| `template_id: str` | The template being edited |
+| `template_id: str \| None` | The template being edited, or None for a new template (R13) |
 | `name: str`, `description: str` | Current field values |
 | `interpreters: list[SessionDataSectionInterpreterBase]` | Working list, starting as a copy of the saved list |
 | `add(interpreter)` | Appends an interpreter. Raises `TitleConflictError` on a duplicate non-blank title. |
 | `replace(index, interpreter)` | Swaps in a rebuilt interpreter at the same position. The caller builds it with the old interpreter's `id`. A different `id` raises `ValueError`, so an interpreter's id never changes (FR-008). Raises `TitleConflictError` like `add`. |
 | `remove(index)`, `move(index, offset)` | Remove an interpreter, or move it up (`-1`) or down (`+1`). A move past either end does nothing. |
 | `problems() -> list[str]` | Returns `validate_template(name, interpreters)` |
-| `has_changes_from(template) -> bool` | Compares name, description, and `[serialize(i) for i in interpreters]` with the saved template |
+| `has_changes_from(template) -> bool` | Compares name, description, and `[serialize(i) for i in interpreters]` with the saved template. With `None` (a new template), returns whether anything has been entered. |
 | `to_edit_dto() -> TemplateEditDto` | Returns the trimmed name and the description and interpreters as they are |
+| `new()` (class method) | Starts an empty draft for the Create window |
+| `to_create_dto() -> TemplateCreateDto` | Returns the trimmed name and the description and interpreters as they are |
 
 ## Template Details window modes (state transitions)
 

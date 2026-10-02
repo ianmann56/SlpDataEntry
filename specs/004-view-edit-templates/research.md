@@ -139,8 +139,9 @@ interpreters rule 4 requires.
 `template_editor_window.py`, and the stub is deleted. The window is a modal `Toplevel`,
 like the Create window. It has a `mode` of `VIEW` or `EDIT`. Switching mode makes the
 same widgets editable or read-only and swaps the buttons. In view mode, the buttons are
-Edit and Close. In edit mode, they are Save and Cancel. The window holds a
-`TemplateDraft` only while it is in edit mode. See [contracts/ui-windows.md](contracts/ui-windows.md).
+Edit and Close. In edit mode, they are Save and Cancel. Entering either mode gives the
+shared `TemplateForm` (R13) a fresh `TemplateDraft` of the saved template, read-only in
+view mode. See [contracts/ui-windows.md](contracts/ui-windows.md).
 
 **Rationale**: This follows clarification 3, the single-window decision. A modal window
 matches the Create window, and it stops two windows from editing the same template at
@@ -263,3 +264,39 @@ reading a format 1 file and never reusing an ID), and
 
 **Rationale**: The project has no test runner, and adding one is not justified for this
 feature. Everything that can go wrong without a display is in the Tkinter-free modules.
+
+## R13. One template form shared by the Create and Template Details windows
+
+**Decision** (revisited after implementation, at the SLP's request): the fields of a
+template live in one component, `TemplateForm` (`template_form.py`). It receives a
+`TemplateDraft` and lets the SLP change it: the name, the description, and the
+interpreter list with its Up, Down, Remove, Add, and filled-in config forms. It can be
+read-only. It never saves anything and knows nothing about students. `commit()` copies
+the fields into the draft and applies any unapplied interpreter form.
+
+The two windows are thin parents around it, and each keeps only what is not shared:
+
+| Window | Owns |
+| --- | --- |
+| `TemplateCreatorWindow` | An empty draft (`TemplateDraft.new()`), Create (`create_template`), and the "unsaved changes" prompt on Cancel |
+| `TemplateDetailsWindow` | The ID and "Used by" rows, view/edit modes, the save confirmation, `edit_template`, and the not-found and failed-save handling |
+
+`TemplateDraft` gains `template_id: str | None` (None for a new template), `new()`,
+`to_create_dto()`, and `has_changes_from(None)` meaning "anything entered at all".
+A shared `tk_utils.scrollable.create_scrollable_frame` gives both windows the same
+scrolling area.
+
+**Rationale**: Before this, the Create window had its own copy of the name, description,
+and interpreter widgets, and a different way to add interpreters (no reorder, no
+filled-in forms). Sharing the form makes creating look and work exactly like editing.
+The one place the two differ, persistence, stays in each parent window.
+
+**Effect on the Create window**: an interpreter is added by choosing a type, pressing
+Add, filling the form, and pressing Apply, the same as in edit mode. Unapplied form
+changes are applied on Create, and interpreters can be reordered before the template is
+first saved. The old window-wide Return-to-create shortcut is dropped, because Return
+is also used inside the form's text and list fields.
+
+**Alternatives considered**: a base window class with the persistence in subclasses.
+This was rejected because inheritance would still mix widgets and persistence in one
+object. Composition keeps the form free of any saving.

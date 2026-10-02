@@ -270,6 +270,17 @@ the manual [quickstart.md](quickstart.md). Scratch scripts are not committed.
 
 ---
 
+## Phase 8: Shared Template Form (refactor requested after implementation)
+
+**Purpose**: Make the Create window reuse the edit view (research R13). One `TemplateForm` holds the template's fields and lets the SLP change a draft. The Create and Template Details windows become parents that keep only their own persistence and the behaviour that isn't shared.
+
+- [X] T031 In `therepy_sessions/interpretation/template_manager/template_rules.py`, let `TemplateDraft` describe a new template: `template_id: str | None`, `TemplateDraft.new()`, `to_create_dto() -> TemplateCreateDto`, and `has_changes_from(None)` returning whether anything has been entered (data-model.md Template Draft).
+- [X] T032 [P] Create `therepy_sessions/tk_utils/scrollable.py` with `create_scrollable_frame(parent, padding="20") -> ttk.Frame` (Canvas, Scrollbar, and an inner frame that stretches to the width).
+- [X] T033 Create `therepy_sessions/interpretation/template_manager/template_form.py` with `TemplateForm`, as [contracts/ui-windows.md](contracts/ui-windows.md) describes (depends on T031). Move the Name, Description and hint, interpreter tree, Up/Down/Remove/Add controls, interpreter form panel, automatic apply, form Cancel, and title-conflict handling out of the details window into it. It has no store, no usage, and no confirmations. Export `LABEL_WIDTH` so the parent windows can line up their own rows.
+- [X] T034 Rewrite `therepy_sessions/interpretation/template_manager/template_details_window.py` around `TemplateForm` (depends on T032, T033). It keeps the ID row, the Used by row, the mode buttons, `_set_mode` (a fresh draft from the saved template, read-only in view mode), the save confirmation, `edit_template`, the not-found and failed-save handling, and the discard prompt.
+- [X] T035 Rewrite `therepy_sessions/interpretation/template_manager/template_creator_window.py` around `TemplateForm` with `TemplateDraft.new()` (depends on T032, T033). It keeps Create (`create_template(draft.to_create_dto())`, validation through `draft.problems()`) and the "unsaved changes" prompt on Cancel or close. Its constructor signature is unchanged.
+- [X] T036 Re-run quickstart V1–V7 on a scratch baseline. Add Create-window checks: the shared form is used, Cancel with nothing entered doesn't prompt, an empty Create lists both problems, adding a second type auto-applies the first, a duplicate title is refused, Cancel with content prompts, and Create saves the description and the table columns.
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

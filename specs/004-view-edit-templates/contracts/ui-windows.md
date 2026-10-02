@@ -61,7 +61,37 @@ template by ID. If it is gone, the window says so and refreshes the list (FR-013
    - `DELETED` shows "Template '<name>' has been deleted."
 4. Refresh the list.
 
+## `TemplateForm` (new: `template_form.py`, research R13)
+
+```python
+class TemplateForm:
+    def __init__(
+        self,
+        parent: tk.Misc,
+        draft: TemplateDraft,
+        interpreter_configs: list[InterpreterConfig],
+        read_only: bool = False,
+    ) -> None: ...
+    frame: ttk.Frame                                  # the caller places it
+    @property
+    def draft(self) -> TemplateDraft: ...
+    def set_draft(self, draft: TemplateDraft) -> None: ...      # show another draft; closes the interpreter form
+    def set_read_only(self, read_only: bool) -> None: ...
+    def focus(self) -> None: ...
+    def commit(self) -> bool: ...                     # copy name/description into the draft, apply the open form
+    def has_unapplied_changes(self) -> bool: ...
+```
+
+The form owns the Name, Description (with the hint when editable), the interpreter tree,
+the Up, Down, Remove, and Add controls, and the interpreter form panel with Apply and
+Cancel. It handles selection with automatic apply (FR-006e), form Cancel (FR-006f), and
+title conflicts, which it reports itself. It never calls a store and takes no usage.
+Read-only hides the controls, the panel, and the hint. Selecting a row then does nothing.
+
 ## `TemplateDetailsWindow` (new: `template_details_window.py`, replaces the `template_editor_window.py` stub)
+
+The template's fields are a `TemplateForm`. This window adds the ID row above it, the
+"Used by" row below it, the mode buttons, and everything that touches the store.
 
 ```python
 class DetailsMode(Enum):
@@ -132,13 +162,17 @@ than the window.
 
 ## `TemplateCreatorWindow` (changed)
 
-- It passes `description=self.description_text.get("1.0", tk.END).strip()` in
-  `TemplateCreateDto` (FR-006c).
-- It shows the hint "Describe the sheet layout. Don't include student names." under
-  the Description field (Principle I).
-- `_validate_form` uses `validate_template(...)` and shows every problem it returns.
-- `_add_interpreter` uses `find_title_conflict(...)` in place of its own check (R1).
-- Its constructor and public members gain type annotations.
+The constructor is unchanged (`parent`, `template_store`, `save_callback`,
+`interpreter_configs`). The window is a modal `Toplevel` around a `TemplateForm` with
+`TemplateDraft.new()` (research R13).
+
+- **Create Template**: `form.commit()`. If `draft.problems()` is not empty, show them in
+  one `showerror`. Otherwise call `create_template(draft.to_create_dto())`, which saves
+  the description (FR-006c), then show "created", call `save_callback()`, and close. An
+  exception goes to `throw(e, "Failed to create template")`.
+- **Cancel, or the window's close button**: if the form has unapplied changes, or
+  `draft.has_changes_from(None)`, ask "You have unsaved changes. Are you sure you want
+  to cancel?" before closing.
 
 ## `program.py` (changed wiring)
 
