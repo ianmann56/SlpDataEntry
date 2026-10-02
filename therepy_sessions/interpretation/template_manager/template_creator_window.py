@@ -1,8 +1,11 @@
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import ttk, messagebox
-import traceback
 import uuid
-from interpretation.template_store import TemplateCreateDto
+from interpretation.template_manager.interpreter_configs import InterpreterConfig
+from interpretation.template_manager.template_rules import DESCRIPTION_HINT, TitleConflictError, find_title_conflict, validate_template
+from interpretation.template_store import TemplateCreateDto, TemplateStore
+from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
 from tk_utils import error_handling
 
 
@@ -17,7 +20,13 @@ class TemplateCreatorWindow:
     - Save the new template
     """
     
-    def __init__(self, parent, template_store, save_callback, interpreter_configs):
+    def __init__(
+        self,
+        parent: tk.Misc,
+        template_store: TemplateStore,
+        save_callback: Callable[[], None],
+        interpreter_configs: list[InterpreterConfig],
+    ) -> None:
         """
         Initialize the template creator window.
         
@@ -27,15 +36,15 @@ class TemplateCreatorWindow:
             save_callback: Callback function to call to update the parent when template is saved
             interpreter_configs: List of InterpreterConfig objects (defaults to DEFAULT_INTERPRETER_CONFIGS)
         """
-        self.parent = parent
-        self.template_store = template_store
-        self.save_callback = save_callback
-        self.interpreter_configs = interpreter_configs
-        self.window = tk.Toplevel(parent)
+        self.parent: tk.Misc = parent
+        self.template_store: TemplateStore = template_store
+        self.save_callback: Callable[[], None] = save_callback
+        self.interpreter_configs: list[InterpreterConfig] = interpreter_configs
+        self.window: tk.Toplevel = tk.Toplevel(parent)
         
         # Form field variables
-        self.name_var = tk.StringVar()
-        self.interpreters = []  # List of constructed interpreter instances, keyed by their own title
+        self.name_var: tk.StringVar = tk.StringVar()
+        self.interpreters: list[SessionDataSectionInterpreterBase] = []  # Constructed interpreter instances, keyed by their own title
         
         self._setup_window()
         self._create_form()
@@ -162,6 +171,8 @@ class TemplateCreatorWindow:
         desc_scrollbar = ttk.Scrollbar(desc_frame, orient=tk.VERTICAL, command=self.description_text.yview)
         desc_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         self.description_text.configure(yscrollcommand=desc_scrollbar.set)
+
+        ttk.Label(desc_frame, text=DESCRIPTION_HINT).grid(row=1, column=0, sticky=tk.W, pady=(2, 0))
         
     def _create_buttons(self):
         """Create the form action buttons."""
@@ -187,14 +198,10 @@ class TemplateCreatorWindow:
         Returns:
             bool: True if form is valid, False otherwise
         """
-        if not self.name_var.get().strip():
-            messagebox.showerror("Validation Error", "Template name is required.")
+        problems = validate_template(self.name_var.get(), self.interpreters)
+        if problems:
+            messagebox.showerror("Validation Error", "\n".join(problems), parent=self.window)
             return False
-
-        if not self.interpreters:
-            messagebox.showerror("Validation Error", "At least one interpreter must be added.")
-            return False
-            
         return True
         
     def _on_create(self):
@@ -206,7 +213,8 @@ class TemplateCreatorWindow:
             # Create the DTO
             create_dto = TemplateCreateDto(
                 name=self.name_var.get().strip(),
-                configured_interpreters=self.interpreters
+                configured_interpreters=self.interpreters,
+                description=self.description_text.get("1.0", tk.END).strip(),
             )
             
             # Create the template via the store
@@ -283,8 +291,8 @@ class TemplateCreatorWindow:
         config_data = self.config_widgets[interpreter_type]['get_config']()
         title = config_data.get('title', '')
 
-        if title and any(interpreter.title == title for interpreter in self.interpreters):
-            messagebox.showwarning("Duplicate Interpreter", f"An interpreter titled '{title}' has already been added.")
+        if find_title_conflict(title, self.interpreters):
+            messagebox.showwarning("Duplicate Interpreter", str(TitleConflictError(title)), parent=self.window)
             return
 
         interpreter_instance = config_obj.construct_interpreter(str(uuid.uuid4()), config_data)

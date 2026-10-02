@@ -71,6 +71,17 @@ class JsonStudentStore(StudentStore):
         del students[self._index_of(students, student_key)]
         self._save(students)
 
+    def clear_current_template(self, template_id: str) -> list[str]:
+        students = self._load()
+        cleared: list[str] = []
+        for index, student in enumerate(students):
+            if student.current_template_id == template_id:
+                students[index] = replace(student, current_template_id=None)
+                cleared.append(student.student_key)
+        if cleared:
+            self._save(students)
+        return sorted(cleared, key=str.casefold)
+
     def recover_unreadable_records(self) -> str:
         if not os.path.exists(self._file_path):
             return ""

@@ -17,6 +17,7 @@ from interpretation.importing.import_window import ImportWindow
 from interpretation.importing.sheet_import_batch import SheetImportBatch
 from interpretation.template_manager.interpreter_configs import STUB_INTERPRETER_CONFIGS
 from interpretation.template_manager.template_management_window import DataSheetTemplateManagementWindow
+from interpretation.template_manager.template_rules import TemplateUsage, group_usage
 from interpretation.template_store import TemplateStore
 from students.json_student_store import JsonStudentStore
 from students.student import TemplateChoice, UnreadableStudentRecordsError
@@ -43,6 +44,14 @@ def main() -> None:
 
     def list_template_choices() -> list[TemplateChoice]:
         return [TemplateChoice(template.id, template.name) for template in template_store.get_all_templates()]
+
+    # Template management learns which students use each template only through these two callables
+    def load_template_usage() -> TemplateUsage | None:
+        try:
+            students = student_store.list_students()
+        except UnreadableStudentRecordsError:
+            return None
+        return group_usage([(student.student_key, student.current_template_id) for student in students])
 
     # Build the Textract client on the first sheet read, so launching and Setup need no AWS credentials
     textract_lock = threading.Lock()
@@ -80,6 +89,8 @@ def main() -> None:
         app = DataSheetTemplateManagementWindow(
             template_store,
             path_window,
+            load_template_usage=load_template_usage,
+            clear_template_from_students=student_store.clear_current_template,
             close_callback=root.destroy,
             interpreter_configs=STUB_INTERPRETER_CONFIGS,
             back_callback=lambda: _return_to(setup, path_window),

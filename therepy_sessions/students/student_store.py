@@ -65,6 +65,22 @@ class StudentStore(ABC):
         """
 
     @abstractmethod
+    def clear_current_template(self, template_id: str) -> list[str]:
+        """
+        Set the Current Template to none for every student using `template_id`, in one save.
+
+        No other part of a student record changes.
+
+        Returns:
+            The cleared Student Keys, sorted ignoring letter case; [] (and nothing is
+            written) when no student uses the template
+
+        Raises:
+            UnreadableStudentRecordsError: If the saved records cannot be read
+            OSError: If the records cannot be saved; no student is changed
+        """
+
+    @abstractmethod
     def recover_unreadable_records(self) -> str:
         """
         Move unreadable saved records to a new backup, leaving the store empty.

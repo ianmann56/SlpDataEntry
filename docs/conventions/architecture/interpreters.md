@@ -24,7 +24,7 @@ A new interpreter type is complete only when all four of these exist:
 | Piece | Location | Responsibility |
 | --- | --- | --- |
 | Interpreter | `interpretation/interpreter_types/<name>_interpreter.py` | Subclass `SessionDataSectionInterpreterBase`. Take `id` and `title` plus its own config. Implement `interpret_student_data_sheet_content`. Return `DataSheetInterpretationDto`. |
-| Config UI | `interpretation/template_manager/interpreter_configs.py` | Subclass `InterpreterConfig`. Implement `name`, `create_config_form` (returning `frame`, `get_config`, `reset`), and `construct_interpreter`. |
+| Config UI | `interpretation/template_manager/interpreter_configs.py` | Subclass `InterpreterConfig`. Implement `name`, `interpreter_type`, `create_config_form` (returning a `ConfigForm` with `frame`, `get_config`, `reset`, and `load`), `construct_interpreter`, and `describe` (readable lines for view mode). `load` fills the form from a saved interpreter so it can be edited. |
 | Serializer | `interpretation/template_manager/storage/serialization.py` | Subclass `InterpreterSerializer` and register it. The output has the shape `{"type", "id", "title", "config"}`. |
 | Registration | the config list passed to the management window, and the serializer registry | Makes the type visible in the UI and loadable from disk. |
 
@@ -44,3 +44,9 @@ A new interpreter type is complete only when all four of these exist:
    and what was found, as `TableInterpreter` does. Never skip data silently.
 6. **Ids are stable.** Template ids and interpreter ids are strings, unique within their
    scope, and never reused after deletion. `TemplateStore.generate_new_id` owns template ids.
+   The templates file records `last_template_id`, the highest id ever given out, so a
+   deleted template's id is never given out again.
+7. **Untouched interpreters are saved as loaded.** When a template is edited, an
+   interpreter the SLP did not change is saved exactly as it was loaded, never rebuilt
+   from its config form. A form cannot always show every saved detail, so rebuilding it
+   could lose data.

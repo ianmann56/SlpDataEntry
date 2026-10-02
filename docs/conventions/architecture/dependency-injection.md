@@ -38,3 +38,8 @@ can run without network access or credentials.
    a sheet reader wrapping `image_to_text`, and a result sink through their
    constructors. `program.py` builds the Textract client lazily, on the first sheet
    read, so the app launches and runs Setup without AWS credentials.
+   `DataSheetTemplateManagementWindow` and `TemplateDetailsWindow` receive
+   `load_template_usage: Callable[[], TemplateUsage | None]`, and the management window
+   also receives `clear_template_from_students: Callable[[str], list[str]]`. Both are
+   wired in `program.py` from the one `StudentStore`. Template management never
+   receives the `StudentStore` itself, so it imports nothing from `students/`.
