@@ -212,3 +212,8 @@ __marimo__/
 
 # Project Specific
 sample_data/
+# Editor and OS files, and temp files left by an interrupted atomic save
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp

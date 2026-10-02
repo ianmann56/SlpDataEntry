@@ -7,12 +7,27 @@ interpreter types injectable and extensible.
 
 import tkinter as tk
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from tkinter import ttk, messagebox
+from typing import Any, TypedDict
 
 from interpretation.student_data_sheet import DataSheetScalarType
+from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
 from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
 from interpretation.interpreter_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
 from interpretation.interpreter_types.table_interpreter import ColumnDefinition, TableInterpreter
+
+
+class ConfigForm(TypedDict):
+    """The configuration form an InterpreterConfig builds, and the functions that drive it."""
+
+    frame: ttk.Frame
+    # Returns the values filled out in the form, for construct_interpreter
+    get_config: Callable[[], dict[str, Any]]
+    # Clears the form so it's ready for a new interpreter
+    reset: Callable[[], None]
+    # Fills the form with an existing interpreter's title and configuration
+    load: Callable[[SessionDataSectionInterpreterBase], None]
 
 
 class InterpreterConfig(ABC):
@@ -23,9 +38,15 @@ class InterpreterConfig(ABC):
     def name(self) -> str:
         """The display name of the interpreter type."""
         pass
+
+    @property
+    @abstractmethod
+    def interpreter_type(self) -> type[SessionDataSectionInterpreterBase]:
+        """The interpreter class this configuration builds, used to find the config for a saved interpreter."""
+        pass
     
     @abstractmethod
-    def create_config_form(self, parent_frame) -> dict:
+    def create_config_form(self, parent_frame: tk.Misc) -> ConfigForm:
         """
         Create the configuration form for this interpreter type.
         
@@ -33,16 +54,12 @@ class InterpreterConfig(ABC):
             parent_frame: The parent tkinter frame to add widgets to
             
         Returns:
-            dict: Configuration form data with keys:
-                - 'frame': The main frame containing all widgets
-                - 'get_config': Function to retrieve configuration data
-                - 'reset': Function to clear the form so it's ready for a new interpreter
-                - Additional implementation-specific keys
+            The form's frame and the functions that read, clear, and fill it
         """
         pass
 
     @abstractmethod
-    def construct_interpreter(self, id, config_values):
+    def construct_interpreter(self, id: str, config_values: dict[str, Any]) -> SessionDataSectionInterpreterBase:
         """
         Constructs a SessionDataInterpreterBase from the configs filled
         out in the form for this configuration.
@@ -53,14 +70,46 @@ class InterpreterConfig(ABC):
         """
         pass
 
+    @abstractmethod
+    def describe(self, interpreter: SessionDataSectionInterpreterBase) -> list[str]:
+        """
+        Describe an interpreter's configuration as readable lines for view mode,
+        e.g. ["Columns: Sentence, Pitch"].
+        """
+        pass
+
+
+def find_config(
+    configs: list[InterpreterConfig], interpreter: SessionDataSectionInterpreterBase
+) -> InterpreterConfig | None:
+    """Return the config that builds this interpreter's type, or None if no config handles it."""
+    return next((config for config in configs if isinstance(interpreter, config.interpreter_type)), None)
+
+
+def _join_or_none(items: list[str]) -> str:
+    """Join items for a description line, or say "(none)" when there are none."""
+    return ", ".join(items) if items else "(none)"
+
+
+def _fill_listbox(listbox: tk.Listbox, items: list[str]) -> None:
+    """Replace a config form listbox's items."""
+    listbox.delete(0, tk.END)
+    for item in items:
+        listbox.insert(tk.END, item)
+
+
 class TableInterpreterConfig(InterpreterConfig):
     """Configuration for Table Interpreter - manages column names."""
     
     @property
     def name(self) -> str:
         return "Table Interpreter"
+
+    @property
+    def interpreter_type(self) -> type[SessionDataSectionInterpreterBase]:
+        return TableInterpreter
     
-    def create_config_form(self, parent_frame) -> dict:
+    def create_config_form(self, parent_frame: tk.Misc) -> ConfigForm:
         """Create configuration form for Table Interpreter."""
         frame = ttk.Frame(parent_frame)
 
@@ -90,14 +139,18 @@ class TableInterpreterConfig(InterpreterConfig):
 
         frame.columnconfigure(0, weight=1)
 
-        def reset():
+        def reset() -> None:
             title_var.set('')
+            column_var.set('')
             columns_listbox.delete(0, tk.END)
+
+        def load(interpreter: SessionDataSectionInterpreterBase) -> None:
+            reset()
+            title_var.set(interpreter.title or '')
+            _fill_listbox(columns_listbox, [column.column_name for column in interpreter.columns])
 
         return {
             'frame': frame,
-            'listbox': columns_listbox,
-            'entry_var': column_var,
             'get_config': lambda: {
                 'title': title_var.get().strip(),
                 'columns': [
@@ -106,10 +159,11 @@ class TableInterpreterConfig(InterpreterConfig):
                     in columns_listbox.get(0, tk.END)
                 ]
             },
-            'reset': reset
+            'reset': reset,
+            'load': load,
         }
 
-    def construct_interpreter(self, id, config_values):
+    def construct_interpreter(self, id: str, config_values: dict[str, Any]) -> SessionDataSectionInterpreterBase:
         """
         Constructs a TableInterpreter from the configuration values.
 
@@ -120,6 +174,9 @@ class TableInterpreterConfig(InterpreterConfig):
         title = config_values.get('title', '')
         column_defs: list[ColumnDefinition] = config_values.get('columns', [])
         return TableInterpreter(id, title, column_defs)
+
+    def describe(self, interpreter: SessionDataSectionInterpreterBase) -> list[str]:
+        return ["Columns: " + _join_or_none([column.column_name for column in interpreter.columns])]
     
     def _add_config_item(self, listbox, entry_var):
         """Add an item to the configuration listbox."""
@@ -150,8 +207,12 @@ class RunningTallyInterpreterConfig(InterpreterConfig):
     @property
     def name(self) -> str:
         return "Running Tally Interpreter"
+
+    @property
+    def interpreter_type(self) -> type[SessionDataSectionInterpreterBase]:
+        return RunningTallyInterpreter
     
-    def create_config_form(self, parent_frame) -> dict:
+    def create_config_form(self, parent_frame: tk.Misc) -> ConfigForm:
         """Create configuration form for Running Tally Interpreter."""
         frame = ttk.Frame(parent_frame)
 
@@ -181,22 +242,27 @@ class RunningTallyInterpreterConfig(InterpreterConfig):
 
         frame.columnconfigure(0, weight=1)
 
-        def reset():
+        def reset() -> None:
             title_var.set('')
+            char_var.set('')
             tally_listbox.delete(0, tk.END)
+
+        def load(interpreter: SessionDataSectionInterpreterBase) -> None:
+            reset()
+            title_var.set(interpreter.title or '')
+            _fill_listbox(tally_listbox, list(interpreter.tally_choice_options or []))
 
         return {
             'frame': frame,
-            'listbox': tally_listbox,
-            'entry_var': char_var,
             'get_config': lambda: {
                 'title': title_var.get().strip(),
                 'tally_characters': list(tally_listbox.get(0, tk.END))
             },
-            'reset': reset
+            'reset': reset,
+            'load': load,
         }
 
-    def construct_interpreter(self, id, config_values):
+    def construct_interpreter(self, id: str, config_values: dict[str, Any]) -> SessionDataSectionInterpreterBase:
         """
         Constructs a RunningTallyInterpreter from the configuration values.
 
@@ -207,6 +273,9 @@ class RunningTallyInterpreterConfig(InterpreterConfig):
         title = config_values.get('title', '')
         tally_characters = config_values.get('tally_characters', [])
         return RunningTallyInterpreter(id, title, DataSheetScalarType.CHOICE, tally_characters)
+
+    def describe(self, interpreter: SessionDataSectionInterpreterBase) -> list[str]:
+        return ["Tally characters: " + _join_or_none(list(interpreter.tally_choice_options or []))]
     
     def _add_config_item(self, listbox, entry_var):
         """Add an item to the configuration listbox."""
@@ -237,8 +306,12 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
     @property
     def name(self) -> str:
         return "Simple Form Interpreter"
+
+    @property
+    def interpreter_type(self) -> type[SessionDataSectionInterpreterBase]:
+        return SimpleFormInterpreter
     
-    def create_config_form(self, parent_frame) -> dict:
+    def create_config_form(self, parent_frame: tk.Misc) -> ConfigForm:
         """Create configuration form for Simple Form Interpreter."""
         frame = ttk.Frame(parent_frame)
 
@@ -268,22 +341,27 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
 
         frame.columnconfigure(0, weight=1)
 
-        def reset():
+        def reset() -> None:
             title_var.set('')
+            field_var.set('')
             fields_listbox.delete(0, tk.END)
+
+        def load(interpreter: SessionDataSectionInterpreterBase) -> None:
+            reset()
+            title_var.set(interpreter.title or '')
+            _fill_listbox(fields_listbox, list(interpreter.fields.keys()))
 
         return {
             'frame': frame,
-            'listbox': fields_listbox,
-            'entry_var': field_var,
             'get_config': lambda: {
                 'title': title_var.get().strip(),
                 'field_names': list(fields_listbox.get(0, tk.END))
             },
-            'reset': reset
+            'reset': reset,
+            'load': load,
         }
 
-    def construct_interpreter(self, id, config_values):
+    def construct_interpreter(self, id: str, config_values: dict[str, Any]) -> SessionDataSectionInterpreterBase:
         """
         Constructs a SimpleFormInterpreter from the configuration values.
 
@@ -301,6 +379,9 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
         }
 
         return SimpleFormInterpreter(id, title, field_configs)
+
+    def describe(self, interpreter: SessionDataSectionInterpreterBase) -> list[str]:
+        return ["Fields: " + _join_or_none(list(interpreter.fields.keys()))]
     
     def _add_config_item(self, listbox, entry_var):
         """Add an item to the configuration listbox."""
@@ -326,7 +407,7 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
 
 
 # Default configuration list - can be easily extended or modified
-STUB_INTERPRETER_CONFIGS = [
+STUB_INTERPRETER_CONFIGS: list[InterpreterConfig] = [
     TableInterpreterConfig(),
     RunningTallyInterpreterConfig(),
     SimpleFormInterpreterConfig(),

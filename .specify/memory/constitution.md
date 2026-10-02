@@ -1,5 +1,33 @@
 <!--
 Sync Impact Report
+- Version change: 1.4.0 → 1.5.0 (MINOR: new rules in referenced docs, and glossary
+  additions)
+- Modified principles: none
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/conventions/architecture/dependency-injection.md rule 6: the template
+    management and Template Details windows receive `load_template_usage`, and the
+    management window receives `clear_template_from_students`, both wired in program.py
+    from the one StudentStore. Template management never receives the StudentStore.
+  - Updated docs/conventions/architecture/interpreters.md: the Config UI piece now
+    requires `interpreter_type`, `describe`, and a `load` entry in the returned
+    `ConfigForm`. Rule 6 adds that the templates file records `last_template_id`, so ids
+    are never given out again. New rule 7: an interpreter the SLP did not change is saved
+    as loaded, never rebuilt from its form.
+  - Updated docs/domain/glossary.md: adds Template Description, Template Usage, Template
+    Details, Template Draft, and Template Form, and updates Current Template.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.4.0 (2026-10-01) added layers.md rule 9 and expanded dependency-injection rule 6
+  - 1.3.0 (2026-09-30) added `students/` and rule 8 to layers.md
+  - 1.2.0 (2026-09-30) added `app_shell/` and rule 7 to layers.md
+  - 1.1.0 (2026-09-26) added Principle VI. Typed Public Interfaces
+  - 1.0.0 (2026-09-26) initial ratification with Principles I–V
+
+Previous report (1.4.0):
 - Version change: 1.3.0 → 1.4.0 (MINOR: new layer rule, an expanded injection rule, and
   glossary additions in referenced docs)
 - Modified principles: none
@@ -212,4 +240,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.4.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-01
+**Version**: 1.5.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-01

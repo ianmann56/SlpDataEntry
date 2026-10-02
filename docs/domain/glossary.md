@@ -37,7 +37,12 @@ use the same name.
 | **Data Sheet Template** | `StudentDataSheetTemplate` | A named, saved set of configured section interpreters describing one sheet layout. An SLP reuses it for every sheet with that layout. |
 | **Interpreter Config** | `InterpreterConfig` | The UI form that lets the SLP configure a section interpreter while building a template. |
 | **Template Store** | `TemplateStore` | Saves templates to and loads them from a local JSON file. |
-| **Current Template** | `Student.current_template_id` | The Data Sheet Template used to interpret a student's data sheets. It is optional, and may refer to a template that has since been deleted. |
+| **Current Template** | `Student.current_template_id` | The Data Sheet Template used to interpret a student's data sheets. It is optional. Deleting a template from the app clears it from every student who used it. It may still refer to a template removed outside the app. |
+| **Template Description** | `StudentDataSheetTemplate.description` | Optional free text describing the sheet layout a template reads. It never identifies a student. |
+| **Template Usage** | `TemplateUsage` | The students, by Student Key, whose Current Template is a given template. |
+| **Template Details** | `TemplateDetailsWindow` | The window showing one saved template, in *view mode* (read-only) or *edit mode*. |
+| **Template Draft** | `TemplateDraft` | The working copy of a template that edit mode changes before Save. |
+| **Template Form** | `TemplateForm` | The fields of one template (name, description, and interpreters) shared by the Create and Template Details windows. It shows a Template Draft and lets the SLP change it, and never saves anything itself. |
 | **Student Store** | `StudentStore` | Saves and loads Students, identified by Student Key. The current implementation, `JsonStudentStore`, keeps them in a local JSON file given at launch. |
 | **Selected File** | `SelectedFile` | An image in the Import window's list. It keeps its Import while the window is open, so a retry does not read it again unless the file changed. |
 | **Import Batch** | `SheetImportBatch` | The list of Selected Files and the rules for importing them. |

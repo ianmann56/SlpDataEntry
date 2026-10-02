@@ -27,17 +27,19 @@ Usage:
 
 import json
 from abc import ABC, abstractmethod
+from typing import Any
 from interpretation.student_data_sheet import DataSheetScalarType
 from interpretation.interpreter_types.table_interpreter import ColumnDefinition, TableInterpreter
 from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
 from interpretation.interpreter_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
+from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
 
 
 class InterpreterSerializer(ABC):
     """Abstract base class for serializing SessionDataSectionInterpreterBase instances to JSON."""
     
     @abstractmethod
-    def serialize(self, interpreter) -> dict:
+    def serialize(self, interpreter: SessionDataSectionInterpreterBase) -> dict[str, Any]:
         """
         Serialize a SessionDataSectionInterpreterBase instance to a dictionary.
         
@@ -50,7 +52,7 @@ class InterpreterSerializer(ABC):
         pass
 
     @abstractmethod
-    def deserialize(self, data: dict):
+    def deserialize(self, data: dict[str, Any]) -> SessionDataSectionInterpreterBase:
         """
         Deserialize a dictionary back to a SessionDataSectionInterpreterBase instance.
         
@@ -66,7 +68,7 @@ class InterpreterSerializer(ABC):
 class TableInterpreterSerializer(InterpreterSerializer):
     """Serializer for TableInterpreter instances."""
     
-    def serialize(self, interpreter) -> dict:
+    def serialize(self, interpreter: SessionDataSectionInterpreterBase) -> dict[str, Any]:
         """
         Serialize a TableInterpreter to a dictionary.
         
@@ -76,8 +78,8 @@ class TableInterpreterSerializer(InterpreterSerializer):
         Returns:
             dict: Dictionary containing type and column configuration
         """
-        # Use the public properties
-        columns = interpreter.columns
+        # Save each column in the shape deserialize() reads back
+        columns = [column.to_json() for column in interpreter.columns]
 
         return {
             'type': 'TableInterpreter',
@@ -88,7 +90,7 @@ class TableInterpreterSerializer(InterpreterSerializer):
             }
         }
 
-    def deserialize(self, data: dict):
+    def deserialize(self, data: dict[str, Any]) -> SessionDataSectionInterpreterBase:
         """
         Deserialize a dictionary to a TableInterpreter instance.
 
@@ -98,7 +100,7 @@ class TableInterpreterSerializer(InterpreterSerializer):
         Returns:
             TableInterpreter: The reconstructed TableInterpreter instance
         """
-        column_defs_json: list[any] = data['config']['columns']
+        column_defs_json: list[Any] = data['config']['columns']
 
         column_defs: list[ColumnDefinition] = [
             ColumnDefinition(col["column_name"], col["column_choices"])
@@ -113,7 +115,7 @@ class TableInterpreterSerializer(InterpreterSerializer):
 class RunningTallyInterpreterSerializer(InterpreterSerializer):
     """Serializer for RunningTallyInterpreter instances."""
     
-    def serialize(self, interpreter) -> dict:
+    def serialize(self, interpreter: SessionDataSectionInterpreterBase) -> dict[str, Any]:
         """
         Serialize a RunningTallyInterpreter to a dictionary.
         
@@ -145,7 +147,7 @@ class RunningTallyInterpreterSerializer(InterpreterSerializer):
             }
         }
 
-    def deserialize(self, data: dict):
+    def deserialize(self, data: dict[str, Any]) -> SessionDataSectionInterpreterBase:
         """
         Deserialize a dictionary to a RunningTallyInterpreter instance.
         
@@ -172,7 +174,7 @@ class RunningTallyInterpreterSerializer(InterpreterSerializer):
 class SimpleFormInterpreterSerializer(InterpreterSerializer):
     """Serializer for SimpleFormInterpreter instances."""
     
-    def serialize(self, interpreter) -> dict:
+    def serialize(self, interpreter: SessionDataSectionInterpreterBase) -> dict[str, Any]:
         """
         Serialize a SimpleFormInterpreter to a dictionary.
         
@@ -214,7 +216,7 @@ class SimpleFormInterpreterSerializer(InterpreterSerializer):
             }
         }
 
-    def deserialize(self, data: dict):
+    def deserialize(self, data: dict[str, Any]) -> SessionDataSectionInterpreterBase:
         """
         Deserialize a dictionary to a SimpleFormInterpreter instance.
         
@@ -243,7 +245,7 @@ class SimpleFormInterpreterSerializer(InterpreterSerializer):
 class InterpreterSerializerRegistry:
     """Registry for managing interpreter serializers."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry with default serializers."""
         # Registry mapping interpreter types to their serializers
         self._serializers = {
@@ -252,7 +254,7 @@ class InterpreterSerializerRegistry:
             'SimpleFormInterpreter': SimpleFormInterpreterSerializer(),
         }
     
-    def get_serializer(self, interpreter):
+    def get_serializer(self, interpreter: SessionDataSectionInterpreterBase) -> InterpreterSerializer:
         """Get the appropriate serializer for an interpreter."""
         interpreter_type = type(interpreter).__name__
         
@@ -261,7 +263,7 @@ class InterpreterSerializerRegistry:
         
         raise ValueError(f"No serializer found for interpreter type: {interpreter_type}")
     
-    def get_serializer_from_data(self, data: dict):
+    def get_serializer_from_data(self, data: dict[str, Any]) -> InterpreterSerializer:
         """Get the appropriate serializer based on dictionary content."""
         interpreter_type = data.get('type')
         
@@ -275,11 +277,11 @@ class InterpreterSerializerRegistry:
 
 
 # Default registry instance
-SERIALIZER_REGISTRY = InterpreterSerializerRegistry()
+SERIALIZER_REGISTRY: InterpreterSerializerRegistry = InterpreterSerializerRegistry()
 
 
 # API convenience functions
-def serialize(interpreter) -> dict:
+def serialize(interpreter: SessionDataSectionInterpreterBase) -> dict[str, Any]:
     """
     Serialize an interpreter instance to a dictionary.
     
@@ -299,7 +301,7 @@ def serialize(interpreter) -> dict:
     return serializer.serialize(interpreter)
 
 
-def deserialize(data: dict):
+def deserialize(data: dict[str, Any]) -> SessionDataSectionInterpreterBase:
     """
     Deserialize a dictionary to an interpreter instance.
     
