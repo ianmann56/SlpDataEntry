@@ -25,7 +25,8 @@ program.py       composition root: parses args, builds clients, wires the layers
    public members, only through the sheet. Storage never loads templates itself.
 2. **Collection normalizes and nothing else.** A collector turns vendor output (for
    example Textract blocks) into `form_data` (label → text, trailing `:` stripped) and
-   `tables` (list of row-major 2D string arrays). It MUST NOT assign domain meaning.
+   `tables` (list of row-major 2D string arrays), with `table_titles` (the title above
+   each table, trailing `:` stripped, `""` when none). It MUST NOT assign domain meaning.
 3. **Interpretation is pure.** Interpreters take an Import and return data. They do no
    I/O, make no network calls, and touch no UI. The same input always produces the same
    output, so they can be exercised against saved sample Imports.

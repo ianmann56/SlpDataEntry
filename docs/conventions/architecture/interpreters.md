@@ -12,6 +12,7 @@ StudentDataSheetTemplate(id, name, [interpreters...])
         ▼
 StudentDataSheetInterpreter
   ├─ reads header fields from form_data: Student Key, Date, Time IN, Time OUT, Goal, Measure
+  ├─ assigns each table on the sheet to one table section (rule 9)
   └─ for each SessionDataSectionInterpreterBase:
         interpret_student_data_sheet_content(import) → DataSheetInterpretationDto(tables, scalars)
      then merges all tables and scalars into one StudentDataSheet, which carries the
@@ -29,7 +30,7 @@ A new interpreter type is complete only when all four of these exist:
 
 | Piece | Location | Responsibility |
 | --- | --- | --- |
-| Interpreter | `interpretation/interpreter_types/<name>_interpreter.py` | Subclass `SessionDataSectionInterpreterBase`. Take `id` and `title` plus its own config. Implement `interpret_student_data_sheet_content`, returning `DataSheetInterpretationDto`, and `section_keys()`, returning the field, column, or tally keys it produces, in template order. `section_kind` defaults to the class name; if the class is renamed, override it to keep the old name. A type that emits form scalars rather than tables is also listed in `FORM_SECTION_KINDS` in `storage/session_layout.py`. |
+| Interpreter | `interpretation/interpreter_types/<name>_interpreter.py` | Subclass `SessionDataSectionInterpreterBase`. Take `id` and `title` plus its own config. Implement `interpret_student_data_sheet_content`, returning `DataSheetInterpretationDto`, and `section_keys()`, returning the field, column, or tally keys it produces, in template order. `section_kind` defaults to the class name; if the class is renamed, override it to keep the old name. A type that reads tables from the sheet overrides `consumes_tables` to return `True`. A type that emits form scalars rather than tables is also listed in `FORM_SECTION_KINDS` in `storage/session_layout.py`. |
 | Config UI | `interpretation/template_manager/interpreter_configs.py` | Subclass `InterpreterConfig`. Implement `name`, `interpreter_type`, `create_config_form` (returning a `ConfigForm` with `frame`, `get_config`, `reset`, and `load`), `construct_interpreter`, and `describe` (readable lines for view mode). `load` fills the form from a saved interpreter so it can be edited. |
 | Serializer | `interpretation/template_manager/storage/serialization.py` | Subclass `InterpreterSerializer` and register it. The output has the shape `{"type", "id", "title", "config"}`. |
 | Registration | the config list passed to the management window, and the serializer registry | Makes the type visible in the UI and loadable from disk. |
@@ -60,3 +61,10 @@ A new interpreter type is complete only when all four of these exist:
    Template Structure. Changing what they return for an existing type changes which
    Student Session Workbook its templates' sessions go to, so treat that like a
    serialization change (rule 4).
+9. **Each table is read by one section.** `StudentDataSheetInterpreter` decides which
+   tables each section whose `consumes_tables` is `True` receives; the section reads
+   only those. A template with one such section gets every table. A template with
+   several gives each table to the section whose title matches the table's title on the
+   sheet, ignoring letter case, spacing, and a trailing `:`. A table with no title or no
+   matching section, a section with no table, or two such sections with the same title
+   fails the sheet (rule 5).

@@ -23,6 +23,11 @@ Properties:
     DTO with the value and type (with those names as property names).
 """
 DataSheetInterpretationDto = namedtuple('DataSheetInterpretationDto', ['tables', 'scalars'])
+
+
+def _normalize_title(title: str) -> str:
+  """A section or table title as compared: no trailing ':', single spaces, ignoring letter case."""
+  return " ".join(title.strip().removesuffix(":").split()).casefold()
   
 class SessionDataSectionInterpreterBase(ABC):
 
@@ -55,6 +60,14 @@ class SessionDataSectionInterpreterBase(ABC):
     renaming an interpreter class changes which workbook its templates' sessions go to.
     """
     return type(self).__name__
+
+  @property
+  def consumes_tables(self) -> bool:
+    """
+    Whether this section reads tables from the sheet. When a template has several such
+    sections, each table goes to the one whose title matches the table's title.
+    """
+    return False
 
   @abstractmethod
   def section_keys(self) -> list[str]:
@@ -185,9 +198,14 @@ class StudentDataSheetInterpreter:
 
     data_sheet = StudentDataSheet(student_key, student_goal, date, time_in, time_out, measure, template=self._template)
 
+    # Each table section sees only the tables assigned to it, so no table is read twice
+    tables_by_section = self._assign_tables(data_sheet_content)
+
     # Each interpretation is paired with the interpreter that produced it, so tables can be tagged
     data_sheet_interpretations = [
-      (interpreter, interpreter.interpret_student_data_sheet_content(data_sheet_content))
+      (interpreter, interpreter.interpret_student_data_sheet_content(
+        tables_by_section.get(interpreter.id, data_sheet_content)
+      ))
       for interpreter
       in self.session_data_templates
     ]
@@ -201,6 +219,58 @@ class StudentDataSheetInterpreter:
 
     return data_sheet
   
+  def _assign_tables(self, data_sheet_content: StudentDataSheetImport) -> dict[str, StudentDataSheetImport]:
+    """
+    Decide which tables on the sheet each table section reads.
+
+    A template with one table section gives it every table, whatever their titles. A
+    template with several gives each table to the section whose title matches the
+    table's title, ignoring letter case, spacing, and a trailing ':'. A table that
+    matches no section, a section with no table, or a table with no title fails the
+    sheet loudly.
+
+    :return: For each table section's id, an Import holding only its tables. Sections
+      that read no tables are left out and see the whole Import.
+    :raises ValueError: If the tables can't be matched to the template's table sections
+    """
+    table_sections = [interpreter for interpreter in self.session_data_templates if interpreter.consumes_tables]
+    if len(table_sections) <= 1:
+      return {section.id: data_sheet_content for section in table_sections}
+
+    section_by_title: dict[str, SessionDataSectionInterpreterBase] = {}
+    for section in table_sections:
+      key = _normalize_title(section.title)
+      if not key:
+        raise ValueError(
+          "the template has more than one table section, so each needs a title matching the title above its table on the sheet"
+        )
+      if key in section_by_title:
+        raise ValueError(f'the template has more than one table section titled "{section.title}", so their tables can\'t be told apart')
+      section_by_title[key] = section
+
+    section_titles = ", ".join(f'"{section.title}"' for section in table_sections)
+    indexes_by_section: dict[str, list[int]] = {section.id: [] for section in table_sections}
+    for index, title in enumerate(data_sheet_content.table_titles):
+      if not _normalize_title(title):
+        raise ValueError(f"table {index + 1} on the sheet has no title, so it can't be matched to one of {section_titles}")
+      section = section_by_title.get(_normalize_title(title))
+      if section is None:
+        raise ValueError(f'the sheet has a table titled "{title}", but the template has no table section with that title (expected {section_titles})')
+      indexes_by_section[section.id].append(index)
+
+    for section in table_sections:
+      if not indexes_by_section[section.id]:
+        raise ValueError(f'no table titled "{section.title}" was found on the sheet')
+
+    return {
+      section_id: StudentDataSheetImport(
+        data_sheet_content.form_data,
+        [data_sheet_content.tables[index] for index in indexes],
+        [data_sheet_content.table_titles[index] for index in indexes],
+      )
+      for section_id, indexes in indexes_by_section.items()
+    }
+
   def _split_by_labels(self, text, labels):
     """
     Parses text content by identifying sections marked with specific labels.

@@ -56,6 +56,13 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
     """
     return self._columns
 
+  @property
+  def consumes_tables(self) -> bool:
+    """
+    A table section reads the tables on the sheet.
+    """
+    return True
+
   def section_keys(self) -> list[str]:
     """
     The column names, in template order.

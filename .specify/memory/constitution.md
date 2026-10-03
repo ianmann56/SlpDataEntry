@@ -21,11 +21,16 @@ Sync Impact Report
     program.py), the window receives open_url, and the Google services are built lazily
     on the first Import press.
   - Updated docs/conventions/architecture/interpreters.md: a complete interpreter type
-    implements section_keys() (and keeps section_kind if renamed); the diagram shows the
-    sheet carrying its template. New rule 8: section keys decide the workbook.
+    implements section_keys() (and keeps section_kind if renamed), and a table-reading
+    type overrides consumes_tables; the diagram shows the sheet carrying its template.
+    New rule 8: section keys decide the workbook. New rule 9: each table is read by one
+    section, matched by title when a template has several table sections.
+  - Updated docs/conventions/architecture/layers.md rule 2: collection also returns
+    table_titles.
   - Updated docs/domain/glossary.md: adds Data Sheet Store, Template Structure, Student
     Session Workbook (replacing Session Sheet), Session Tab, Session Moment, Workbook
-    Layout Order, and Therapy Data Folder, and updates the pipeline's Storage step.
+    Layout Order, and Therapy Data Folder, updates the pipeline's Storage step, and adds
+    table_titles to Import.
 - Templates requiring updates: none
 - Deferred TODOs: none
 - Prior history:

@@ -38,9 +38,9 @@ def image_to_text(image_path, inject_textract_client) -> StudentDataSheetImport:
         )
         
         form_data = _extract_form_data(response)
-        tables = _extract_table_data(response)
+        tables, table_titles = _extract_table_data(response)
     
-        return StudentDataSheetImport(form_data, tables)
+        return StudentDataSheetImport(form_data, tables, table_titles)
         
     except FileNotFoundError:
         raise
@@ -49,22 +49,47 @@ def image_to_text(image_path, inject_textract_client) -> StudentDataSheetImport:
     except Exception as e:
         raise Exception(f"Error processing image {image_path}: {str(e)}")
 
-def _extract_table_data(response):
+def _extract_table_data(response) -> tuple[list[list[list[str]]], list[str]]:
     """
-    Extracts tabular data from Textract response.
+    Extracts tabular data, and each table's title, from Textract response.
     
     Args:
         response: Full Textract response
         
     Returns:
-        list: A list of 2D lists that represent each row in the table.
+        tuple: A list of 2D lists that represent each row in each table, and a list of
+            the title of each table in the same order ("" when Textract found none).
     """
     tables = []
+    titles = []
     for block in response.get('Blocks', []):
         if block['BlockType'] == 'TABLE':
             table = _extract_table_from_block(response, block)
             tables.append(table)
-    return tables
+            titles.append(_extract_table_title(response, block))
+    return tables, titles
+
+
+def _extract_table_title(response, table_block) -> str:
+    """
+    Extracts the title Textract found above a table, with any trailing ':' removed.
+    
+    Args:
+        response: Full Textract response
+        table_block: TABLE block from response
+        
+    Returns:
+        str: The title text, or "" when the table has none
+    """
+    blocks = {block['Id']: block for block in response['Blocks']}
+    parts = []
+    for relationship in table_block.get('Relationships', []):
+        if relationship['Type'] == 'TABLE_TITLE':
+            for title_id in relationship['Ids']:
+                title_block = blocks.get(title_id)
+                if title_block is not None:
+                    parts.append(_get_text_from_block(response, title_block))
+    return ' '.join(part for part in parts if part).strip().removesuffix(':').strip()
 
 
 def _extract_form_data(response):

@@ -52,6 +52,13 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
     """
     return self._tally_choice_options
 
+  @property
+  def consumes_tables(self) -> bool:
+    """
+    A running tally is read from a table on the sheet.
+    """
+    return True
+
   def section_keys(self) -> list[str]:
     """
     The one column a running tally emits.

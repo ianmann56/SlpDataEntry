@@ -29,7 +29,7 @@ use the same name.
 
 | Term | Code | Meaning |
 | --- | --- | --- |
-| **Import** | `StudentDataSheetImport` | Raw OCR output for one sheet: `form_data` (label → text) and `tables` (list of 2D string arrays). It carries no meaning yet. |
+| **Import** | `StudentDataSheetImport` | Raw OCR output for one sheet: `form_data` (label → text), `tables` (list of 2D string arrays), and `table_titles` (the title printed above each table, or `""`). It carries no meaning yet. |
 | **Interpretation** | `StudentDataSheet` | The meaningful result: header fields plus typed tables and scalars. |
 | **Scalar** | `DataSheetScalarDto` | One typed value (`key`, `value`, `type`, `choice_options`). |
 | **Scalar Type** | `DataSheetScalarType` | `TEXT`, `INT`, `CHOICE`, `DATE`, `BOOLEAN`. |
