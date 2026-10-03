@@ -461,3 +461,11 @@ Each step leaves the app working, with two known gaps until later stories close 
 - Before US4, re-importing a sheet with a Time IN adds a second tab named
   `<Date> <Time IN> 2` at the end of the workbook. US4 recognizes it as already saved
   instead and places new tabs newest first.
+
+---
+
+## Phase 8: Convergence
+
+- [ ] T033 CRITICAL: Fully annotate the public members this feature changed (`image_to_text(image_path: str, inject_textract_client: Callable[[], Any]) -> StudentDataSheetImport` in `therepy_sessions/collection/images/aws_image_collection.py`, `SimpleFormInterpreter.__init__(self, id: str, title: str, fields: dict[str, FieldConfiguration]) -> None` in `therepy_sessions/interpretation/interpreter_types/simple_form_interpreter.py`, and `-> None` on `TableInterpreter.__init__` in `therepy_sessions/interpretation/interpreter_types/table_interpreter.py`) per Constitution VI (contradicts)
+- [ ] T034 Give the Google sign-in a timeout in `therepy_sessions/clients/google_service.py` (`run_local_server(timeout_seconds=...)`) so a closed or abandoned sign-in tab ends `prepare()` with an error, and translate it in `GoogleDriveDataSheetStore._translate_errors` to "Google sign-in was cancelled or timed out; press Import to try again", so the import does not start and the SLP is told why per FR-006a (partial)
+- [ ] T035 Record matching tables to template sections by title (Import `table_titles` from Textract `TABLE_TITLE`, `consumes_tables`, `StudentDataSheetInterpreter._assign_tables`, interpreters rule 9) in this feature's `spec.md` (a functional requirement and edge cases) and `plan.md` (a research decision), or move it to its own feature, per spec/plan scope (unrequested)
