@@ -48,11 +48,18 @@ use the same name.
 | **Import Batch** | `SheetImportBatch` | The list of Selected Files and the rules for importing them. |
 | **Import Run** | | The Selected Files processed by one press of Import (those not yet succeeded). |
 | **Sheet Outcome** | `SheetOutcome` | One file's result: *not imported*, *succeeded*, or *failed* with a reason that names the fix. |
-| **Session Sheet** | `create_therapy_session_sheet` | The Google Sheet the tool writes as output, with summary text and charts. |
+| **Data Sheet Store** | `DataSheetStore` | The storage mechanism for interpreted data sheets. The import code and its window save sheets only through it. The current implementation, `GoogleDriveDataSheetStore`, saves to Student Session Workbooks. |
+| **Template Structure** | `TemplateShape.structure_identity()` | The shape of a template that decides where its sessions are saved: its sections and, within each, the set of field, column, and tally keys, compared without regard to order. A template's name, description, ids, value types, and choice options are not part of it. |
+| **Student Session Workbook** | `GoogleDriveDataSheetStore` | The Google Sheet holding every saved session for one Student Key and one Template Structure, in the Therapy Data Folder. It is named from the Student Key and the name of the template that started it, and found by a hidden label, so renaming it does not lose it. |
+| **Session Tab** | | One tab in a Student Session Workbook, holding the values of one imported sheet. It is named with that sheet's Session Moment. |
+| **Session Moment** | `SessionMoment` | A sheet's session Date plus its Time IN, as read from the sheet. It names a Session Tab and identifies the session within its workbook. A sheet with a blank Time IN has a date-only Session Moment, which never identifies a duplicate. |
+| **Workbook Layout Order** | `WorkbookLayout` | The order of sections, form fields, and columns taken from the template that started a workbook. Every tab in that workbook uses it. |
+| **Therapy Data Folder** | `DATA_FOLDER_PATH` | The Google Drive folder `SLP Therepy Data/Current Year` holding every Student Session Workbook. |
 
 ## Pipeline in one line
 
 Photo of a data sheet → **Collection** (OCR into an Import) → **Interpretation**
-(apply a Template to get a StudentDataSheet) → **Storage** (write a Session Sheet to Google Sheets).
+(apply a Template to get a StudentDataSheet) → **Storage** (save to the student's Student Session
+Workbook through the Data Sheet Store).
 
 See [student-data-privacy.md](student-data-privacy.md) for how student information must be handled.

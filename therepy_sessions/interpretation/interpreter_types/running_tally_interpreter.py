@@ -2,6 +2,8 @@ from functools import reduce
 from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
 from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetScalarType
 
+# The one column a running tally emits
+TALLY_COLUMN_NAME: str = 'Tally'
 
 class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
   """
@@ -50,6 +52,12 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
     """
     return self._tally_choice_options
 
+  def section_keys(self) -> list[str]:
+    """
+    The one column a running tally emits.
+    """
+    return [TALLY_COLUMN_NAME]
+
   def interpret_student_data_sheet_content(self, data_sheet_content):
     """
     Processes multiple tables from the data sheet using column-based interpretation.
@@ -81,7 +89,7 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
       letters_string = reduce(lambda acc, s: acc + s, row, '')
       tally_string = tally_string + letters_string
 
-    tally_column_name = 'Tally'
+    tally_column_name = TALLY_COLUMN_NAME
 
     tally_as_rows = [
       { tally_column_name: DataSheetScalarDto(tally_column_name, letter, self._tally_type, self._tally_choice_options) }

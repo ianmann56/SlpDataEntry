@@ -32,8 +32,6 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
   Use case: Therapy session data sheets with consistent column layouts like 'Word',
   'Times w/Prompting', 'Times w/o Prompting', etc.
   """
-  _columns: list[ColumnDefinition] = []
-
   def __init__(self, id: str, title: str, columns: list[ColumnDefinition]):
     """
     Initializes the template with expected column names for table processing.
@@ -46,7 +44,7 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
     :param columns: List of expected column definitons that should be present in data sheet tables
     """
     super().__init__(id, title)
-    self._columns = columns
+    self._columns: list[ColumnDefinition] = columns
 
   @property
   def columns(self) -> list[ColumnDefinition]:
@@ -57,6 +55,12 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
         list: List of column names
     """
     return self._columns
+
+  def section_keys(self) -> list[str]:
+    """
+    The column names, in template order.
+    """
+    return [column.column_name for column in self._columns]
 
   def interpret_student_data_sheet_content(self, data_sheet_content: StudentDataSheetImport):
     """

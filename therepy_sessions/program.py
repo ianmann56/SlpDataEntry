@@ -4,6 +4,7 @@ import os
 import sys
 import threading
 import traceback
+import webbrowser
 import darkdetect
 import tkinter as tk
 from typing import Any
@@ -12,13 +13,16 @@ import sv_ttk
 from app_shell.home_window import HomeWindow
 from app_shell.setup_window import SetupWindow
 from clients.aws_clients import construct_textract_client
+from clients.google_service import create_drive_service, create_sheets_service, load_google_credentials
 from collection.images.aws_image_collection import image_to_text
+from interpretation.data_sheet_store import DataSheetStore
 from interpretation.importing.import_window import ImportWindow
 from interpretation.importing.sheet_import_batch import SheetImportBatch
 from interpretation.template_manager.interpreter_configs import STUB_INTERPRETER_CONFIGS
 from interpretation.template_manager.template_management_window import DataSheetTemplateManagementWindow
 from interpretation.template_manager.template_rules import TemplateUsage, group_usage
 from interpretation.template_store import TemplateStore
+from storage.google_drive_data_sheet_store import GoogleDriveDataSheetStore
 from students.json_student_store import JsonStudentStore
 from students.student import TemplateChoice, UnreadableStudentRecordsError
 from students.student_store import StudentStore
@@ -64,22 +68,49 @@ def main() -> None:
                 textract_client = construct_textract_client()
             return textract_client
 
+    # Build the Google services on the first Import press, so launching and Setup need no sign-in.
+    # They are rebuilt once the credentials stop being valid, which signs in again if needed.
+    google_lock = threading.Lock()
+    google_credentials: Any = None  # google.oauth2.credentials.Credentials
+    sheets_service: Any = None      # googleapiclient Resource, sheets v4
+    drive_service: Any = None       # googleapiclient Resource, drive v3
+
+    def ensure_google_services() -> None:
+        nonlocal google_credentials, sheets_service, drive_service
+        if google_credentials is None or not google_credentials.valid:
+            google_credentials = load_google_credentials()
+            sheets_service = create_sheets_service(google_credentials)
+            drive_service = create_drive_service(google_credentials)
+
+    def inject_sheets_service() -> Any:
+        with google_lock:
+            ensure_google_services()
+            return sheets_service
+
+    def inject_drive_service() -> Any:
+        with google_lock:
+            ensure_google_services()
+            return drive_service
+
     def check_records_readable() -> None:
         student_store.list_students()
         template_store.check_readable()
 
     def open_import_path() -> None:
         path_window = _open_child_window(root, root)
+        # One store per visit, shared by the batch and the window
+        data_sheet_store: DataSheetStore = GoogleDriveDataSheetStore(inject_drive_service, inject_sheets_service)
         ImportWindow(
             path_window,
             SheetImportBatch(
                 read_sheet=lambda path: image_to_text(path, inject_textract_client),
                 student_store=student_store,
                 get_template=template_store.get_template_by_id,
+                data_sheet_store=data_sheet_store,
             ),
+            data_sheet_store,
             check_records_readable,
-            # Printing stands in for the Storage step until it is built
-            on_sheet_interpreted=lambda sheet: sheet.debug(),
+            open_url=webbrowser.open,
             on_back=lambda: _return_to(root, path_window),
             on_exit=root.destroy,
         )

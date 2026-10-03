@@ -1,9 +1,16 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from typing import TYPE_CHECKING
 
 import ipdb
 from interpretation.student_data_sheet import StudentDataSheet
 from collection.collection_headers import StudentDataSheetImport
+
+if TYPE_CHECKING:
+  # Imported for type checking only: the template module imports this module
+  from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
   
 """
 Represents the interpreted data from a data sheet.
@@ -19,7 +26,7 @@ DataSheetInterpretationDto = namedtuple('DataSheetInterpretationDto', ['tables',
   
 class SessionDataSectionInterpreterBase(ABC):
 
-  def __init__(self, id, title):
+  def __init__(self, id: str, title: str) -> None:
     """
     :param id: The unique id identifying this specific interpreter instance within a template.
     :param title: The user-facing title identifying this interpreter within a template.
@@ -28,18 +35,36 @@ class SessionDataSectionInterpreterBase(ABC):
     self._title = title
 
   @property
-  def id(self):
+  def id(self) -> str:
     """
     The unique id identifying this specific interpreter instance within a template.
     """
     return self._id
 
   @property
-  def title(self):
+  def title(self) -> str:
     """
     The user-facing title identifying this interpreter within a template.
     """
     return self._title
+
+  @property
+  def section_kind(self) -> str:
+    """
+    The kind of section this interpreter reads. Part of the Template Structure, so
+    renaming an interpreter class changes which workbook its templates' sessions go to.
+    """
+    return type(self).__name__
+
+  @abstractmethod
+  def section_keys(self) -> list[str]:
+    """
+    The field / column / tally keys this section produces, in template order.
+
+    These feed the Template Structure: changing them changes which Student Session
+    Workbook a template's sessions are saved to.
+    """
+    pass
 
   @abstractmethod
   def interpret_student_data_sheet_content(self, data_sheet_content: StudentDataSheetImport) -> DataSheetInterpretationDto:
@@ -116,13 +141,21 @@ class StudentDataSheetInterpreter:
   table structures or data sheet layouts in therapy session documentation.
   """
 
-  session_data_templates : list[SessionDataSectionInterpreterBase] = []
-
-  def __init__(self, session_data_templates):
+  def __init__(
+    self,
+    session_data_templates: list[SessionDataSectionInterpreterBase],
+    template: StudentDataSheetTemplate,
+  ) -> None:
+    """
+    :param session_data_templates: The template's section interpreters, in template order.
+    :param template: The template these interpreters come from. Every sheet this
+      interpreter builds carries it.
+    """
     super().__init__()
-    self.session_data_templates = session_data_templates
+    self.session_data_templates: list[SessionDataSectionInterpreterBase] = session_data_templates
+    self._template = template
 
-  def interpret_student_data_sheet(self, data_sheet_content: StudentDataSheetImport):
+  def interpret_student_data_sheet(self, data_sheet_content: StudentDataSheetImport) -> StudentDataSheet:
     """
     Takes the given imported student's data sheet from an image or some other external system
     and interprets the content based on the template configured for that student.
@@ -140,7 +173,8 @@ class StudentDataSheetInterpreter:
         tables: a list of 2D arrays, each 2D array representing a table. Each array at the lowest
                 level represents a row of data. The column headers are expected to be the first row.
 
-    :return: A DTO with the name and goal of the student and the date on which the sample was taken.
+    :return: The interpreted sheet. It carries the template it was interpreted with, and
+      each of its tables is tagged with the id of the interpreter that produced it.
     """
     student_key = data_sheet_content.form_data['Student Key']
     date = data_sheet_content.form_data['Date']
@@ -149,17 +183,18 @@ class StudentDataSheetInterpreter:
     student_goal = data_sheet_content.form_data['Goal']
     measure = data_sheet_content.form_data['Measure']
 
-    data_sheet = StudentDataSheet(student_key, student_goal, date, time_in, time_out, measure)
+    data_sheet = StudentDataSheet(student_key, student_goal, date, time_in, time_out, measure, template=self._template)
 
+    # Each interpretation is paired with the interpreter that produced it, so tables can be tagged
     data_sheet_interpretations = [
-      template.interpret_student_data_sheet_content(data_sheet_content)
-      for template
+      (interpreter, interpreter.interpret_student_data_sheet_content(data_sheet_content))
+      for interpreter
       in self.session_data_templates
     ]
 
-    for interpretation in data_sheet_interpretations:
+    for interpreter, interpretation in data_sheet_interpretations:
       for table in interpretation.tables:
-        data_sheet.register_table(table)
+        data_sheet.register_table(table, interpreter.id)
 
       for scalar_name, scalar_dto in interpretation.scalars.items():
         data_sheet.register_scalar(scalar_name, scalar_dto)
