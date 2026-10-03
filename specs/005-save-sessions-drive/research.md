@@ -198,7 +198,7 @@ workbook is not trashed and is still in the folder. If the check fails, it drops
 entry and searches again.
 
 **Rationale**: Drive search is eventually consistent. A workbook created for the first
-`JA` sheet in a batch may not show up in a search a second later for the second `JA`
+`AG` sheet in a batch may not show up in a search a second later for the second `AG`
 sheet, which would create a duplicate workbook and break FR-007. The cache is only an
 accelerator: Drive is still the source of truth, and the cache dies with the window.
 
@@ -223,7 +223,10 @@ not guaranteed.
      `deleteSheet` the default tab, and `createDeveloperMetadata` with the layout.
   3. If step 2 fails, `drive.files.delete` the new file (best effort) and report the
      failure. A failed delete is printed to the console, and the empty workbook is later
-     found and reused. It holds no session tab, so no data is wrong.
+     found and reused. It holds no session tab, so no data is wrong. The next save to it
+     repairs it: because its layout metadata is missing, that save's `batchUpdate` also
+     writes the layout and deletes the empty default tab (FR-019; contracts/
+     session-storage.md § `save(sheet)` step 5.1).
 
 **Rationale**: This meets "nothing partial remains" (FR-002) with no compensation logic
 for existing workbooks. Writing values with `updateCells`, rather than
@@ -316,7 +319,8 @@ would need justification.
    - a blank row before the next block
 
 Each table column is mapped by key, so a template whose columns are listed in a
-different order still writes to the original positions (FR-025a).
+different order still writes its columns in the workbook's original order (FR-025,
+FR-025a).
 
 Choice options, types, ids, and the template name or description are never written
 (FR-023).
@@ -363,7 +367,8 @@ working.
 
 The client-secret path keeps today's default, which is outside the repo. It can now be
 overridden with the `SLP_GOOGLE_CLIENT_SECRET_FILE` environment variable
-(dependency-injection rule 4).
+(dependency-injection rule 4). The variable is read inside `load_google_credentials()`,
+not at import time (Principle IV).
 
 `program.py` builds the credentials and services once, lazily, behind
 `inject_drive_service` and `inject_sheets_service`, guarded by a lock like

@@ -72,7 +72,7 @@ def tab_base_name(moment: SessionMoment) -> str: ...                      # "{da
 def unique_tab_name(base: str, taken: Collection[str]) -> str: ...        # base, then base + " 2", " 3", …
 def insert_index(new: SessionMoment, existing: Sequence[SessionMoment | None]) -> int: ...
 def session_rows(sheet: StudentDataSheet, layout: WorkbookLayout) -> list[list[CellValue]]: ...   # R9
-def workbook_name(student_key: str, template_name: str) -> str: ...      # "JA - Emotion Causes"
+def workbook_name(student_key: str, template_name: str) -> str: ...      # "AG - Emotion Causes"
 ```
 
 | Function | Guarantees | Spec |
@@ -138,6 +138,13 @@ It is idempotent within one store.
       `fields=properties.title,sheets.properties(sheetId,title,index),developerMetadata`
       returns the workbook name, the tabs, and the layout. A missing layout falls back
       to `from_shape(shape)`.
+      - **Repair** (spec edge case, FR-019): a missing layout means an earlier create
+        failed and its cleanup also failed. In that case the `batchUpdate` in step 4
+        also carries `createDeveloperMetadata` with the fallback layout, and a
+        `deleteSheet` (after the `addSheet`) for every tab whose `A1:B6` (step 2) is
+        empty. Those empty tabs are left out of the duplicate check, `titles`, and
+        `tab_moments_in_index_order`. A workbook that has its layout is never repaired,
+        so an empty tab the SLP added is not removed.
    2. One `values.batchGet` reads `'<tab>'!A1:B6` for every tab, giving
       `moment_from_rows` for each.
    3. **Duplicate**: if `moment_of(sheet)` matches any tab's moment, return that tab with
@@ -148,7 +155,8 @@ It is idempotent within one store.
       - a new `sheetId` (random 31-bit, not in use)
 
       Then send one `batchUpdate` with `addSheet` and `updateCells` from
-      `session_rows(sheet, layout)`. Return `already_saved=False`.
+      `session_rows(sheet, layout)`, plus the repair requests from step 1 when they
+      apply. Return `already_saved=False`.
 6. Every `execute(num_retries=3)`. `HttpError`, `RefreshError`, `TransportError`, and
    `OSError` become `DataSheetStoreError`, with messages such as:
    - "not signed in to Google; press Import to sign in"
@@ -164,10 +172,11 @@ only (FR-028). Nothing is logged to a file (FR-026).
 ## `clients/google_service.py` (changed)
 
 ```python
-CLIENT_SECRET_FILE: str   # default as today, outside the repo; overridden by env SLP_GOOGLE_CLIENT_SECRET_FILE
+DEFAULT_CLIENT_SECRET_FILE: str   # today's default path, outside the repo
+CLIENT_SECRET_FILE_ENV: str = "SLP_GOOGLE_CLIENT_SECRET_FILE"   # read inside load_google_credentials(), never at import time
 SCOPES: list[str] = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 
-def load_google_credentials() -> Any: ...                  # google.oauth2.credentials.Credentials; the pickle cache, refresh, and browser login as today
+def load_google_credentials() -> Any: ...                  # google.oauth2.credentials.Credentials; the pickle cache, refresh, and browser login as today; resolves the secret path from CLIENT_SECRET_FILE_ENV, else DEFAULT_CLIENT_SECRET_FILE
 def create_sheets_service(credentials: Any) -> Any: ...    # build('sheets', 'v4')
 def create_drive_service(credentials: Any) -> Any: ...     # build('drive', 'v3')
 ```

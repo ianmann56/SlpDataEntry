@@ -41,6 +41,8 @@ retried with the existing rules (R1).
 - caches workbooks found or created in this window, to beat search lag (R5)
 - writes each tab with one atomic `batchUpdate`, placing values by key and typing them
   from the interpreted type (R6, R7)
+- repairs a workbook left empty by a failed create whose cleanup also failed: the next
+  save writes its missing layout and removes its empty default tab (R6)
 - detects duplicates from the Date and Time IN in each tab. A blank Time IN gets a
   date-only tab name and is never a duplicate (R8).
 
@@ -143,7 +145,7 @@ specs/005-save-sessions-drive/
 ├── plan.md                         # This file
 ├── research.md                     # Phase 0: decisions R1–R13
 ├── data-model.md                   # Shapes, outcomes, workbook/tab/label model, cell rules
-├── quickstart.md                   # Validation V1–V8
+├── quickstart.md                   # Validation V1–V9
 ├── contracts/
 │   ├── interpretation-and-import.md  # DataSheetStore port, sheet/interpreter changes, batch, window, wiring
 │   └── session-storage.md            # template_structure, session_layout, GoogleDriveDataSheetStore, google_service

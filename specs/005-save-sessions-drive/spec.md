@@ -17,7 +17,7 @@
 - Q: Should saved values be real numbers or plain text? → A: Values whose interpreted type is a number are saved as numbers; all others are saved as plain text exactly as read, with no automatic conversion. The plan must keep this decision derived from the template's value types so a later feature can let the SLP configure it per field on the template (that configuration is out of scope here).
 - Q: Where does a new session tab go among existing tabs? → A: Ordered by session date, newest first (later refined to date then Time IN; see below).
 - Q: How are header and form values laid out at the top of a tab? → A: A vertical list (field name in column A, value in column B, one field per row), then a blank row, then each table or tally block.
-- Q: When templates with the same keys in a different order share a workbook, which order do tabs use? → A: The order of the template that started the workbook, stored with the workbook's hidden label and used for every later tab.
+- Q: When templates with the same keys in a different order share a workbook, which order do tabs use? → A: The order of the template that started the workbook, stored with the workbook's hidden label and used for every later tab. (Later refined: it is kept in the workbook's hidden workbook metadata, which may be separate from the label; see FR-013a.)
 - Q: When does the app make sure the SLP is signed in to Google? → A: When Import is pressed, before any sheet is read: sign in if needed and confirm the folder exists. If that fails, the import does not start and the SLP is told why.
 - Q: If several workbooks in the folder carry the same student and template structure (e.g. a copy made in Drive), which one is used? → A: The most recently changed one.
 - Q: After a sheet is saved, what should its row in the Import window show? → A: A status indicator showing whether the sheet's import (including its save) succeeded or failed, plus an Open action on succeeded rows that opens the saved tab in the browser.
@@ -34,13 +34,13 @@ After a day of sessions, the SLP imports a batch of photographed Student Data Sh
 
 **Why this priority**: This is the Storage step of the pipeline. Without it, the import produces nothing the SLP can keep, review, or analyze.
 
-**Independent Test**: With student `JA` assigned a template, import one synthetic sample sheet dated `9/14/2026` with Time IN `11:00 AM`. Confirm a workbook named from `JA` and the template name now exists in `SLP Therepy Data/Current Year` with a tab named `9/14/2026 11:00 AM` holding the sheet's values. Import a second sheet for `JA` dated `9/16/2026` and confirm it appears as a second tab in the same workbook, with no new workbook created.
+**Independent Test**: With student `AG` assigned a template, import one synthetic sample sheet dated `9/14/2026` with Time IN `11:00 AM`. Confirm a workbook named from `AG` and the template name now exists in `SLP Therepy Data/Current Year` with a tab named `9/14/2026 11:00 AM` holding the sheet's values. Import a second sheet for `AG` dated `9/16/2026` and confirm it appears as a second tab in the same workbook, with no new workbook created.
 
 **Acceptance Scenarios**:
 
-1. **Given** student `JA` has a Current Template and no workbook exists for `JA` with that template's structure, **When** a sheet for `JA` is imported, **Then** a new workbook is created in `SLP Therepy Data/Current Year`, named from `JA` and the template's name, with one tab named with the session Date and Time IN on the sheet.
-2. **Given** a workbook already exists for `JA` with that template's structure, **When** another sheet for `JA` is imported, **Then** a new tab is added to that existing workbook and no new workbook is created.
-3. **Given** a batch mixes sheets for `JA` and `BK`, **When** the batch is imported, **Then** each sheet is saved to the workbook of its own student, never to another student's workbook.
+1. **Given** student `AG` has a Current Template and no workbook exists for `AG` with that template's structure, **When** a sheet for `AG` is imported, **Then** a new workbook is created in `SLP Therepy Data/Current Year`, named from `AG` and the template's name, with one tab named with the session Date and Time IN on the sheet.
+2. **Given** a workbook already exists for `AG` with that template's structure, **When** another sheet for `AG` is imported, **Then** a new tab is added to that existing workbook and no new workbook is created.
+3. **Given** a batch mixes sheets for `AG` and `BK`, **When** the batch is imported, **Then** each sheet is saved to the workbook of its own student, never to another student's workbook.
 4. **Given** the folder `SLP Therepy Data/Current Year` does not exist in the SLP's Google Drive, **When** the first sheet is saved, **Then** the folder (and its parent) is created and the workbook is placed inside it.
 5. **Given** a sheet has been saved, **When** the SLP looks at the Import window, **Then** that sheet's row shows it succeeded only after the save completed.
 6. **Given** a sheet has been saved, **When** the SLP chooses Open on its row, **Then** the saved tab opens in their web browser.
@@ -70,16 +70,16 @@ Over a school year the SLP adjusts templates. When a student's sheet layout real
 
 **Why this priority**: It keeps each workbook consistent and analyzable across sessions. The basic save (Stories 1–2) works without it for a student who never changes templates.
 
-**Independent Test**: Import a sheet for `JA` under template A. Assign `JA` a different template B with the same name as A but a different field; import again and confirm a second workbook is created. Assign `JA` template C, which has a different name but the same sections and fields as A in a different order; import again and confirm the tab is added to the first workbook.
+**Independent Test**: Import a sheet for `AG` under template A. Assign `AG` a different template B with the same name as A but a different field; import again and confirm a second workbook is created. Assign `AG` template C, which has a different name but the same sections and fields as A in a different order; import again and confirm the tab is added to the first workbook.
 
 **Acceptance Scenarios**:
 
-1. **Given** `JA` has a workbook started with template A, **When** `JA`'s Current Template is changed to a template with a different structure and a sheet is imported, **Then** a new workbook is created for `JA` named from the new template's name, and the old workbook is unchanged.
-2. **Given** `JA` has a workbook started with template A, **When** `JA`'s Current Template is changed to another template with the same name as A but a different structure, **Then** new imports go to a new workbook, even though the names match.
-3. **Given** `JA` has a workbook started with template A, **When** `JA`'s Current Template is changed to a template with a different name but the same structure as A, **Then** new imports go to the existing workbook, and the workbook keeps its original name.
+1. **Given** `AG` has a workbook started with template A, **When** `AG`'s Current Template is changed to a template with a different structure and a sheet is imported, **Then** a new workbook is created for `AG` named from the new template's name, and the old workbook is unchanged.
+2. **Given** `AG` has a workbook started with template A, **When** `AG`'s Current Template is changed to another template with the same name as A but a different structure, **Then** new imports go to a new workbook, even though the names match.
+3. **Given** `AG` has a workbook started with template A, **When** `AG`'s Current Template is changed to a template with a different name but the same structure as A, **Then** new imports go to the existing workbook, and the workbook keeps its original name.
 4. **Given** two templates have the same sections, fields, and columns listed in a different order, **When** their structures are compared, **Then** they are treated as the same structure.
-5. **Given** `JA` switched from template A to template B and later back to template A (or a template with A's structure), **When** a sheet is imported, **Then** it is saved to the original workbook started with A.
-6. **Given** `JA` and `BK` use the same template, **When** sheets for each are imported, **Then** each student has their own workbook.
+5. **Given** `AG` switched from template A to template B and later back to template A (or a template with A's structure), **When** a sheet is imported, **Then** it is saved to the original workbook started with A.
+6. **Given** `AG` and `BK` use the same template, **When** sheets for each are imported, **Then** each student has their own workbook.
 
 ---
 
@@ -89,16 +89,16 @@ Sometimes a student has more than one session on the same day; each has its own 
 
 **Why this priority**: It happens rarely, but without it a second session on one day could be lost, or a re-import could double-count a session.
 
-**Independent Test**: Import two sheets for `JA` dated `9/14/2026`, one with Time IN `11:00 AM` and one with `1:30 PM`. Confirm the workbook has two tabs, `9/14/2026 1:30 PM` and `9/14/2026 11:00 AM`. Import the `11:00 AM` sheet again, or a retake that reads one tally differently, and confirm no new tab is created, the existing tab is unchanged, and the row shows "already saved".
+**Independent Test**: Import two sheets for `AG` dated `9/14/2026`, one with Time IN `11:00 AM` and one with `1:30 PM`. Confirm the workbook has two tabs, `9/14/2026 1:30 PM` and `9/14/2026 11:00 AM`. Import the `11:00 AM` sheet again, or a retake that reads one tally differently, and confirm no new tab is created, the existing tab is unchanged, and the row shows "already saved".
 
 **Acceptance Scenarios**:
 
-1. **Given** `JA`'s workbook has a tab for `9/14/2026 11:00 AM`, **When** a sheet for `JA` dated `9/14/2026` with Time IN `1:30 PM` is saved, **Then** a new tab `9/14/2026 1:30 PM` is created and the existing tab is not changed.
-2. **Given** `JA`'s workbook has a tab for `9/14/2026 11:00 AM`, **When** a sheet with the same Date and Time IN is imported again, whether its other values match or not, **Then** no new tab is created, the existing tab is not changed, the row shows succeeded with "already saved", and Open goes to the existing tab.
-3. **Given** two sheets for `JA` with the same Date and Time IN are in the same batch, **When** the batch is imported, **Then** the first is saved and the second shows succeeded with "already saved".
-4. **Given** `JA`'s workbook has a tab `9/14/2026` from a sheet with a blank Time IN, **When** another sheet for `JA` dated `9/14/2026` with a blank Time IN is imported, **Then** it is saved to a new tab `9/14/2026 2`, and the first tab is not changed.
+1. **Given** `AG`'s workbook has a tab for `9/14/2026 11:00 AM`, **When** a sheet for `AG` dated `9/14/2026` with Time IN `1:30 PM` is saved, **Then** a new tab `9/14/2026 1:30 PM` is created and the existing tab is not changed.
+2. **Given** `AG`'s workbook has a tab for `9/14/2026 11:00 AM`, **When** a sheet with the same Date and Time IN is imported again, whether its other values match or not, **Then** no new tab is created, the existing tab is not changed, the row shows succeeded with "already saved", and Open goes to the existing tab.
+3. **Given** two sheets for `AG` with the same Date and Time IN are in the same batch, **When** the batch is imported, **Then** the first is saved and the second shows succeeded with "already saved".
+4. **Given** `AG`'s workbook has a tab `9/14/2026` from a sheet with a blank Time IN, **When** another sheet for `AG` dated `9/14/2026` with a blank Time IN is imported, **Then** it is saved to a new tab `9/14/2026 2`, and the first tab is not changed.
 
-**Tab order** (applies to every save): **Given** `JA`'s workbook has tabs `9/16/2026 11:00 AM` and `9/10/2026 11:00 AM`, **When** a sheet dated `9/14/2026` with Time IN `11:00 AM` is saved, **Then** the tabs read `9/16/2026 11:00 AM`, `9/14/2026 11:00 AM`, `9/10/2026 11:00 AM` (newest first).
+**Tab order** (applies to every save): **Given** `AG`'s workbook has tabs `9/16/2026 11:00 AM` and `9/10/2026 11:00 AM`, **When** a sheet dated `9/14/2026` with Time IN `11:00 AM` is saved, **Then** the tabs read `9/16/2026 11:00 AM`, `9/14/2026 11:00 AM`, `9/10/2026 11:00 AM` (newest first).
 
 ---
 
@@ -110,6 +110,7 @@ Sometimes a student has more than one session on the same day; each has its own 
 - Google Drive cannot be reached or sign-in fails when Import is pressed: the import does not start and the SLP is told why (FR-006a).
 - Google Drive becomes unreachable, or a save is refused, partway through a batch: that sheet is marked failed with a reason naming the problem (e.g. "Could not save to Google Drive: no connection"), and the other sheets in the batch are still processed.
 - A save fails partway (e.g. the tab was created but its values were not written): the sheet is marked failed, and retrying it does not leave a duplicate or half-filled tab behind.
+- Creating a new workbook fails after the file exists, and removing that file also fails (e.g. the connection drops): the empty workbook is left in the folder. The next save that finds it completes it: it stores the missing Workbook Layout Order, adds the session tab, and removes any empty tab, so the workbook ends up holding only session tabs (FR-019).
 - A failed save is retried with a later Import press in the same window: the sheet is saved once; it is not read again by the reading service if its earlier reading is still valid (existing import retry rules).
 - The SLP renames a workbook in Google Drive: later imports still find and add to it.
 - The SLP deletes a workbook, or moves it to the trash or out of the `SLP Therepy Data/Current Year` folder: the next import for that student and structure starts a new workbook in the folder.
@@ -143,10 +144,10 @@ Sometimes a student has more than one session on the same day; each has its own 
 - **FR-008**: To decide which workbook a sheet is saved to, the application MUST use the sheet's student (by Student Key) and the Template Structure of the template used to interpret it. The template's name, description, and id MUST NOT affect which workbook is chosen.
 - **FR-009**: Two templates MUST be treated as having the same Template Structure when they have the same set of sections and, within each section, the same set of keys (field names, column names, and tally columns), regardless of the order in which sections, fields, or columns are listed. Value types and lists of allowed choices MUST NOT be part of the Template Structure: a change that keeps every key but changes a field's type or choices (e.g. adding `P` to a `Y`/`N` column) keeps saving to the same workbook.
 - **FR-010**: When no workbook exists yet for a sheet's Student Key and Template Structure, the application MUST create one in the folder and save the sheet to it.
-- **FR-011**: A new workbook MUST be named from the Student Key and the name of the template used to start it (e.g. `JA - Emotion Causes`). The workbook's name MUST NOT change when later imports use a template with the same structure but a different name.
+- **FR-011**: A new workbook MUST be named from the Student Key and the name of the template used to start it (e.g. `AG - Emotion Causes`). The workbook's name MUST NOT change when later imports use a template with the same structure but a different name.
 - **FR-012**: When a workbook already exists for a sheet's Student Key and Template Structure, the application MUST add the sheet to it and MUST NOT create another workbook.
 - **FR-013**: The application MUST find an existing workbook by its Student Key and Template Structure, even if the SLP has renamed it in Drive, as long as it is still in the folder and not in the trash. A workbook that is deleted, trashed, or moved out of the folder MUST be treated as missing, so the next import starts a new one.
-- **FR-013a**: Each workbook MUST carry a hidden label in Drive (not shown in its name or tabs) holding its Student Key, a fingerprint of its Template Structure, and its Workbook Layout Order (FR-025a). The application MUST find workbooks by searching the folder for this label, and MUST NOT depend on any local record, so the same workbooks are found from any computer or after a reinstall.
+- **FR-013a**: Each workbook MUST carry hidden workbook metadata, not shown in its name or tabs, made of two parts: a hidden label in Drive holding its Student Key and a fingerprint of its Template Structure, and its Workbook Layout Order (FR-025a), which may be kept inside the workbook rather than in the label. The application MUST find workbooks by searching the folder for the hidden label, and MUST NOT depend on any local record, so the same workbooks are found from any computer or after a reinstall.
 - **FR-013b**: When more than one workbook in the folder carries the same Student Key and Template Structure (for example, the SLP copied a workbook in Drive), the application MUST save to the one most recently changed in Drive, and MUST NOT change, merge, or remove the others.
 
 **Session tabs**
@@ -171,20 +172,20 @@ Sometimes a student has more than one session on the same day; each has its own 
 - **FR-024**: Values MUST be saved as they were interpreted. Blank values MUST be saved as empty cells in their place.
 - **FR-024a**: A value whose interpreted type is a number MUST be saved as a number the spreadsheet can calculate with. Every other value (text, choice, date, yes/no, and raw form text) MUST be saved as plain text exactly as read, and the spreadsheet MUST NOT auto-convert it (e.g. `9/14` stays text, `007` keeps its zeros). If a number-typed value cannot be read as a number, it MUST be saved as plain text rather than dropped.
 - **FR-024b**: How each value is saved MUST be decided from that value's type in the interpretation (which comes from the template), not from guessing at its content, so a later feature can let the SLP choose it per field on the template without changing the save rules.
-- **FR-025**: Every tab in a workbook MUST lay out its values in the same positions, so the tabs of one workbook can be compared or combined.
-- **FR-025a**: The order of form fields, of table and tally blocks, and of columns within each block MUST follow the Workbook Layout Order: the order in the template that started the workbook. Later imports with a same-structure template listed in a different order MUST still use the Workbook Layout Order. The Workbook Layout Order MUST be stored with the workbook's hidden label (FR-013a), so it survives reinstalls and other computers.
+- **FR-025**: Every tab in a workbook MUST use the same layout: the same field-name labels in the same rows of the header and form list, the same table and tally blocks in the same order, and the same columns in the same order within each block, so the tabs of one workbook can be compared or combined. Because each block has one row per row of the paper sheet (FR-022), a block MAY start on a different row in different tabs when an earlier block has a different number of rows.
+- **FR-025a**: The order of form fields, of table and tally blocks, and of columns within each block MUST follow the Workbook Layout Order: the order in the template that started the workbook. Later imports with a same-structure template listed in a different order MUST still use the Workbook Layout Order. The Workbook Layout Order MUST be stored in the workbook's hidden workbook metadata (FR-013a), so it survives reinstalls and other computers.
 
 **Privacy**
 
 - **FR-026**: Session data MUST be sent only to the SLP's Google Drive and Google Sheets (an approved service) and MUST NOT be written to any local persistent log.
 - **FR-027**: Workbook names, tab names, and messages shown in the Import window MUST identify students only by Student Key.
-- **FR-028**: The hidden workbook label MUST identify the student only by Student Key and MUST NOT contain session values; the structure fingerprint and the Workbook Layout Order MUST be derived only from template keys.
+- **FR-028**: The hidden workbook metadata (label and Workbook Layout Order) MUST identify the student only by Student Key and MUST NOT contain session values; the structure fingerprint and the Workbook Layout Order MUST be derived only from template keys.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Interpretation** (`StudentDataSheet`): Existing concept. The interpreted result for one sheet; the source of every value saved.
 - **Template Structure**: The shape of a Data Sheet Template that decides where its sessions are saved: its sections and, within each, the set of field, column, and tally keys, compared without regard to order. It ignores the template's name, description, id, value types, and choice options. New glossary term.
-- **Student Session Workbook**: The Google Sheet holding every saved session for one Student Key and one Template Structure. Named from the Student Key and the name of the template that started it. Lives in `SLP Therepy Data/Current Year`. Carries a hidden label (Student Key, structure fingerprint, and Workbook Layout Order) used to find it and lay out its tabs. Replaces the glossary's **Session Sheet** entry as the tool's output.
+- **Student Session Workbook**: The Google Sheet holding every saved session for one Student Key and one Template Structure. Named from the Student Key and the name of the template that started it. Lives in `SLP Therepy Data/Current Year`. Carries hidden workbook metadata: a hidden label (Student Key and structure fingerprint) used to find it, and its Workbook Layout Order used to lay out its tabs. Replaces the glossary's **Session Sheet** entry as the tool's output.
 - **Workbook Layout Order**: The order of sections, form fields, and columns taken from the template that started a workbook. Every tab in that workbook uses it. New glossary term.
 - **Session Moment**: A sheet's session Date plus its Time IN, as read from the sheet. It names a Session Tab and identifies the session within a workbook. A sheet with a blank Time IN has a date-only Session Moment, which never identifies a duplicate. New glossary term.
 - **Session Tab**: One tab in a Student Session Workbook holding the values of one imported sheet, named with that sheet's Session Moment.

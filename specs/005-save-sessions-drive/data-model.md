@@ -185,5 +185,5 @@ Internally it caches `(student_key, fingerprint) → spreadsheet id` for the win
 | A blank Date fails the sheet (FR-017) | `SheetImportBatch`, before `DataSheetStore.save` |
 | A blank Time IN still saves, gets a date-only name, and is never a duplicate (FR-017a) | `session_layout.tab_base_name`, `SessionMoment.matches` |
 | A duplicate writes nothing (FR-016a) | `GoogleDriveDataSheetStore.save`, before any write |
-| No partial tab or empty new workbook remains (FR-002) | One atomic `batchUpdate`; a new file is deleted if its first batch fails |
+| No partial tab or empty new workbook remains (FR-002, FR-019) | One atomic `batchUpdate`; a new file is deleted if its first batch fails. If that delete also fails, the next save repairs the workbook (contracts/session-storage.md § `save(sheet)` step 5.1) |
 | Labels and layout hold no session values (FR-028) | They are built only from `shape_of(sheet.template)` and the stored Student Key |
