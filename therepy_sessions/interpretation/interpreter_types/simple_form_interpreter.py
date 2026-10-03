@@ -23,11 +23,6 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
   'Times w/Prompting', 'Times w/o Prompting', etc.
   """
 
-  # A dictionary of fields and their field configurations.
-  # Key: The field name
-  # Values: The FieldConfiguration that describes the field.
-  _fields = {}
-
   def __init__(self, id, title, fields):
     """
     Initializes the template with expected field configurations for form processing.
@@ -41,7 +36,10 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
       names, the values are the configurations as FieldConfiguration objects.
     """
     super().__init__(id, title)
-    self._fields = fields
+    # A dictionary of fields and their field configurations.
+    # Key: The field name
+    # Values: The FieldConfiguration that describes the field.
+    self._fields: dict[str, FieldConfiguration] = fields
 
   @property
   def fields(self):
@@ -52,6 +50,12 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
         dict: Dictionary of field names to FieldConfiguration objects
     """
     return self._fields
+
+  def section_keys(self) -> list[str]:
+    """
+    The field names, in template order.
+    """
+    return list(self._fields.keys())
 
   def interpret_student_data_sheet_content(self, data_sheet_content):
     """

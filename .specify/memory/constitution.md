@@ -1,5 +1,48 @@
 <!--
 Sync Impact Report
+- Version change: 1.5.0 → 1.6.0 (MINOR: new rules in referenced docs, and glossary
+  additions)
+- Modified principles: none
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/conventions/architecture/layers.md: rule 1 states that StudentDataSheet
+    carries the template it was interpreted with, and that Storage reads the template
+    only through the sheet. New rule 10: interpretation/importing/ reaches storage only
+    through the injected DataSheetStore port in interpretation/data_sheet_store.py, with
+    implementations in storage/. The storage/ line and "Adding a new destination" are
+    updated.
+  - Updated docs/conventions/architecture/dependency-injection.md: rule 1 names
+    create_sheets_service, create_drive_service, and load_google_credentials; rule 2's
+    example uses the store's providers; rule 4 adds SLP_GOOGLE_CLIENT_SECRET_FILE, read
+    only when load_google_credentials() runs; rule 6 says ImportWindow and
+    SheetImportBatch receive the same DataSheetStore (one per Import visit, built in
+    program.py), the window receives open_url, and the Google services are built lazily
+    on the first Import press.
+  - Updated docs/conventions/architecture/interpreters.md: a complete interpreter type
+    implements section_keys() (and keeps section_kind if renamed), and a table-reading
+    type overrides consumes_tables; the diagram shows the sheet carrying its template.
+    New rule 8: section keys decide the workbook. New rule 9: each table is read by one
+    section, matched by title when a template has several table sections.
+  - Updated docs/conventions/architecture/layers.md rule 2: collection also returns
+    table_titles.
+  - Updated docs/domain/glossary.md: adds Data Sheet Store, Template Structure, Student
+    Session Workbook (replacing Session Sheet), Session Tab, Session Moment, Workbook
+    Layout Order, and Therapy Data Folder, updates the pipeline's Storage step, and adds
+    table_titles to Import.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.5.0 (2026-10-01) amended dependency-injection rule 6 and interpreters.md, and added
+    template glossary terms
+  - 1.4.0 (2026-10-01) added layers.md rule 9 and expanded dependency-injection rule 6
+  - 1.3.0 (2026-09-30) added `students/` and rule 8 to layers.md
+  - 1.2.0 (2026-09-30) added `app_shell/` and rule 7 to layers.md
+  - 1.1.0 (2026-09-26) added Principle VI. Typed Public Interfaces
+  - 1.0.0 (2026-09-26) initial ratification with Principles I–V
+
+Previous report (1.5.0):
 - Version change: 1.4.0 → 1.5.0 (MINOR: new rules in referenced docs, and glossary
   additions)
 - Modified principles: none
@@ -240,4 +283,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.5.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-01
+**Version**: 1.6.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-03

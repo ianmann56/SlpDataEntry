@@ -80,6 +80,8 @@ Call the `storage/session_layout.py` functions directly.
 | Store: two blank-time sheets with the same date | Tabs `9/14/2026` and `9/14/2026 2` |
 | Store: `batchUpdate` fails while creating a workbook | `files.delete` is called on the new file, and `DataSheetStoreError` is raised |
 | Store: two workbooks match | The one listed first (newest `modifiedTime`) is used |
+| Store: an existing workbook with no `slpWorkbookLayout` metadata and an empty default tab (a failed create whose cleanup failed) | One `batchUpdate` with `addSheet`, `updateCells`, `createDeveloperMetadata`, and `deleteSheet` of the empty tab |
+| Store: the same workbook, but with its layout metadata and an empty tab the SLP added | No `createDeveloperMetadata` and no `deleteSheet` |
 | Inspect every recorded `appProperties` and developer-metadata body | Holds no Goal, Measure, or table value (FR-028) |
 
 ## V4. First save end to end (US1, US2)
@@ -130,7 +132,24 @@ cd therepy_sessions
    "Could not save to Google Drive: no connection…". Turn networking back on and press
    Import. **Expect** them to save, with no duplicate tab for the first sheet.
 
-## V8. Privacy check (Principle I)
+## V8. Save time (SC-006)
+
+The extra time saving adds to a batch is the time spent connecting to Drive
+(`prepare()`, which finds the folder) plus the time spent in `save`, so measure those
+directly. Interactive sign-in is excluded: it depends on how fast the SLP types, and it
+happens only when no token is cached.
+
+1. In the scratch directory, make 10 copies of a synthetic `AG` Import from
+   `sample_data/imports/`, each with a different Date.
+2. In a scratch script run from `therepy_sessions/`, interpret each copy with `AG`'s
+   template, then build a `GoogleDriveDataSheetStore` with the real Google services.
+   With a cached sign-in token, time `prepare()` and the 10 `save` calls together.
+3. Run it on a typical school network connection, on a test Google account.
+
+**Expect** `prepare()` and the 10 saves to take 60 seconds or less in total (the first
+save creates the workbook, the other 9 add tabs).
+
+## V9. Privacy check (Principle I)
 
 - `git status` shows no token, client secret, sample output, or workbook export staged.
 - No log file was written under `therepy_sessions/`.

@@ -5,16 +5,17 @@ can run without network access or credentials.
 
 ## Rules
 
-1. **Construct clients in `clients/`.** `construct_textract_client()` and
-   `create_google_service()` are the only places that call `boto3.client(...)` or
-   `googleapiclient.discovery.build(...)`.
+1. **Construct clients in `clients/`.** `construct_textract_client()`,
+   `create_sheets_service()`, and `create_drive_service()` are the only places that call
+   `boto3.client(...)` or `googleapiclient.discovery.build(...)`. Google credentials
+   come only from `load_google_credentials()`, which runs the OAuth sign-in when needed.
 2. **Accept a provider, not a global.** A function that needs a client takes a
    zero-argument provider, by convention named `inject_<client>`, and calls it only when
    it needs the client:
 
    ```python
    def image_to_text(image_path, inject_textract_client): ...
-   def create_therapy_session_sheet(data, sheet_title, inject_google_service): ...
+   GoogleDriveDataSheetStore(inject_drive_service, inject_sheets_service)
 
    image_to_text(path, lambda: textract_client)
    ```
@@ -24,7 +25,9 @@ can run without network access or credentials.
    start OAuth flows at import time.
 4. **Read credentials from the environment.** AWS uses the standard boto3 chain
    (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`). Google OAuth
-   client-secret paths MUST point outside the repository. See
+   client-secret paths MUST point outside the repository. The default path can be
+   overridden with the `SLP_GOOGLE_CLIENT_SECRET_FILE` environment variable, which
+   `load_google_credentials()` reads when it runs, never at import time. See
    [../../domain/student-data-privacy.md](../../domain/student-data-privacy.md).
 5. **Translate vendor errors at the boundary.** Adapters catch SDK exceptions
    (`ClientError`, `NoCredentialsError`) and re-raise them with a message that explains
@@ -35,9 +38,13 @@ can run without network access or credentials.
    `list_template_choices` through their constructors. They MUST NOT create their own.
    `program.py` builds the one `JsonStudentStore`.
    `ImportWindow` and `SheetImportBatch` receive the `StudentStore`, a template lookup,
-   a sheet reader wrapping `image_to_text`, and a result sink through their
-   constructors. `program.py` builds the Textract client lazily, on the first sheet
-   read, so the app launches and runs Setup without AWS credentials.
+   a sheet reader wrapping `image_to_text`, and the same `DataSheetStore` through their
+   constructors. `program.py` builds one `GoogleDriveDataSheetStore` per Import window
+   visit and passes it to both, typed as `DataSheetStore`. The window also receives
+   `open_url` (`webbrowser.open`), so it does no I/O itself. `program.py` builds the
+   Textract client lazily, on the first sheet read, and the Google credentials and
+   services lazily, on the first Import press, so the app launches and runs Setup
+   without AWS credentials or a Google sign-in.
    `DataSheetTemplateManagementWindow` and `TemplateDetailsWindow` receive
    `load_template_usage: Callable[[], TemplateUsage | None]`, and the management window
    also receives `clear_template_from_students: Callable[[str], list[str]]`. Both are
