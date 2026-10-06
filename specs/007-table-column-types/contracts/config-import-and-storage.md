@@ -94,8 +94,9 @@ WORKBOOK_KEY_TAB_NAME: str = "Workbook Key"
   - otherwise by `type`, as in R4. A `date` becomes its serial day number with
     `number_format=DATE`.
 - `workbook_key_rows` reads only `interpreter.title`, `section_kind`, and
-  `option_descriptions()` from `template.interpreters`, never interpreter types. An
-  untitled section is labeled by its kind's display name.
+  `option_descriptions()` from `template.interpreters`, never interpreter types. Each
+  `OptionDescription.section` already holds a title or the interpreter's own fallback name,
+  so Storage needs no section names of its own.
 - `session_rows` is unchanged: Tally-derived keys are ordinary keys.
 
 ## Storage — `storage/google_drive_data_sheet_store.py` (CHANGE)

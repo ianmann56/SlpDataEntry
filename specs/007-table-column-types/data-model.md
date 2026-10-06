@@ -122,9 +122,9 @@ section uses `mark`, because it only has tally options.
 
 | Record | Fields |
 | --- | --- |
-| `ValueProblem` | `section: str` (section title or kind), `item: str` (column, field, or `""`), `row: str` (`"row 3"`, `"table 2, row 3"`, or `""`), `value: str`, `expected: str` (`"a whole number"`, `"one of +, -, P"`, …) |
+| `ValueProblem` | `section: str` (section title, or a fallback such as `Table`; always shown quoted), `item: str` (column, field, or `""`), `row: str` (`"row 3"`, `"table 2, row 3"`, or `""`), `value: str`, `expected: str` (`"a whole number"`, `"one of +, -, P"`, …) |
 | `InvalidValuesError(ValueError)` | `problems: list[ValueProblem]`. `str()` joins every problem with `"; "`. |
-| `ValueReadError(ValueError)` | `expected: str`. Raised by a single read, and turned into a `ValueProblem` by the interpreter. |
+| `ValueReadError(ValueError)` | `expected: str`, `found: str = ""` (the offending part of the text, such as the one bad tally mark; empty means the whole text). Raised by a single read, and turned into a `ValueProblem` by the interpreter. |
 
 ### OptionDescription — `interpretation/value_types.py`
 

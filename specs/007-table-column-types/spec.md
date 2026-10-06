@@ -150,7 +150,7 @@ The SLP's Simple Form sections (labeled fields read from the sheet, such as "Pro
 - A True/False cell is blank, such as an unchecked box: it is saved as empty, never as false (FR-010).
 - A Choice cell holds a value whose letters match a choice except for case (`p` vs `P`): it is saved as the choice as configured.
 - A Tally cell is blank: it is read as zero marks, not as an invalid value. Its marks text is empty, every count and the total are 0, and every percentage is left blank.
-- The SLP changes a column's type from Choice or Tally to another type: the choices or tally options are discarded when the template is saved, after the SLP is warned in the form.
+- The SLP changes a column's type from Choice or Tally to another type: the SLP is warned in the form and asked to confirm. On confirming, the choices or tally options are cleared from the form, and the template is saved without them. Cancelling the template's edits restores them.
 - The SLP changes a column's type after sessions are already saved: earlier Session Tabs keep the values they were saved with; only later imports use the new type. If the change makes a column a Tally, stops it being one, or changes its tally options, later sessions go to a new Student Session Workbook (FR-017).
 - The SLP edits a description after sessions are saved: the Workbook Key shows the new description the next time a session is saved to that workbook; until then it shows the earlier one.
 - A workbook created before this feature: it gets its Workbook Key the next time a session is saved to it.
@@ -224,8 +224,8 @@ The SLP's Simple Form sections (labeled fields read from the sheet, such as "Pro
 - **Tally Option**: One allowed mark in a Tally column. Has a one-character mark and an optional description of what it means.
 - **Tally Summary**: What a tally is saved as: its marks in order, a count per tally option, the total number of marks, and each option's percentage of the total.
 - **Workbook Key**: The one tab in a Student Session Workbook that lists every choice and tally option of its template with its description. It is not a Session Tab.
-- **Form Field Definition**: One expected field in a Simple Form section. Has a name and a Field Type (any Column Type except Tally); a Choice field also has an ordered list of Choice Options.
-- **Typed Cell Value**: The value read from one cell, following its column's type: a text, whole number, decimal number, true/false, date, choice, or sequence of tally marks, or empty.
+- **Field Configuration**: One expected field in a Simple Form section. Has a name and a Field Type (any Column Type except Tally); a Choice field also has an ordered list of Choice Options.
+- **Typed Value**: The value read from one cell or field, following its type: a text, whole number, decimal number, true/false, date, choice, or sequence of tally marks, or empty.
 
 ## Success Criteria *(mandatory)*
 
@@ -246,6 +246,6 @@ The SLP's Simple Form sections (labeled fields read from the sheet, such as "Pro
 - Dates on sheets are written in US month/day/year order. Two-digit years are in the 2000s.
 - Choice values may be more than one character (e.g. `NR` for "no response"); tally options are always single marks, since a tally cell is read one mark at a time.
 - Columns are typed per table section; there is no shared library of column types or choice sets across templates.
-- The new domain terms (Column Type, Field Type, Choice Option, Tally Option, Tally Summary, Workbook Key) will be added to the glossary as part of this feature, per Principle II, and the Template Structure entry will be updated to include Tally columns' tally options.
+- The new domain terms (Column Definition, Column Type, Field Configuration, Field Type, Choice Option, Tally Option, Tally Summary, Workbook Key) will be added to the glossary as part of this feature, and the Scalar entry will describe its Typed Value, per Principle II, and the Template Structure entry will be updated to include Tally columns' tally options.
 - A sheet that fails because of a cell value is retried the same way as any other failed sheet: the SLP fixes the cause (for example, changes the column's type or adds a choice) and presses Import again.
 - Values in Session Tabs saved before a type change are not rewritten.

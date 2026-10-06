@@ -20,7 +20,7 @@ class TallyOption(NamedTuple):  mark: str;  description: str = ""
 class TallySummary(NamedTuple):
     marks: str; counts: dict[str, int]; total: int; percentages: dict[str, float | None]
 
-class ValueReadError(ValueError):     expected: str
+class ValueReadError(ValueError):     expected: str; found: str = ""
 class ValueProblem(NamedTuple):       section: str; item: str; row: str; value: str; expected: str
 class InvalidValuesError(ValueError): problems: list[ValueProblem]
 class OptionDescription(NamedTuple):  section: str; item: str; item_type: str; option: str; description: str
@@ -42,7 +42,8 @@ Behavior:
   - blank text → marks `""`, every count 0, total 0, every percentage `None`
   - spaces are ignored and marks are matched ignoring letter case; the result uses each
     mark as configured
-  - a non-option character → `ValueReadError("only the marks Y, N, P")`
+  - a non-option character → `ValueReadError("only the marks Y, N, P", found="X")`, naming the
+    first bad mark, so a Running Tally error can name the mark read (FR-021)
 - `tally_keys` returns, in order: `base`, then `f"{base} {mark}"` for each option, then
   `f"{base} Total"`, then `f"{base} {mark} %"` for each option (R3).
 - `tally_scalars` returns exactly the keys from `tally_keys`, typed TEXT / INT / INT /

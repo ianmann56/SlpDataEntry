@@ -65,7 +65,7 @@ Scratch scripts are not committed.
 
 **Purpose**: Record the "before" state, so compatibility can be proven later.
 
-- [ ] T001 Copy the current templates JSON file to `/tmp/templates-before-007.json` and confirm it contains at least one TableInterpreter, one RunningTallyInterpreter, and one SimpleFormInterpreter. If it doesn't, add synthetic ones through the app on the unchanged code first, so every old shape is represented (quickstart Prerequisites)
+- [ ] T001 Copy the current templates JSON file to `/tmp/templates-before-007.json`, and copy the students JSON file to `/tmp/students-before-007.json`. Confirm the templates copy contains at least one TableInterpreter, one RunningTallyInterpreter, and one SimpleFormInterpreter. If it doesn't, launch the unchanged app on the copies only (`python3 therepy_sessions/program.py /tmp/templates-before-007.json /tmp/students-before-007.json`) and add synthetic ones there, so every old shape is represented without touching the real templates file (quickstart Prerequisites)
 - [ ] T002 With the code unchanged, run a scratch script from `therepy_sessions/` that loads `/tmp/templates-before-007.json` through `interpretation/template_store.py` and prints each template's `storage.template_structure.shape_of(t).structure_fingerprint()`. Save the output to `/tmp/fingerprints-before-007.txt` for T023
 
 ---
@@ -91,8 +91,8 @@ the shared editors that every story builds on.
   - `COLUMN_TYPE_LABELS` (Text, Integer, Decimal, True/False, Date, Choice, Tally)
   - `has_options(column_type) -> bool`
   - the `NamedTuple`s `ChoiceOption(value, description="")` and `TallyOption(mark, description="")`
-  - `ValueReadError(ValueError)` with `expected: str`
-  - `ValueProblem(section, item, row, value, expected)`, with a `message()` that renders e.g. `"Words", column "Trials", row 3: "l" is not a whole number`; empty `item`/`row` parts are omitted, and `section` is quoted only when it's a title
+  - `ValueReadError(ValueError)` with `expected: str` and `found: str = ""` (the offending part of the text; empty means the whole text)
+  - `ValueProblem(section, item, row, value, expected)`, with a `message()` that renders e.g. `"Words", column "Trials", row 3: "l" is not a whole number`; empty `item`/`row` parts are omitted, and `section` is always shown quoted (it holds a title or the interpreter's fallback name, e.g. `"Table"`)
   - `InvalidValuesError(ValueError)` holding `problems: list[ValueProblem]`, whose `str()` joins the messages with `"; "`
   - `OptionDescription(section, item, item_type, option, description)`
   - `scalar_type_for(column_type) -> DataSheetScalarType` (TEXT→TEXT, INT→INT, DECIMAL→DECIMAL, BOOLEAN→BOOLEAN, DATE→DATE, CHOICE→CHOICE; raise `ValueError` for TALLY)
@@ -210,7 +210,8 @@ fails, naming the cell (quickstart V7, V8, V9 for these types).
 - [ ] T020 [US1] Live check, quickstart V7 (simple types only), V8 (Trials, Score, Done, When), and V9, with a test Google account and synthetic `ZZ` sheets. Include a synthetic sheet whose True/False column uses printed checkboxes, to confirm T018 (scenarios in `specs/007-table-column-types/quickstart.md`)
 
 **Checkpoint**: US1 is fully functional. Typed simple columns can be set up, read, and
-saved, and bad values fail with every cell named.
+saved, and bad values fail with every cell named. US1 acceptance scenario 1 ("one of the
+seven column types") is fully met once US2 adds Choice (T026) and US3 adds Tally (T034).
 
 ---
 
@@ -297,7 +298,7 @@ V1, V2, V4, V8, V11).
   - `read_tally(text, options) -> TallySummary`:
     - blank text gives marks `""`, zero counts, total 0, and `None` percentages
     - spaces are removed, each character is matched to an option mark ignoring case, and the configured mark is recorded
-    - a non-option character raises `ValueReadError(f"only the marks {', '.join(marks)}")`
+    - a non-option character raises `ValueReadError(f"only the marks {', '.join(marks)}", found=<that character, as read>)`
   - `tally_keys(base, options) -> list[str]`: `base`, `f"{base} {mark}"`…, `f"{base} Total"`, `f"{base} {mark} %"`…
   - `tally_scalars(base, summary, options) -> dict[str, DataSheetScalarDto]`: marks as TEXT, counts and total as INT, and percentages as PERCENT whose `typed_value` is the fraction or `None`, with `value` the formatted text
 
@@ -334,7 +335,7 @@ saves `YYNPY`, 3/1/1, 5, 60/20/20% (quickstart V3, V5, V10).
   - `section_keys()` returns `tally_keys(TALLY_COLUMN_NAME, options)`
   - each table is read by concatenating every cell's text in row-major order (as today, without the `print`) and passing it to `read_tally`
   - each table emits one row, `tally_scalars(TALLY_COLUMN_NAME, summary, options)`, with `"columns"` equal to the key list
-  - a `ValueReadError` becomes `ValueProblem(section=self.title or "Running Tally", item="", row=<"" or "table N">, value=<the offending text>, expected=...)`, raised as `InvalidValuesError` after every table
+  - a `ValueReadError` becomes `ValueProblem(section=self.title or "Running Tally", item="", row=<"" or "table N">, value=e.found, expected=...)`, so the message names the bad mark read (FR-021, US5 scenario 3), raised as `InvalidValuesError` after every table
   - `config_problems()` returns `option_problems("Running Tally", TALLY, marks)`
   - `option_descriptions()` returns one `OptionDescription(title, "", "Tally", mark, description)` per option
 - [ ] T038 [US5] In `RunningTallyInterpreterSerializer` in `therepy_sessions/interpretation/template_manager/storage/serialization.py`, `serialize` writes `{"tally_options": [{"mark", "description"}]}`. `deserialize` reads `tally_options`, or else the old `tally_choice_options` strings with blank descriptions, ignoring `tally_type` (research R7, FR-023)
@@ -391,8 +392,8 @@ saves typed values, and `abc` in the Integer field fails the sheet naming the fi
 ## Phase 9: Polish & Cross-Cutting Concerns
 
 - [ ] T047 [P] Update `docs/domain/glossary.md` (research R12):
-  - add **Column Type** (`ColumnType`), **Field Type** (`FIELD_TYPES`), **Choice Option** (`ChoiceOption`), **Tally Option** (`TallyOption`), **Tally Summary** (`TallySummary`), and **Workbook Key** (`WORKBOOK_KEY_TAB_NAME`)
-  - update **Scalar** / **Scalar Type** to add `DECIMAL`, `PERCENT`, and `typed_value`
+  - add **Column Definition** (`ColumnDefinition`), **Column Type** (`ColumnType`), **Field Configuration** (`FieldConfiguration`), **Field Type** (`FIELD_TYPES`), **Choice Option** (`ChoiceOption`), **Tally Option** (`TallyOption`), **Tally Summary** (`TallySummary`), and **Workbook Key** (`WORKBOOK_KEY_TAB_NAME`)
+  - update **Scalar** / **Scalar Type** to add `DECIMAL`, `PERCENT`, and the Scalar's Typed Value (`typed_value`)
   - update **Template Structure** to say that Tally options count through their keys
   - update **Tally** to mention Tally columns and the Tally Summary
 - [ ] T048 [P] Update `docs/conventions/architecture/interpreters.md`:
@@ -406,7 +407,8 @@ saves typed values, and `abc` in the Integer field fails the sheet naming the fi
   - `storage/` has no `isinstance(` checks on interpreter classes
   - no class-level mutable attributes remain in the three interpreter modules
   - every new public member is annotated (Principle VI)
-- [ ] T051 Run the full quickstart (V1–V11) end to end on the finished branch, and record any failure as a new task before merging. Confirm that no real student artifact or token file is staged (`git status`) (scenarios in `specs/007-table-column-types/quickstart.md`)
+- [ ] T051 Run the full quickstart (V1–V11) end to end on the finished branch, and record any failure as a new task before merging. Time V7 with every column type and the descriptions, and confirm it takes under 5 minutes (SC-001). Confirm that no real student artifact or token file is staged (`git status`) (scenarios in `specs/007-table-column-types/quickstart.md`)
+- [ ] T052 [P] Commit synthetic sample Imports under `therepy_sessions/sample_data/007/`, as JSON files each holding a `StudentDataSheetImport`'s `form_data`, `tables`, and `table_titles`: a valid sheet covering every column type, a Running Tally grid, a Simple Form section, and a sheet with bad values (quickstart V2, V3, V9). Use only made-up values and the Student Key `ZZ`, never a real student's sheet (Principle I, constitution Development Workflow). Add a short `README.md` there saying what each file checks
 
 ---
 
@@ -443,7 +445,7 @@ saves typed values, and `abc` in the Integer field fails the sheet naming the fi
 - US1: T018 (collection) beside T014–T017.
 - US2: T027 (session_layout) beside T025–T026.
 - US3: T031 (value_types) and T032 (option_rules) together.
-- Polish: T047 and T048.
+- Polish: T047, T048, and T052.
 - `serialization.py` and `interpreter_configs.py` hold one class per interpreter, so
   tasks on different classes can be done by different people, but they must be merged
   with care.
