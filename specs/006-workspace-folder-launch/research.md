@@ -179,7 +179,14 @@ modal (`grab_set` and `wait_window`), and centered on the screen, because its pa
 hidden. It is not marked `transient()` to its parent: a window transient to a withdrawn
 window is never shown by some Linux window managers. It calls `lift()` and
 `focus_force()` instead, so it comes to the front. Its ttk frame fills the whole
-`Toplevel`, so no unthemed Tk background shows (FR-014). Only after `open_workspace` returns the files does `main()` build the stores'
+`Toplevel`, so no unthemed Tk background shows (FR-014).
+
+`main()` calls `root.winfo_id()` before `sv_ttk.set_theme`. sv-ttk applies its colors
+when Tk sends the root a `<<ThemeChanged>>` event, and Tk drops that event for a window
+that doesn't exist on screen yet. Before this feature the root was always shown first, so
+the event arrived. Withdrawn from the start, the root never got it, and the prompts and
+the home screen kept Tk's default light gray. `winfo_id()` makes the root's window exist
+without showing it. Only after `open_workspace` returns the files does `main()` build the stores'
 consumers, show the root, and build `HomeWindow`.
 
 | Dialog | Text names | Buttons | Closing it from the title bar |

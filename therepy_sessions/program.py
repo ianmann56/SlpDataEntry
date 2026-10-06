@@ -42,6 +42,11 @@ def main() -> None:
     # Create root Tkinter window
     root = tk.Tk()
 
+    # Make the root's window exist before theming. The theme applies its colors when Tk
+    # sends the root a theme-changed event, which Tk drops for a window that doesn't exist
+    # yet, and the root is withdrawn below without ever being shown first.
+    root.winfo_id()
+
     # Set theme to light or dark based on system.
     sv_ttk.set_theme(darkdetect.theme())
 
