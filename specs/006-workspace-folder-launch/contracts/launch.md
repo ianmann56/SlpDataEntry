@@ -35,8 +35,8 @@ Example: python program.py ~/SLP-Workspace
 
 ## Dialogs
 
-Each dialog has the window title shown here. Closing it from the title bar does what
-**Close** does.
+Each dialog has the window title shown here. Closing it from the title bar, or pressing
+Escape, does what **Close** does.
 
 ### New Workspace (state `NOT_SET_UP`)
 
@@ -89,6 +89,7 @@ Title: **Can't Open Workspace**
 | The folder does not exist | "This folder doesn't exist: `<folder>`" |
 | The path is a file | "This isn't a folder: `<folder>`. Choose the folder that holds students.json and templates.json." |
 | A Workspace name is a folder | "`<path>` is a folder, but it should be a file. Fix this in the Workspace folder, then launch again." |
+| A Workspace name is a broken link | "`<path>` is a link to a file that doesn't exist. Fix this in the Workspace folder, then launch again." |
 | A new Workspace file could not be created | "Couldn't create `<path>`: `<reason>`. Nothing was set up in this folder." |
 
 Button: **Close** only.

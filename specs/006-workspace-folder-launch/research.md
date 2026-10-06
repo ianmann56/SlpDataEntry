@@ -56,6 +56,7 @@ It raises `WorkspaceFolderError` when:
 - the folder does not exist
 - the path is not a folder
 - either Workspace name is a folder rather than a file
+- either Workspace name is a link to a file that doesn't exist (a broken symlink)
 
 Names are compared as the operating system compares them. On a case-sensitive file
 system, `Students.json` is a different name. On a case-insensitive one, it is the same
@@ -64,7 +65,9 @@ listed.
 
 **Rationale**: The spec's edge cases treat a folder at a Workspace name as an error, not
 as missing (so the SLP is never told to restore a file that is actually there in the
-wrong form). Asking the OS about the two exact paths, rather than listing the folder,
+wrong form). A broken link is an error for a similar reason. `os.path.lexists` sees it,
+so it can't count as missing. But the stores use `os.path.exists`, which doesn't see it,
+so as complete the app would open with no Students or no Templates and give no warning. Asking the OS about the two exact paths, rather than listing the folder,
 avoids reading anything unrelated in it.
 
 **Alternatives considered**:
@@ -173,7 +176,10 @@ it gets the folder error from R2 (FR-012).
 before the Workspace is opened. Every Workspace dialog is a small ttk `Toplevel` built
 in `workspace_dialogs.py`. It is themed by `sv-ttk` like the other windows (FR-014),
 modal (`grab_set` and `wait_window`), and centered on the screen, because its parent is
-hidden. Only after `open_workspace` returns the files does `main()` build the stores'
+hidden. It is not marked `transient()` to its parent: a window transient to a withdrawn
+window is never shown by some Linux window managers. It calls `lift()` and
+`focus_force()` instead, so it comes to the front. Its ttk frame fills the whole
+`Toplevel`, so no unthemed Tk background shows (FR-014). Only after `open_workspace` returns the files does `main()` build the stores'
 consumers, show the root, and build `HomeWindow`.
 
 | Dialog | Text names | Buttons | Closing it from the title bar |

@@ -33,8 +33,8 @@ Run a scratch script (not committed) against temporary folders, with fake dialog
 creators, and confirm:
 
 - `inspect_workspace` returns `COMPLETE`, `PARTIAL` (with the right `missing_file`), and
-  `NOT_SET_UP`, and raises `WorkspaceFolderError` for a missing path, a file path, and a
-  folder named `students.json`.
+  `NOT_SET_UP`, and raises `WorkspaceFolderError` for a missing path, a file path, a
+  folder named `students.json`, and a broken symlink named `students.json`.
 - `open_workspace`:
   - returns files without calling any fake for `COMPLETE`
   - calls only `show_missing_workspace_file` for `PARTIAL` and creates nothing
@@ -108,6 +108,7 @@ For each folder, check that:
 | `program.py "$SCRATCH/nope"` | **Can't Open Workspace**: the folder doesn't exist |
 | `program.py "$SCRATCH/complete/students.json"` | **Can't Open Workspace**: not a folder |
 | `mkdir "$SCRATCH/dirname"; mkdir "$SCRATCH/dirname/students.json"`, then launch with `"$SCRATCH/dirname"` | **Can't Open Workspace**: `students.json` is a folder |
+| `mkdir "$SCRATCH/link"; touch "$SCRATCH/link/templates.json"; ln -s "$SCRATCH/gone.json" "$SCRATCH/link/students.json"`, then launch with `"$SCRATCH/link"` | **Can't Open Workspace**: `students.json` is a link to a file that doesn't exist |
 | `mkdir "$SCRATCH/ro"; chmod a-w "$SCRATCH/ro"`, then launch with it and accept | **Can't Open Workspace**: couldn't create `students.json`; the folder is still empty |
 | `mkdir "$SCRATCH/My Wörkspace"`, then launch with it and accept | It works like V3. |
 
@@ -118,7 +119,7 @@ Run `chmod u+w "$SCRATCH/ro"` before cleaning up.
 - With the system in dark mode and then light mode, every Workspace dialog matches the
   home screen's theme (FR-014).
 - No dialog text contains a Student Key, only paths (FR-016).
-- With networking off, V2 through V6 behave the same (FR-015, SC-005 of feature 001).
+- With networking off, V2 through V6 behave the same (FR-015).
 
 ## V8. Docs and git
 

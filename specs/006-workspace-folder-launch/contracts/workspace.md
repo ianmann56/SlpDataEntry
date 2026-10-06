@@ -52,7 +52,7 @@ def inspect_workspace(folder: str) -> WorkspaceInspection:
 
     Raises:
         WorkspaceFolderError: The folder does not exist or is not a folder, or a
-            Workspace file name in it is a folder
+            Workspace file name in it is a folder or a broken link
     """
 
 
@@ -121,6 +121,7 @@ Every dialog:
 
 - is a modal ttk `Toplevel`, themed like the other windows (FR-014)
 - is centered on the screen and returns when it is closed
+- treats the title-bar close and Escape as **Close**
 - shows only paths and fixed text, never file contents (FR-016)
 
 The message text is defined in [launch.md](launch.md).

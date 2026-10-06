@@ -89,7 +89,8 @@ changes.
 
 | Error | Raised by | When | Shown as |
 | --- | --- | --- | --- |
-| `WorkspaceFolderError(path, reason)` | `inspect_workspace` | The folder is missing or not a folder, or a Workspace name is a folder. | The Folder error dialog, then exit |
+| `WorkspaceFolderError(path, reason)` | `inspect_workspace` | The folder is missing or not a folder, or a Workspace name is a folder or a broken link. | The Folder error dialog, then exit |
+| `WorkspaceFolderError(folder, reason)` | `open_workspace`, US1 stage only | The folder is partial or not set up, before US2 and US3 handle those states (tasks.md T006). Removed by T023. | The Folder error dialog, then exit |
 | `WorkspaceCreateError(path, reason)` | `open_workspace` | A new Workspace file could not be created. The other file is already rolled back (research R4). | The Folder error dialog, naming the file, then exit (FR-013) |
 | `FileExistsError` | `create_empty_file` | The file appeared after inspection. | Wrapped in `WorkspaceCreateError`. The existing file is untouched (FR-011). |
 

@@ -80,18 +80,25 @@ story, and each story leaves the app safe to merge:
     - raises `WorkspaceFolderError(folder, "This folder doesn't exist: <folder>")` if `not os.path.exists(folder)`
     - raises `WorkspaceFolderError(folder, "This isn't a folder: <folder>. Choose the folder that holds students.json and templates.json.")` if `not os.path.isdir(folder)`
     - raises `WorkspaceFolderError(path, "<path> is a folder, but it should be a file. Fix this in the Workspace folder, then launch again.")` if either Workspace path `os.path.isdir`
+    - raises `WorkspaceFolderError(path, "<path> is a link to a file that doesn't exist. Fix this in the Workspace folder, then launch again.")` if either Workspace path has `os.path.lexists` true but `os.path.exists` false (a broken symlink), so it never counts as present while the store sees no file
     - otherwise uses `os.path.lexists` on the two exact paths to return `COMPLETE`, `PARTIAL` (with `missing_file` set to the missing path), or `NOT_SET_UP`
     - never lists or reads the folder
   - Module and function docstrings name the Workspace and Workspace State glossary terms.
 - [ ] T004 Create `therepy_sessions/workspace/workspace_dialogs.py` per contracts/workspace.md § `workspace/workspace_dialogs.py` and research R6 (depends on T003):
-  - A private helper `_show_dialog(parent: tk.Misc, title: str, message: str, buttons: list[str], close_button: str) -> str`. It builds a `tk.Toplevel(parent)` holding a `ttk.Frame` with padding, a wrapped `ttk.Label` for the message, and one `ttk.Button` per label, right-aligned with the last one as default. It makes the window non-resizable, centers it on the screen (the parent is withdrawn), makes it modal with `grab_set()`, and maps the title-bar close (`WM_DELETE_WINDOW`) and Escape to `close_button`. It blocks with `wait_window()` and returns the label pressed.
+  - A private helper `_show_dialog(parent: tk.Misc, title: str, message: str, buttons: list[str], close_button: str) -> str`:
+    - It builds a `tk.Toplevel(parent)` holding a `ttk.Frame` with padding, packed with `fill="both", expand=True` so the frame covers the whole window and no unthemed Tk background shows in dark mode (FR-014).
+    - In the frame go a wrapped `ttk.Label` for the message and one `ttk.Button` per label, right-aligned, with the last one as default.
+    - The window is non-resizable and centered on the screen, because the parent is withdrawn.
+    - Do **not** call `transient()`: a window transient to a withdrawn parent is never shown by some Linux window managers. After centering, call `lift()` and `focus_force()`, then `grab_set()` to make it modal.
+    - The title-bar close (`WM_DELETE_WINDOW`) and Escape both act as `close_button` (contracts/launch.md § Dialogs).
+    - It blocks with `wait_window()` and returns the label pressed.
   - `show_workspace_error(parent: tk.Misc, error: WorkspaceFolderError | WorkspaceCreateError) -> None`: title **Can't Open Workspace**, message `error.reason`, button **Close** only.
   - Import only `tkinter`, `tkinter.ttk`, and `workspace.workspace`. The theme comes from `sv_ttk`, which `program.py` has already set, so don't import `sv_ttk` here.
 - [ ] T005 Offline check of the foundation (quickstart V1, first bullet). From `therepy_sessions/`, run a scratch script with `tempfile.TemporaryDirectory()` that confirms `inspect_workspace` returns:
   - `COMPLETE` with both files present
   - `PARTIAL` with `missing_file` correct, in both directions
   - `NOT_SET_UP` for an empty folder, and for a folder holding only an unrelated file and `students.json.bak`
-  - `WorkspaceFolderError` for a missing path, a file path, and a folder named `students.json`
+  - `WorkspaceFolderError` for a missing path, a file path, a folder named `students.json`, and a broken symlink named `students.json` (with `templates.json` present)
 
   Also confirm with `grep -n "^import\|^from" therepy_sessions/workspace/*.py` that the import rules in Path Conventions hold.
 
@@ -147,7 +154,7 @@ two-file way and confirm the usage message (quickstart V2, V5, V6).
 - [ ] T014 [US1] Validate US1 from `therepy_sessions/`, with synthetic data only. Seed `$SCRATCH/complete` by hand with the empty formats from data-model.md, then add a Template and Student `AG` through Setup.
   - quickstart V2 (everyday launch, and a save written to the Workspace)
   - V5 (the picker opens, cancelling exits with nothing created, and picking `$SCRATCH/complete` opens)
-  - V6 rows 1–4 (usage message with exit code 1, missing folder, file path, and a folder named `students.json`)
+  - V6 rows 1–5 (usage message with exit code 1, missing folder, file path, a folder named `students.json`, and a broken link named `students.json`)
   - an empty folder shows **Can't Open Workspace** and `ls -A` stays empty
 
 **Checkpoint**: The app launches only from a Workspace. US1 can be merged on its own.
@@ -198,7 +205,7 @@ V3).
 - [ ] T021 [US2] Validate US2 manually:
   - quickstart V3 (Close, title-bar close, Start New Workspace, relaunch with no prompt)
   - V5 last bullet (picking an empty folder)
-  - V6 rows 5–6 (read-only folder shows **Can't Open Workspace** and stays empty; a path with spaces and non-ASCII characters works)
+  - V6 rows 6–7 (read-only folder shows **Can't Open Workspace** and stays empty; a path with spaces and non-ASCII characters works)
 
 **Checkpoint**: The SLP can set up a Workspace from inside the app.
 
