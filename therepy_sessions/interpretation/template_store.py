@@ -66,6 +66,27 @@ class TemplateStore:
         """
         self.storage_file_path: str = storage_file_path
 
+    def create_empty_file(self) -> None:
+        """
+        Create the templates file holding no Templates, in format 2.
+
+        `last_template_id` starts at 0 only here, for a brand new file, so ids are never
+        given out again against Students who still point at older templates. The file is
+        opened in exclusive-create mode, so an existing file is never written over.
+
+        Raises:
+            FileExistsError: The file already exists; it is left unchanged
+            OSError: The file could not be written; any partial file is removed
+        """
+        data = {'format_version': FORMAT_VERSION, 'last_template_id': 0, 'templates': []}
+        with open(self.storage_file_path, 'x', encoding='utf-8') as file:
+            try:
+                json.dump(data, file, indent=2, ensure_ascii=False)
+            except BaseException:
+                file.close()
+                _remove_quietly(self.storage_file_path)
+                raise
+
     def check_readable(self) -> None:
         """
         Check that the templates file can be read.
@@ -315,3 +336,11 @@ def _highest_numeric_id(templates_data: list[dict[str, Any]]) -> int:
             # Non-numeric ID, skip
             pass
     return highest
+
+
+def _remove_quietly(path: str) -> None:
+    """Remove a partly written file, ignoring a failure to remove it."""
+    try:
+        os.remove(path)
+    except OSError:
+        pass

@@ -212,6 +212,9 @@ __marimo__/
 
 # Project Specific
 sample_data/
+# Workspace files hold student records (Principle I)
+students.json
+templates.json
 # Editor and OS files, and temp files left by an interrupted atomic save
 .DS_Store
 Thumbs.db

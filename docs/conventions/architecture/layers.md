@@ -11,7 +11,8 @@ storage/         StudentDataSheet → output destination   (DataSheetStore imple
 tk_utils/        shared Tkinter helpers
 app_shell/       navigation shell windows (home screen, Setup menu); Tkinter only
 students/        student setup records, student store, and windows; no pipeline imports
-program.py       composition root: parses args, builds clients, wires the layers
+workspace/       Workspace folder rules and launch dialogs; no pipeline or students imports
+program.py       composition root: parses args, opens the Workspace, builds clients, wires the layers
 ```
 
 ## Rules
@@ -55,6 +56,11 @@ program.py       composition root: parses args, builds clients, wires the layers
    `interpretation/data_sheet_store.py`. Implementations live in `storage/`, which
    imports the port to implement it, and only `program.py` names one. So
    `interpretation/` still imports nothing from `storage/`.
+11. **The Workspace stands apart.** `workspace/` MUST NOT import from `clients/`,
+   `collection/`, `interpretation/`, `storage/`, or `students/`, and never builds a
+   store. Its rules (`workspace.py`) import no Tkinter, and its dialogs live in
+   `workspace_dialogs.py`. It creates Workspace files only through callables wired in
+   `program.py` from each store's `create_empty_file`.
 
 ## Adding a new source or destination
 

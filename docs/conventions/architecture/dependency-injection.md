@@ -36,7 +36,10 @@ can run without network access or credentials.
 6. **Inject stores and config lists too.** Windows receive `TemplateStore`,
    `StudentStore`, their `InterpreterConfig` list, and providers such as
    `list_template_choices` through their constructors. They MUST NOT create their own.
-   `program.py` builds the one `JsonStudentStore`.
+   `program.py` builds the one `JsonStudentStore` and the one `TemplateStore`, from the
+   Workspace paths given by `workspace_files`. `open_workspace` receives every dialog and
+   file creator it uses as a callable from `program.py`, so `workspace/` never builds a
+   store.
    `ImportWindow` and `SheetImportBatch` receive the `StudentStore`, a template lookup,
    a sheet reader wrapping `image_to_text`, and the same `DataSheetStore` through their
    constructors. `program.py` builds one `GoogleDriveDataSheetStore` per Import window
