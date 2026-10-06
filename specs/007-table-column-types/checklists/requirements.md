@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,7 +31,5 @@
 
 ## Notes
 
-- Iteration 1: two [NEEDS CLARIFICATION] markers remain, awaiting the SLP's answers:
-  - FR-012: what happens to a cell that does not match its column's type.
-  - FR-016: how a Tally cell is saved to the Student Session Workbook.
-- Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
+- Iteration 1: two [NEEDS CLARIFICATION] markers (FR-012, FR-016).
+- Iteration 2 (2026-10-05): resolved by the SLP. Q1 = A, so a cell that doesn't fit its type fails the sheet's import, naming every bad cell's column, row, and value. Q2 = C, so a Tally cell is saved as its marks plus a count per tally option. As a result, FR-017 now makes Tally columns' options part of the Template Structure. All items pass.
