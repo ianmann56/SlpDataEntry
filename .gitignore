@@ -220,3 +220,5 @@ templates.json
 Thumbs.db
 *.tmp
 *.swp
+
+.claude/worktrees
