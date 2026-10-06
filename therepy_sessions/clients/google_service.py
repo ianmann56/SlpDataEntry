@@ -12,6 +12,8 @@ DEFAULT_CLIENT_SECRET_FILE: str = '../../slpdataentry_3_credentials.json'
 # Overrides the default when set. Read inside load_google_credentials(), never at import time.
 CLIENT_SECRET_FILE_ENV: str = 'SLP_GOOGLE_CLIENT_SECRET_FILE'
 SCOPES: list[str] = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+# How long the browser sign-in waits before giving up, so a closed or abandoned sign-in tab ends with an error
+SIGN_IN_TIMEOUT_SECONDS: int = 300
 
 # Kept from the earlier single-service version, so existing sign-ins keep working
 _TOKEN_FILE: str = '.token_sheets_v4.pickle'
@@ -27,6 +29,10 @@ def load_google_credentials() -> Any:
 
     Returns:
         google.oauth2.credentials.Credentials
+
+    Raises:
+        google_auth_oauthlib.flow.WSGITimeoutError: If the browser sign-in is not
+            finished within SIGN_IN_TIMEOUT_SECONDS
     """
     cred = None
 
@@ -47,7 +53,7 @@ def load_google_credentials() -> Any:
         if not refreshed:
             client_secret_file = os.environ.get(CLIENT_SECRET_FILE_ENV, DEFAULT_CLIENT_SECRET_FILE)
             flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES)
-            cred = flow.run_local_server()
+            cred = flow.run_local_server(timeout_seconds=SIGN_IN_TIMEOUT_SECONDS)
 
         with open(_TOKEN_FILE, 'wb') as token:
             pickle.dump(cred, token)

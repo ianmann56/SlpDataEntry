@@ -23,7 +23,7 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
   'Times w/Prompting', 'Times w/o Prompting', etc.
   """
 
-  def __init__(self, id, title, fields):
+  def __init__(self, id: str, title: str, fields: dict[str, FieldConfiguration]) -> None:
     """
     Initializes the template with expected field configurations for form processing.
 

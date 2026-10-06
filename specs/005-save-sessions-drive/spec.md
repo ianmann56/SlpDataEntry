@@ -117,6 +117,8 @@ Sometimes a student has more than one session on the same day; each has its own 
 - The SLP renames a tab: it still counts as that session, because duplicates are found from the Date and Time IN in the tab, not its name. The SLP deletes a tab: that session can be imported again and gets a new tab. New tab names are unique among the tabs that exist at the time of saving.
 - The student's Student Key is later changed in the Students window: the existing workbook keeps its name; new imports under the new key start a new workbook named with the new key.
 - The SLP copies a workbook in Drive and the copy carries the same hidden label: new sessions go to whichever of them was changed most recently (FR-013b). Since each save changes that workbook, later saves keep going to it until the SLP edits the other one.
+- A template has two or more table or running tally sections: each table on the sheet is given to the section whose title matches the title printed above it, so each table appears once in the tab (FR-020a).
+- A table on such a sheet has no printed title, or its title matches no section, or a section finds no table: the sheet is marked failed with a reason naming the problem, and nothing is saved for it. The SLP fixes the template's section titles or the sheet and retries.
 - A new workbook would have the same name as an existing file in the folder (e.g. two structures started by templates with the same name for the same student): both files are kept; each is identified by its structure, not its name.
 
 ## Requirements *(mandatory)*
@@ -166,6 +168,7 @@ Sometimes a student has more than one session on the same day; each has its own 
 **Tab contents**
 
 - **FR-020**: A session tab MUST contain every value from the interpreted Data Sheet: Student Key, Date, Time IN, Time OUT, Goal, Measure, every form value, and every cell of every table and running tally.
+- **FR-020a**: Each table on the paper sheet MUST be read by exactly one table or running tally section of the template, so no table's values appear twice in the tab. When the template has one such section, it MUST receive every table. When it has several, each table MUST go to the section whose title matches the title printed above the table on the sheet, ignoring letter case, surrounding spaces, and a trailing `:`. A table with no title or no matching section, a section with no matching table, or two such sections with the same title MUST fail the sheet with a reason the SLP can understand, and nothing MUST be saved for it.
 - **FR-021**: Header and form values MUST be listed first, starting at the top of the tab, one field per row: the field name in the first column and its value in the second. The header fields (Student Key, Date, Time IN, Time OUT, Goal, Measure) come first in that order, followed by the form values.
 - **FR-022**: After the header and form list, and one blank row, each table and running tally MUST appear as a block of rows under a header row of its column names, with blocks separated by one blank row, with one row per row of the paper sheet, in the order the rows appear on the sheet. Each block MUST be labeled with its section title when it has one.
 - **FR-023**: A session tab MUST NOT contain template or interpretation metadata: no lists of allowed choices, no value types, no section or template ids, and no template name or description.

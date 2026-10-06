@@ -56,6 +56,10 @@ when Import is pressed, before any sheet is read (R10).
 
 **The prototype** `storage/file_creator.py` is retired (R13).
 
+**Each table goes to one section**: Collection reads each table's printed title, and
+the sheet interpreter gives each table to the section with that title, so a template with
+several table sections no longer saves every table twice (R14).
+
 ## Technical Context
 
 **Language/Version**: Python 3.12
@@ -121,7 +125,7 @@ OAuth).
 | II. Domain Language Fidelity | New terms are added to `docs/domain/glossary.md` in this change: **Data Sheet Store**, **Template Structure**, **Student Session Workbook** (replacing **Session Sheet**), **Session Tab**, **Session Moment**, **Workbook Layout Order**, and **Therapy Data Folder**. Code identifiers match them: `DataSheetStore`, `SessionMoment`, `WorkbookLayout`, `GoogleDriveDataSheetStore`. | ✅ Pass (glossary update in scope) |
 | III. Layered Pipeline | Only `StudentDataSheet` crosses interpretation → storage. The template rides on it as `sheet.template` (R2). The `DataSheetStore` ABC lives in `interpretation/`, so `interpretation/` imports nothing from `storage/` or `clients/`. `storage/` imports `interpretation/` to implement the port (allowed downstream). Interpretation stays pure: attaching the template is not I/O. Sheets and Drive request bodies live only in `storage/` (rule 4). Layout and ordering rules are plain functions, not widget callbacks (rule 5). `program.py` is the only module that names the concrete store (rule 6). **Amendment**: layers rule 1 states that the sheet carries its template, and that Storage reads it only through the sheet. It also names `DataSheetStore` as the port that the importing code and windows use to reach storage. | ✅ Pass + amendment |
 | IV. Injected External Services | Google credentials and services are built only in `clients/google_service.py`, lazily, behind `inject_drive_service` and `inject_sheets_service` in `program.py` (R11). No module-level clients and no OAuth at import time. `GoogleDriveDataSheetStore` translates `HttpError`, `RefreshError`, and transport errors into `DataSheetStoreError` (DI rule 5). **Amendment**: DI rule 6 now says `ImportWindow` and `SheetImportBatch` receive a `DataSheetStore` (one instance per Import visit, built in `program.py`) instead of the result sink, and the window also receives `open_url`. | ✅ Pass + amendment |
-| V. Pluggable Interpreters & Templates | Storage never `isinstance`-checks interpreter types. Each interpreter reports `section_keys()` and `section_kind` through the base class, and Storage reads them from `sheet.template` (R2). Serialized templates are unchanged, so every saved template still loads. A mismatched sheet still fails loudly. A new destination is a new `DataSheetStore` subclass, with no change to the import flow. **Amendment**: `interpreters.md` makes `section_keys` part of a complete interpreter type, and notes that `StudentDataSheet` carries its template. | ✅ Pass + amendment |
+| V. Pluggable Interpreters & Templates | Storage never `isinstance`-checks interpreter types. Each interpreter reports `section_keys()` and `section_kind` through the base class, and Storage reads them from `sheet.template` (R2). Serialized templates are unchanged, so every saved template still loads. A mismatched sheet still fails loudly. A new destination is a new `DataSheetStore` subclass, with no change to the import flow. A template whose table sections don't match the sheet's table titles fails loudly (R14). **Amendment**: `interpreters.md` makes `section_keys` and `consumes_tables` part of a complete interpreter type, notes that `StudentDataSheet` carries its template, and adds rule 9 (each table is read by one section). | ✅ Pass + amendment |
 | VI. Typed Public Interfaces | All new types are `NamedTuple`/`Enum`/`TypedDict` and fully annotated (contracts). Touched members of the interpreter classes, `StudentDataSheet`, `DataSheetTable`, `StudentDataSheetInterpreter`, and `google_service` gain annotations in this change. Google `Resource` objects are typed `Any`, with a comment naming the concrete type (type-declarations rule 6). | ✅ Pass |
 | Tech constraints | Output goes through `google-api-python-client` with OAuth, as the constitution specifies. No new runtime dependency, so `pip_requirements.txt` and `ALL_DEPENDENCIES.md` are unchanged. Local persistence is unchanged. | ✅ Pass |
 | Development Workflow | The debug-print stand-in from feature 003 is replaced by the shipped Storage path (`debug()` stays as an uncalled developer aid). Offline checks use synthetic inputs (R12). | ✅ Pass |
@@ -143,7 +147,7 @@ OAuth).
 ```text
 specs/005-save-sessions-drive/
 ├── plan.md                         # This file
-├── research.md                     # Phase 0: decisions R1–R13
+├── research.md                     # Phase 0: decisions R1–R14
 ├── data-model.md                   # Shapes, outcomes, workbook/tab/label model, cell rules
 ├── quickstart.md                   # Validation V1–V9
 ├── contracts/
@@ -160,15 +164,18 @@ specs/005-save-sessions-drive/
 therepy_sessions/
 ├── program.py                                   # CHANGE: lazy Google services, one GoogleDriveDataSheetStore per Import visit injected as DataSheetStore, open_url
 ├── clients/
-│   └── google_service.py                        # CHANGE: load_google_credentials / create_sheets_service / create_drive_service; env override; remove unused helpers
+│   └── google_service.py                        # CHANGE: load_google_credentials / create_sheets_service / create_drive_service; env override; sign-in timeout; remove unused helpers
+├── collection/
+│   ├── collection_headers.py                    # CHANGE: StudentDataSheetImport.table_titles (R14)
+│   └── images/aws_image_collection.py           # CHANGE: read TABLE_TITLE into table_titles (R14)
 ├── interpretation/
 │   ├── data_sheet_store.py                      # NEW: DataSheetStore ABC, SavedDataSheet, DataSheetStoreError (the storage port)
 │   ├── student_data_sheet.py                    # CHANGE: template, use_student_key, register_table(table, section_id), DataSheetTable.section_id
 │   ├── templates/
-│   │   └── student_data_sheet_interpreter.py    # CHANGE: base section_kind/section_keys; interpreter takes the template, attaches it, tags tables
+│   │   └── student_data_sheet_interpreter.py    # CHANGE: base section_kind/section_keys/consumes_tables; interpreter takes the template, attaches it, tags tables, assigns tables by title (R14)
 │   ├── interpreter_types/
-│   │   ├── table_interpreter.py                 # CHANGE: section_keys
-│   │   ├── running_tally_interpreter.py         # CHANGE: section_keys
+│   │   ├── table_interpreter.py                 # CHANGE: section_keys, consumes_tables
+│   │   ├── running_tally_interpreter.py         # CHANGE: section_keys, consumes_tables
 │   │   └── simple_form_interpreter.py           # CHANGE: section_keys
 │   ├── template_manager/
 │   │   └── student_data_sheet_template.py       # CHANGE: to_data_sheet_interpreter passes self
@@ -183,9 +190,9 @@ therepy_sessions/
 
 docs/
 ├── conventions/architecture/
-│   ├── layers.md                                # AMEND: rule 1 (sheet carries its template; DataSheetStore port)
+│   ├── layers.md                                # AMEND: rule 1 (sheet carries its template; DataSheetStore port); rule 2 (table_titles)
 │   ├── dependency-injection.md                  # AMEND: rule 6 (DataSheetStore injected, open_url, lazy Google services)
-│   └── interpreters.md                          # AMEND: section_keys/section_kind in "Adding a new interpreter type"; the sheet carries its template
+│   └── interpreters.md                          # AMEND: section_keys/section_kind/consumes_tables in "Adding a new interpreter type"; the sheet carries its template; rule 9 (each table read by one section)
 └── domain/
     └── glossary.md                              # AMEND: new terms; Session Sheet → Student Session Workbook
 

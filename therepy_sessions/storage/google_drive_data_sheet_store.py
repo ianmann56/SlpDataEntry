@@ -17,6 +17,7 @@ from typing import Any
 
 import httplib2
 from google.auth.exceptions import GoogleAuthError, RefreshError, TransportError
+from google_auth_oauthlib.flow import WSGITimeoutError
 from googleapiclient.errors import HttpError
 from oauthlib.oauth2.rfc6749.errors import OAuth2Error
 
@@ -423,6 +424,8 @@ class GoogleDriveDataSheetStore(DataSheetStore):
             raise DataSheetStoreError("not signed in to Google; press Import to sign in") from e
         except OAuth2Error as e:
             raise DataSheetStoreError("Google sign-in was cancelled or refused; press Import to try again") from e
+        except WSGITimeoutError as e:
+            raise DataSheetStoreError("Google sign-in was cancelled or timed out; press Import to try again") from e
         except FileNotFoundError as e:
             raise DataSheetStoreError(f"the Google sign-in settings file was not found ({e.filename})") from e
         except (TransportError, httplib2.HttpLib2Error, OSError) as e:

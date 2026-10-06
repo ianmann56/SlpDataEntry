@@ -32,7 +32,7 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
   Use case: Therapy session data sheets with consistent column layouts like 'Word',
   'Times w/Prompting', 'Times w/o Prompting', etc.
   """
-  def __init__(self, id: str, title: str, columns: list[ColumnDefinition]):
+  def __init__(self, id: str, title: str, columns: list[ColumnDefinition]) -> None:
     """
     Initializes the template with expected column names for table processing.
 

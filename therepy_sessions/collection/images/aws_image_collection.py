@@ -1,18 +1,21 @@
 import json
 import os
+from collections.abc import Callable
+from typing import Any
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from collection.collection_headers import StudentDataSheetImport
 
-def image_to_text(image_path, inject_textract_client) -> StudentDataSheetImport:
+def image_to_text(image_path: str, inject_textract_client: Callable[[], Any]) -> StudentDataSheetImport:
     """
     Converts an image to text using AWS Textract with table detection.
     
     Args:
         image_path (str): Path to the image file
+        inject_textract_client (Callable[[], Any]): Returns the boto3 Textract client to use
         
     Returns:
-        dict: Contains both raw text and structured table data
+        StudentDataSheetImport: The raw text, form fields, tables, and table titles
         
     Raises:
         FileNotFoundError: If the image file doesn't exist

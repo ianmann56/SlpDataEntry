@@ -339,7 +339,9 @@ error is shown through `error_handling.throw` ("Cannot start the import").
 
 `GoogleDriveDataSheetStore.prepare()` calls its injected service providers. These build
 the Google credentials and services lazily in `program.py`, running OAuth
-`run_local_server` if needed. It then finds or creates `SLP Therepy Data` (in My
+`run_local_server` if needed, with a timeout (`SIGN_IN_TIMEOUT_SECONDS`) so a closed or
+abandoned sign-in tab ends `prepare()` with "Google sign-in was cancelled or timed out"
+instead of waiting forever. It then finds or creates `SLP Therepy Data` (in My
 Drive root) and `Current Year` inside it.
 
 **Rationale**:
@@ -419,3 +421,32 @@ glossary's **Session Sheet** entry becomes **Student Session Workbook**.
 **Rationale**: The spec puts charts and summaries out of scope and says the prototype is
 replaced. Keeping dead code that names "Jimmy" and writes charts would confuse the
 Storage layer's contract.
+
+## R14. Giving each table to one section (FR-020a)
+
+**Decision**: Collection reads the title printed above each table from Textract's
+`TABLE_TITLE` blocks into `StudentDataSheetImport.table_titles` (trailing `:` stripped,
+`""` when none), in the same order as `tables`. Each interpreter declares
+`consumes_tables`. `StudentDataSheetInterpreter._assign_tables` decides which tables each
+table-consuming section receives:
+
+- one such section: every table
+- several: the table whose title matches the section title, ignoring letter case,
+  spacing, and a trailing `:`
+
+A table with no title or no matching section, a section with no table, or two such
+sections with the same title fails the sheet loudly (interpreters rule 9).
+
+**Rationale**: Before this, every table section read every table, so a template with two
+table sections produced each table twice, and the session tab would hold duplicate,
+mislabeled blocks (FR-020, FR-022). Matching by title uses what the SLP already sees on
+the sheet and in the template, and keeps Collection free of domain meaning (layers
+rule 2): it only reports the printed title. Single-section templates keep working with
+untitled tables.
+
+**Alternatives considered**:
+
+- Matching by position (the Nth table to the Nth section). Rejected: Textract does not
+  promise table order, and a skipped table would shift every later one silently.
+- Matching by column headers. Rejected: two sections may share the same columns, and
+  OCR errors in headers would misroute data.
