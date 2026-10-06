@@ -82,6 +82,25 @@ class JsonStudentStore(StudentStore):
             self._save(students)
         return sorted(cleared, key=str.casefold)
 
+    def create_empty_file(self) -> None:
+        """
+        Create the student records file holding no Students.
+
+        The file is opened in exclusive-create mode, so an existing file is never
+        written over.
+
+        Raises:
+            FileExistsError: The file already exists; it is left unchanged
+            OSError: The file could not be written; any partial file is removed
+        """
+        with open(self._file_path, "x", encoding="utf-8") as file:
+            try:
+                json.dump({"format_version": FORMAT_VERSION, "students": []}, file, indent=2, ensure_ascii=False)
+            except BaseException:
+                file.close()
+                _remove_quietly(self._file_path)
+                raise
+
     def recover_unreadable_records(self) -> str:
         if not os.path.exists(self._file_path):
             return ""
@@ -154,3 +173,11 @@ class JsonStudentStore(StudentStore):
             json.dump(data, file, indent=2, ensure_ascii=False)
             temp_path = file.name
         os.replace(temp_path, self._file_path)
+
+
+def _remove_quietly(path: str) -> None:
+    """Remove a partly written file, ignoring a failure to remove it."""
+    try:
+        os.remove(path)
+    except OSError:
+        pass

@@ -1,12 +1,12 @@
 #!../.venv/bin/python3
 
-import os
 import sys
 import threading
 import traceback
 import webbrowser
 import darkdetect
 import tkinter as tk
+from tkinter import filedialog
 from typing import Any
 
 import sv_ttk
@@ -28,23 +28,62 @@ from students.student import TemplateChoice, UnreadableStudentRecordsError
 from students.student_store import StudentStore
 from tk_utils import error_handling
 from students.students_window import StudentsWindow, ask_to_start_fresh
+from workspace.workspace import WorkspaceCreateError, WorkspaceFolderError, open_workspace, workspace_files
+from workspace.workspace_dialogs import (
+    ask_to_start_new_workspace,
+    show_missing_workspace_file,
+    show_workspace_error,
+)
 
 def main() -> None:
     # Parse command line arguments
-    args = parse_command_line_args()
-    template_storage_file_path, student_storage_file_path = args[0], args[1]
+    folder_arg = parse_command_line_args()
 
     # Create root Tkinter window
     root = tk.Tk()
 
+    # Make the root's window exist before theming. The theme applies its colors when Tk
+    # sends the root a theme-changed event, which Tk drops for a window that doesn't exist
+    # yet, and the root is withdrawn below without ever being shown first.
+    root.winfo_id()
+
     # Set theme to light or dark based on system.
     sv_ttk.set_theme(darkdetect.theme())
 
+    # Keep the root hidden until the Workspace is open, so only its dialogs show
+    root.withdraw()
+
+    folder = folder_arg
+    if folder is None:
+        folder = filedialog.askdirectory(parent=root, title="Choose Workspace Folder", mustexist=True)
+    if not folder:
+        root.destroy()
+        return
+
+    files = workspace_files(folder)
+
     # Create the template store shared by every visit to template management
-    template_store = TemplateStore(template_storage_file_path)
+    template_store = TemplateStore(files.templates_file)
 
     # Create the one student store; windows receive it by injection
-    student_store: StudentStore = JsonStudentStore(student_storage_file_path)
+    student_store: StudentStore = JsonStudentStore(files.students_file)
+
+    try:
+        opened = open_workspace(
+            folder,
+            ask_to_start_new_workspace=lambda path: ask_to_start_new_workspace(root, path),
+            show_missing_workspace_file=lambda inspection: show_missing_workspace_file(root, inspection),
+            create_students_file=student_store.create_empty_file,
+            create_templates_file=template_store.create_empty_file,
+        )
+    except (WorkspaceFolderError, WorkspaceCreateError) as e:
+        show_workspace_error(root, e)
+        opened = None
+    if opened is None:
+        root.destroy()
+        return
+
+    root.deiconify()
 
     def list_template_choices() -> list[TemplateChoice]:
         return [TemplateChoice(template.id, template.name) for template in template_store.get_all_templates()]
@@ -176,58 +215,24 @@ def _return_to(parent: tk.Misc, child: tk.Toplevel) -> None:
     child.destroy()
     parent.deiconify()
 
-def validate_storage_file_path(file_path: str) -> None:
+def parse_command_line_args() -> str | None:
     """
-    Validate that the storage file path has a .json extension.
-    
-    Args:
-        file_path (str): The file path to validate
-        
-    Exits:
-        If the file path does not have a .json extension
-    """
-    if not file_path.lower().endswith('.json'):
-        print(f"Error: Storage file must be a JSON file (got: {file_path})")
-        print("Please provide a file path with .json extension")
-        sys.exit(1)
+    Parse the command line.
 
-def validate_distinct_storage_files(template_path: str, student_path: str) -> None:
-    """
-    Validate that the template file and student records file are different files.
-
-    Args:
-        template_path (str): The template storage file path
-        student_path (str): The student records file path
-
-    Exits:
-        If both paths resolve to the same file
-    """
-    if os.path.normcase(os.path.realpath(template_path)) == os.path.normcase(os.path.realpath(student_path)):
-        print("Error: The template file and student records file must be different files")
-        sys.exit(1)
-
-def parse_command_line_args() -> list[str]:
-    """
-    Parse command line arguments and return configuration.
-    
     Returns:
-        list: The command line arguments (excluding script name)
-        
+        The Workspace folder given, or None when it was left out, so a picker opens
+
     Exits:
-        If required arguments are missing or invalid
+        If more than one argument is given
     """
-    # Check that both file path arguments are provided
-    if len(sys.argv) < 3:
-        print("Usage: python program.py <template_storage_file_path> <student_storage_file_path>")
-        print("Example: python program.py templates.json students.json")
+    if len(sys.argv) > 2:
+        print("Usage: python program.py [<workspace_folder>]")
+        print("The Workspace folder holds students.json and templates.json.")
+        print("Leave the folder out to choose it from a folder picker.")
+        print("Example: python program.py ~/SLP-Workspace")
         sys.exit(1)
-    
-    # Validate the storage file paths
-    validate_storage_file_path(sys.argv[1])
-    validate_storage_file_path(sys.argv[2])
-    validate_distinct_storage_files(sys.argv[1], sys.argv[2])
-    
-    return sys.argv[1:]
+
+    return sys.argv[1] if len(sys.argv) == 2 else None
 
 if __name__ == '__main__':
     try:

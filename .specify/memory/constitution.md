@@ -1,5 +1,36 @@
 <!--
 Sync Impact Report
+- Version change: 1.6.0 → 1.7.0 (MINOR: new rules in referenced docs, and glossary
+  additions)
+- Modified principles: none
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/conventions/architecture/layers.md: adds `workspace/` to the package
+    layout, and `program.py` now opens the Workspace. New rule 11: workspace/ imports no
+    pipeline package and not students/, never builds a store, keeps its rules free of
+    Tkinter, and creates Workspace files only through callables wired in program.py.
+  - Updated docs/conventions/architecture/dependency-injection.md rule 6: program.py
+    builds the JsonStudentStore and TemplateStore from the Workspace paths, and
+    open_workspace receives every dialog and file creator as a callable.
+  - Updated docs/domain/glossary.md: adds Workspace and Workspace State, and the Student
+    Store and Template Store entries name their files in the Workspace.
+- Other edits: Technology Constraints says the local JSON files live in the Workspace.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.6.0 (2026-10-03) amended layers.md rules 1, 2 and 10, dependency-injection rule 6,
+    and interpreters.md, and added Data Sheet Store and storage glossary terms
+  - 1.5.0 (2026-10-01) amended dependency-injection rule 6 and interpreters.md, and added
+    template glossary terms
+  - 1.4.0 (2026-10-01) added layers.md rule 9 and expanded dependency-injection rule 6
+  - 1.3.0 (2026-09-30) added `students/` and rule 8 to layers.md
+  - 1.2.0 (2026-09-30) added `app_shell/` and rule 7 to layers.md
+  - 1.1.0 (2026-09-26) added Principle VI. Typed Public Interfaces
+  - 1.0.0 (2026-09-26) initial ratification with Principles I–V
+
+Previous report (1.6.0):
 - Version change: 1.5.0 → 1.6.0 (MINOR: new rules in referenced docs, and glossary
   additions)
 - Modified principles: none
@@ -238,8 +269,8 @@ are explicit and checkable. Right now most of them exist only in docstrings.
 - Desktop UI: Tkinter with the `sv-ttk` theme and `darkdetect` for light/dark mode.
 - OCR: AWS Textract (`boto3`) using the `FORMS` and `TABLES` features.
 - Output: Google Sheets and Drive through `google-api-python-client` with OAuth.
-- Local persistence: JSON files (e.g. the template store), written with UTF-8 and
-  `indent=2`.
+- Local persistence: JSON files in the Workspace folder (`students.json` and
+  `templates.json`), written with UTF-8 and `indent=2`.
 - A new runtime dependency or external service MUST be justified in the feature's plan.
   An external service that receives student data also triggers Principle I.
 
@@ -283,4 +314,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.6.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-03
+**Version**: 1.7.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-05
