@@ -198,7 +198,7 @@ workbook is not trashed and is still in the folder. If the check fails, it drops
 entry and searches again.
 
 **Rationale**: Drive search is eventually consistent. A workbook created for the first
-`JA` sheet in a batch may not show up in a search a second later for the second `JA`
+`AG` sheet in a batch may not show up in a search a second later for the second `AG`
 sheet, which would create a duplicate workbook and break FR-007. The cache is only an
 accelerator: Drive is still the source of truth, and the cache dies with the window.
 
@@ -223,7 +223,10 @@ not guaranteed.
      `deleteSheet` the default tab, and `createDeveloperMetadata` with the layout.
   3. If step 2 fails, `drive.files.delete` the new file (best effort) and report the
      failure. A failed delete is printed to the console, and the empty workbook is later
-     found and reused. It holds no session tab, so no data is wrong.
+     found and reused. It holds no session tab, so no data is wrong. The next save to it
+     repairs it: because its layout metadata is missing, that save's `batchUpdate` also
+     writes the layout and deletes the empty default tab (FR-019; contracts/
+     session-storage.md § `save(sheet)` step 5.1).
 
 **Rationale**: This meets "nothing partial remains" (FR-002) with no compensation logic
 for existing workbooks. Writing values with `updateCells`, rather than
@@ -316,7 +319,8 @@ would need justification.
    - a blank row before the next block
 
 Each table column is mapped by key, so a template whose columns are listed in a
-different order still writes to the original positions (FR-025a).
+different order still writes its columns in the workbook's original order (FR-025,
+FR-025a).
 
 Choice options, types, ids, and the template name or description are never written
 (FR-023).
@@ -335,7 +339,9 @@ error is shown through `error_handling.throw` ("Cannot start the import").
 
 `GoogleDriveDataSheetStore.prepare()` calls its injected service providers. These build
 the Google credentials and services lazily in `program.py`, running OAuth
-`run_local_server` if needed. It then finds or creates `SLP Therepy Data` (in My
+`run_local_server` if needed, with a timeout (`SIGN_IN_TIMEOUT_SECONDS`) so a closed or
+abandoned sign-in tab ends `prepare()` with "Google sign-in was cancelled or timed out"
+instead of waiting forever. It then finds or creates `SLP Therepy Data` (in My
 Drive root) and `Current Year` inside it.
 
 **Rationale**:
@@ -363,7 +369,8 @@ working.
 
 The client-secret path keeps today's default, which is outside the repo. It can now be
 overridden with the `SLP_GOOGLE_CLIENT_SECRET_FILE` environment variable
-(dependency-injection rule 4).
+(dependency-injection rule 4). The variable is read inside `load_google_credentials()`,
+not at import time (Principle IV).
 
 `program.py` builds the credentials and services once, lazily, behind
 `inject_drive_service` and `inject_sheets_service`, guarded by a lock like
@@ -414,3 +421,32 @@ glossary's **Session Sheet** entry becomes **Student Session Workbook**.
 **Rationale**: The spec puts charts and summaries out of scope and says the prototype is
 replaced. Keeping dead code that names "Jimmy" and writes charts would confuse the
 Storage layer's contract.
+
+## R14. Giving each table to one section (FR-020a)
+
+**Decision**: Collection reads the title printed above each table from Textract's
+`TABLE_TITLE` blocks into `StudentDataSheetImport.table_titles` (trailing `:` stripped,
+`""` when none), in the same order as `tables`. Each interpreter declares
+`consumes_tables`. `StudentDataSheetInterpreter._assign_tables` decides which tables each
+table-consuming section receives:
+
+- one such section: every table
+- several: the table whose title matches the section title, ignoring letter case,
+  spacing, and a trailing `:`
+
+A table with no title or no matching section, a section with no table, or two such
+sections with the same title fails the sheet loudly (interpreters rule 9).
+
+**Rationale**: Before this, every table section read every table, so a template with two
+table sections produced each table twice, and the session tab would hold duplicate,
+mislabeled blocks (FR-020, FR-022). Matching by title uses what the SLP already sees on
+the sheet and in the template, and keeps Collection free of domain meaning (layers
+rule 2): it only reports the printed title. Single-section templates keep working with
+untitled tables.
+
+**Alternatives considered**:
+
+- Matching by position (the Nth table to the Nth section). Rejected: Textract does not
+  promise table order, and a skipped table would shift every later one silently.
+- Matching by column headers. Rejected: two sections may share the same columns, and
+  OCR errors in headers would misroute data.

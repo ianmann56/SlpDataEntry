@@ -50,6 +50,7 @@ class StudentDataSheetTemplate:
   def to_data_sheet_interpreter(self) -> StudentDataSheetInterpreter:
     """
     Constructs a StudentDataSheetInterpreter from this template, using its
-    configured interpreters as the session data templates.
+    configured interpreters as the session data templates. Every sheet it
+    interprets carries this template.
     """
-    return StudentDataSheetInterpreter(self.interpreters)
+    return StudentDataSheetInterpreter(self.interpreters, self)

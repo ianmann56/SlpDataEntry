@@ -7,7 +7,7 @@ pipeline with separate adapter and UI packages beside it.
 clients/         external SDK construction only (boto3 Textract, Google Sheets)
 collection/      source → StudentDataSheetImport         (OCR, image handling)
 interpretation/  StudentDataSheetImport → StudentDataSheet (templates, interpreters)
-storage/         StudentDataSheet → output destination   (Google Sheets)
+storage/         StudentDataSheet → output destination   (DataSheetStore implementations: Google Drive/Sheets)
 tk_utils/        shared Tkinter helpers
 app_shell/       navigation shell windows (home screen, Setup menu); Tkinter only
 students/        student setup records, student store, and windows; no pipeline imports
@@ -20,10 +20,13 @@ program.py       composition root: parses args, builds clients, wires the layers
    `interpretation` or `storage`. `interpretation` MUST NOT import from `storage` or
    `clients`. The only thing crossing the collection → interpretation boundary is
    `StudentDataSheetImport`. The only thing crossing interpretation → storage is
-   `StudentDataSheet`.
+   `StudentDataSheet`. The sheet carries the template it was interpreted with
+   (`StudentDataSheet.template`), and Storage reads the template, and its interpreters'
+   public members, only through the sheet. Storage never loads templates itself.
 2. **Collection normalizes and nothing else.** A collector turns vendor output (for
    example Textract blocks) into `form_data` (label → text, trailing `:` stripped) and
-   `tables` (list of row-major 2D string arrays). It MUST NOT assign domain meaning.
+   `tables` (list of row-major 2D string arrays), with `table_titles` (the title above
+   each table, trailing `:` stripped, `""` when none). It MUST NOT assign domain meaning.
 3. **Interpretation is pure.** Interpreters take an Import and return data. They do no
    I/O, make no network calls, and touch no UI. The same input always produces the same
    output, so they can be exercised against saved sample Imports.
@@ -47,13 +50,19 @@ program.py       composition root: parses args, builds clients, wires the layers
    injected sheet reader, never by importing `collection.images`, so the only thing
    crossing collection → interpretation is still `StudentDataSheetImport`. This rule is
    one-way: rule 8 still keeps `students/` free of pipeline imports.
+10. **Importing reaches storage through the Data Sheet Store.** `interpretation/importing/`
+   saves sheets only through an injected `DataSheetStore`, the port defined in
+   `interpretation/data_sheet_store.py`. Implementations live in `storage/`, which
+   imports the port to implement it, and only `program.py` names one. So
+   `interpretation/` still imports nothing from `storage/`.
 
 ## Adding a new source or destination
 
 - New input source (PDF, scanner, another OCR vendor): add a module under
   `collection/<kind>/` that returns `StudentDataSheetImport`.
-- New output (CSV, a different spreadsheet layout): add a module under `storage/` that
-  accepts `StudentDataSheet` plus injected clients.
+- New output (CSV, a different spreadsheet layout): add a `DataSheetStore` subclass
+  under `storage/` that accepts `StudentDataSheet` plus injected clients, and wire it in
+  `program.py`. The import code and window need no change.
 
 Any external service that receives student data is also subject to
 [../../domain/student-data-privacy.md](../../domain/student-data-privacy.md).

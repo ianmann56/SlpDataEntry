@@ -3,15 +3,16 @@ The Import Batch: the list of Selected Files in the Import window, and the rules
 importing them.
 
 Each file is read into an Import, matched to a student by the Student Key on the sheet,
-and interpreted with that student's Current Template. The template is chosen per sheet,
-so one batch can mix students with different sheet layouts. A failure on one sheet never
-stops the others, and becomes a Sheet Outcome whose message names the fix.
+interpreted with that student's Current Template, and saved through the injected Data
+Sheet Store. The template is chosen per sheet, so one batch can mix students with
+different sheet layouts. A sheet succeeds only once it is saved. A failure on one sheet
+never stops the others, and becomes a Sheet Outcome whose message names the fix.
 
 A file keeps its Import while the window is open. A later Import press reuses it unless
 the file changed on disk, so each successful reading is paid for once.
 
 This module has no Tkinter, and no I/O of its own beyond checking a file's modified
-time. Reading sheets, finding students, and loading templates are all injected.
+time. Reading sheets, finding students, loading templates, and saving are all injected.
 """
 
 import os
@@ -22,6 +23,7 @@ from enum import Enum
 from typing import NamedTuple
 
 from collection.collection_headers import StudentDataSheetImport
+from interpretation.data_sheet_store import DataSheetStore, SavedDataSheet
 from interpretation.student_data_sheet import StudentDataSheet
 from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
 from students.student import UnreadableStudentRecordsError
@@ -43,6 +45,8 @@ class FailureReason(Enum):
     TEMPLATE_MISSING = "template_missing"
     TEMPLATE_MISMATCH = "template_mismatch"
     STUDENT_RECORDS_UNREADABLE = "student_records_unreadable"
+    MISSING_DATE = "missing_date"
+    SAVE_FAILED = "save_failed"
 
 
 class SheetOutcome(NamedTuple):
@@ -55,12 +59,14 @@ class SheetOutcome(NamedTuple):
       template_name: The template used, on success or when the sheet did not match it.
       failure_reason: Why the file failed. Set only when status is FAILED.
       message: Text shown to the SLP. Names students only by Student Key.
+      saved: Where the session was saved. Set only when status is SUCCEEDED.
     """
     status: SheetStatus
     student_key: str | None = None
     template_name: str | None = None
     failure_reason: FailureReason | None = None
     message: str = ""
+    saved: SavedDataSheet | None = None
 
 
 class ProcessedSheet(NamedTuple):
@@ -126,6 +132,8 @@ _FAILURE_MESSAGES: dict[FailureReason, str] = {
     FailureReason.TEMPLATE_MISSING: "Student {student_key}'s Current Template no longer exists or could not be loaded. Choose another in Setup → Students.",
     FailureReason.TEMPLATE_MISMATCH: 'The sheet does not match template "{template_name}": {detail}. Fix the template, or retake the photo.',
     FailureReason.STUDENT_RECORDS_UNREADABLE: "The student records could not be read. Fix them in Setup → Students.",
+    FailureReason.MISSING_DATE: "No session Date was found on the sheet. Fill in the Date and retake the photo.",
+    FailureReason.SAVE_FAILED: "Could not save to Google Drive: {detail}. Press Import again to retry.",
 }
 
 
@@ -168,6 +176,7 @@ class SheetImportBatch:
         read_sheet: Callable[[str], StudentDataSheetImport],
         student_store: StudentStore,
         get_template: Callable[[str], StudentDataSheetTemplate | None],
+        data_sheet_store: DataSheetStore,
         stat_mtime_ns: Callable[[str], int] = _os_stat_mtime_ns,
     ) -> None:
         """
@@ -177,11 +186,13 @@ class SheetImportBatch:
             read_sheet: Reads one image into an Import
             student_store: Finds the student named on a sheet
             get_template: Loads a template by id, or returns None if it no longer exists
+            data_sheet_store: Saves each interpreted sheet
             stat_mtime_ns: Returns a file's modified time in nanoseconds
         """
         self._read_sheet = read_sheet
         self._student_store = student_store
         self._get_template = get_template
+        self._data_sheet_store = data_sheet_store
         self._stat_mtime_ns = stat_mtime_ns
         self._files: list[SelectedFile] = []
 
@@ -225,7 +236,7 @@ class SheetImportBatch:
 
     def process_file(self, identity: str) -> ProcessedSheet:
         """
-        Read, match, and interpret one file, and record its outcome.
+        Read, match, interpret, and save one file, and record its outcome.
 
         A saved Import is reused while the file's modified time is unchanged. Never
         raises for a problem with the sheet: every failure becomes a FAILED outcome
@@ -279,6 +290,16 @@ class SheetImportBatch:
 
         try:
             data_sheet = template.to_data_sheet_interpreter().interpret_student_data_sheet(sheet_import)
+        except KeyError as e:
+            # A sheet with no Date label at all is missing its date, not a different layout
+            if e.args and e.args[0] == "Date":
+                raise _SheetFailed(FailureReason.MISSING_DATE, student_key=student_key, template_name=template.name) from e
+            raise _SheetFailed(
+                FailureReason.TEMPLATE_MISMATCH,
+                student_key=student_key,
+                template_name=template.name,
+                detail=_mismatch_detail(e),
+            ) from e
         except Exception as e:
             raise _SheetFailed(
                 FailureReason.TEMPLATE_MISMATCH,
@@ -287,7 +308,27 @@ class SheetImportBatch:
                 detail=_mismatch_detail(e),
             ) from e
 
-        return SheetOutcome(SheetStatus.SUCCEEDED, student_key=student_key, template_name=template.name), data_sheet
+        # Storage names workbooks with the stored key, not the text read from the sheet
+        data_sheet.use_student_key(student.student_key)
+
+        if not data_sheet.date.strip():
+            raise _SheetFailed(FailureReason.MISSING_DATE, student_key=student_key, template_name=template.name)
+
+        try:
+            saved = self._data_sheet_store.save(data_sheet)
+        except Exception as e:
+            raise _SheetFailed(
+                FailureReason.SAVE_FAILED, student_key=student_key, template_name=template.name, detail=str(e),
+            ) from e
+
+        if saved.already_saved:
+            message = f"Already saved in {saved.location_name}"
+        else:
+            message = f"Saved to {saved.location_name}"
+        outcome = SheetOutcome(
+            SheetStatus.SUCCEEDED, student_key=student_key, template_name=template.name, message=message, saved=saved,
+        )
+        return outcome, data_sheet
 
     def _current_import(self, selected: SelectedFile) -> StudentDataSheetImport:
         """Return the file's saved Import if the file is unchanged, otherwise read it again."""

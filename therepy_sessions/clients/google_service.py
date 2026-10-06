@@ -1,26 +1,43 @@
-import datetime
-import pickle
 import os
-from google_auth_oauthlib.flow import Flow, InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
-from google.auth.transport.requests import Request
+import pickle
+from typing import Any
+
 from google.auth.exceptions import RefreshError
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 
-CLIENT_SECRET_FILE = '../../slpdataentry_3_credentials.json'
-# CLIENT_SECRET_FILE = '../../slpdataentry-client-key.json'
-API_SERVICE_NAME = 'sheets'
-API_VERSION = 'v4'
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+# Today's default path, outside the repo
+DEFAULT_CLIENT_SECRET_FILE: str = '../../slpdataentry_3_credentials.json'
+# Overrides the default when set. Read inside load_google_credentials(), never at import time.
+CLIENT_SECRET_FILE_ENV: str = 'SLP_GOOGLE_CLIENT_SECRET_FILE'
+SCOPES: list[str] = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+# How long the browser sign-in waits before giving up, so a closed or abandoned sign-in tab ends with an error
+SIGN_IN_TIMEOUT_SECONDS: int = 300
 
-def create_google_service():
+# Kept from the earlier single-service version, so existing sign-ins keep working
+_TOKEN_FILE: str = '.token_sheets_v4.pickle'
+
+
+def load_google_credentials() -> Any:
+    """
+    Return Google credentials, signing in through the browser if needed.
+
+    Uses the cached token when it is valid, refreshes it when it has expired, and falls
+    back to the browser sign-in when there is no token or it can't be refreshed. The
+    token is cached again after a refresh or sign-in.
+
+    Returns:
+        google.oauth2.credentials.Credentials
+
+    Raises:
+        google_auth_oauthlib.flow.WSGITimeoutError: If the browser sign-in is not
+            finished within SIGN_IN_TIMEOUT_SECONDS
+    """
     cred = None
 
-    pickle_file = f'.token_{API_SERVICE_NAME}_{API_VERSION}.pickle'
-    # print(pickle_file)
-
-    if os.path.exists(pickle_file):
-        with open(pickle_file, 'rb') as token:
+    if os.path.exists(_TOKEN_FILE):
+        with open(_TOKEN_FILE, 'rb') as token:
             cred = pickle.load(token)
 
     if not cred or not cred.valid:
@@ -34,19 +51,37 @@ def create_google_service():
                 print('Cached Google token is expired or revoked. Opening browser to log in again.')
 
         if not refreshed:
-            flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
-            cred = flow.run_local_server()
+            client_secret_file = os.environ.get(CLIENT_SECRET_FILE_ENV, DEFAULT_CLIENT_SECRET_FILE)
+            flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES)
+            cred = flow.run_local_server(timeout_seconds=SIGN_IN_TIMEOUT_SECONDS)
 
-        with open(pickle_file, 'wb') as token:
+        with open(_TOKEN_FILE, 'wb') as token:
             pickle.dump(cred, token)
 
-    try:
-        service = build(API_SERVICE_NAME, API_VERSION, credentials=cred)
-        return service
-    except Exception as e:
-        print('Unable to connect to Google Service.')
-        raise e
+    return cred
 
-def convert_to_RFC_datetime(year=1900, month=1, day=1, hour=0, minute=0):
-    dt = datetime.datetime(year, month, day, hour, minute, 0).isoformat() + 'Z'
-    return dt
+
+def create_sheets_service(credentials: Any) -> Any:
+    """
+    Build a Google Sheets v4 service.
+
+    Args:
+        credentials: google.oauth2.credentials.Credentials
+
+    Returns:
+        googleapiclient Resource for Sheets v4
+    """
+    return build('sheets', 'v4', credentials=credentials)
+
+
+def create_drive_service(credentials: Any) -> Any:
+    """
+    Build a Google Drive v3 service.
+
+    Args:
+        credentials: google.oauth2.credentials.Credentials
+
+    Returns:
+        googleapiclient Resource for Drive v3
+    """
+    return build('drive', 'v3', credentials=credentials)
