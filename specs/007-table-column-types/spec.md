@@ -13,12 +13,14 @@
 ### Session 2026-10-05
 
 - Q: When a non-blank cell cannot be read as its column's type, what happens? → A: The whole sheet's import fails, with a reason naming the column, the row, and the value read. Nothing from that sheet is saved; the other sheets in the Import Run are unaffected.
-- Q: How is a Tally cell saved to the Student Session Workbook? → A: Both ways: the marks as one text value in the order read (e.g. `YYNP`), plus one count per tally option in its own workbook column (e.g. Y=2, N=1, P=1). Because those count columns come from the tally options, a Tally column's options are part of the Template Structure.
+- Q: How is a Tally cell saved to the Student Session Workbook? → A: Both ways: the marks as one text value in the order read (e.g. `YYNP`), plus one count per tally option in its own workbook column (e.g. Y=2, N=1, P=1). Because those count columns come from the tally options, a Tally column's options are part of the Template Structure. (Extended below: a tally also saves its total and each option's percentage, together called a Tally Summary.)
 - Q: Should the existing Running Tally section also let the SLP describe each tally character, like a Tally column? → A: Yes, and it also switches to the Tally column's saving format: the whole running tally is saved as its marks in order plus one count per tally option, instead of one row per mark.
 - Q: In a True/False column, should an `X` mark count as true or as false? → A: Neither. `X` is not accepted, because it can mean either. A True/False cell holding `X` fails the sheet's import like any other value that doesn't fit its type.
 - Q: When setting up a table section's columns, how should the SLP edit each column's type and its choices or tally options? → A: The column list shows each column's name and type. Selecting a column shows its details below the list: name, a type picker, and, for Choice or Tally, a list of options, each with its value and description.
 - Q: Besides a count for each tally option, should a tally also save a total and percentages? → A: Yes. Every tally (Tally column or Running Tally section) saves its marks, one count per option, the total number of marks, and each option's percentage of that total.
 - Q: Should the descriptions of choices and tally options also be written into the Student Session Workbook, or only shown in the app? → A: Both. Each workbook gets one key tab listing every choice and tally option with its description, updated whenever a session is saved.
+- Q: In a True/False column, should a blank cell (such as an unchecked box) be saved as false, or left empty? → A: Always empty. A blank True/False cell means "not recorded" and is never saved as false.
+- Q: Should the fields of a Simple Form section also be able to have a type, the same as table columns? → A: Yes, all types except Tally: Text, Integer, Decimal, True/False, Date, or Choice, using the same editor and reading rules as table columns.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -118,6 +120,24 @@ The SLP's templates with a Running Tally section (a grid of tally marks read in 
 
 ---
 
+### User Story 6 - Simple Form fields get types (Priority: P3)
+
+The SLP's Simple Form sections (labeled fields read from the sheet, such as "Prompts given:") get the same type picker as table columns, minus Tally. A field typed Integer, for example, is saved to the workbook as a number.
+
+**Why this priority**: It brings typed, analyzable values to form fields with the same editor and reading rules as table columns, so it adds little new behavior once the column types exist.
+
+**Independent Test**: Create a Simple Form section with fields typed Integer, Date, True/False, and Choice (with described choices). Import a synthetic sheet with valid values in those fields and confirm the workbook holds a number, a date, a true/false value, and the choice. Then import one with `abc` in the Integer field and confirm the sheet fails, naming that field.
+
+**Acceptance Scenarios**:
+
+1. **Given** the SLP is configuring a Simple Form section, **When** they select a field, **Then** they see its name and a type picker offering Text, Integer, Decimal, True/False, Date, and Choice, with Text selected by default, and for Choice the same option list with descriptions as table columns.
+2. **Given** a field typed Integer, **When** a sheet with `4` in that field is imported, **Then** the workbook holds the number 4.
+3. **Given** a field typed Integer, **When** a sheet with `abc` in that field is imported, **Then** the sheet's import fails with a reason naming the section, the field, and the value `abc`, and nothing from that sheet is saved.
+4. **Given** a Simple Form section saved before this feature, **When** the app loads it, **Then** every field is treated as Text and imports as before.
+5. **Given** a Simple Form section with a Choice field, **When** a session is saved, **Then** that field's choices and descriptions appear in the Workbook Key.
+
+---
+
 ### Edge Cases
 
 - A cell holds surrounding spaces, such as ` 7 `: spaces are ignored before reading the value for every type except Text, which keeps the writing as read.
@@ -127,6 +147,7 @@ The SLP's templates with a Running Tally section (a grid of tally marks read in 
 - A Date cell holds a two-digit year, such as `10/3/26`: it is read as 2026.
 - A Date cell holds an impossible date, such as `2/30/2026`: it is an invalid value.
 - A True/False cell holds a checkmark: it is read as true. A True/False cell holding `X` fails the sheet's import (FR-009, FR-012), because `X` can mean either yes or no on paper sheets.
+- A True/False cell is blank, such as an unchecked box: it is saved as empty, never as false (FR-010).
 - A Choice cell holds a value whose letters match a choice except for case (`p` vs `P`): it is saved as the choice as configured.
 - A Tally cell is blank: it is read as zero marks, not as an invalid value. Its marks text is empty, every count and the total are 0, and every percentage is left blank.
 - The SLP changes a column's type from Choice or Tally to another type: the choices or tally options are discarded when the template is saved, after the SLP is warned in the form.
@@ -173,14 +194,20 @@ The SLP's templates with a Running Tally section (a grid of tally marks read in 
 - **FR-015**: Text and Choice values MUST be saved as text.
 - **FR-016**: A Tally cell MUST be saved as a **Tally Summary**: the marks in one text value, in the order read (e.g. `YYNP`); one count per tally option (e.g. Y=2, N=1, P=1); the total number of marks (4); and each option's percentage of the total (Y=50%, N=25%, P=25%). Each count, the total, and each percentage MUST be in its own workbook column named for the Tally column and what it holds. Counts, the total, and percentages MUST be saved as numbers (percentages shown as percentages), and per-option columns MUST follow the tally options' configured order. When the total is 0, every percentage MUST be left blank.
 - **FR-017**: Changing a column's type, its choices, or any description MUST NOT change the template's Template Structure, so sessions keep going to the same Student Session Workbook. The exception is Tally columns: because each tally option adds a workbook column, making a column a Tally, changing a column from Tally to another type, or adding, removing, or changing a Tally column's options MUST change the Template Structure.
-
-- **FR-024**: Every Student Session Workbook MUST have one **Workbook Key** tab, placed after the Session Tabs. It lists, for each Choice column, Tally column, and Running Tally section in the template, the section, the column (where there is one), and each choice or tally option in its configured order with its description. It MUST be created or rewritten each time a session is saved to the workbook, from the template used for that save. A workbook whose template has no Choice, Tally, or Running Tally options still gets the key tab, saying there are no codes to explain.
+- **FR-024**: Every Student Session Workbook MUST have one **Workbook Key** tab, placed after the Session Tabs. It lists, for each Choice column, Choice form field, Tally column, and Running Tally section in the template, the section, the column or field (where there is one), and each choice or tally option in its configured order with its description. It MUST be created or rewritten each time a session is saved to the workbook, from the template used for that save. A workbook whose template has no Choice, Tally, or Running Tally options still gets the key tab, saying there are no codes to explain.
 - **FR-025**: The Workbook Key tab MUST NOT be treated as a Session Tab: it never names a Session Moment, is never taken as a duplicate session, and is never removed as an empty tab.
 
 **Compatibility**
 
 - **FR-018**: Templates saved before this feature MUST load without changes by the SLP. A column with no recorded type MUST be treated as Text, or as Choice (with no descriptions) when it has saved choices.
-- **FR-019**: The Simple Form section MUST keep working as it does today; this feature does not change it.
+- **FR-019**: Simple Form sections saved before this feature MUST load without changes by the SLP, with every field treated as Text.
+
+**Simple Form fields**
+
+- **FR-026**: Every field of a Simple Form section MUST have exactly one **Field Type**: Text, Integer, Decimal, True/False, Date, or Choice. Tally MUST NOT be offered for form fields. New fields MUST default to Text.
+- **FR-027**: A Simple Form section's configuration MUST list its fields, each showing its name and type, and selecting a field MUST show its name, a type picker, and, for Choice, the same option list with values and descriptions as table columns (FR-002a). Choice fields MUST follow the same rules as Choice columns (FR-003, FR-005).
+- **FR-028**: Form field values MUST be read (FR-008 to FR-011) and saved (FR-014, FR-015) by the same rules as table columns of the same type. A non-blank value that cannot be read as its field's type MUST fail the sheet's import as in FR-012, with the reason naming the section, the field, and the value read.
+- **FR-029**: Changing a field's type, choices, or descriptions MUST NOT change the Template Structure. Field types, choices, and descriptions MUST be saved with the template and shown in its details (FR-006, FR-007), and Choice fields MUST appear in the Workbook Key (FR-024).
 
 **Running Tally sections**
 
@@ -197,6 +224,7 @@ The SLP's templates with a Running Tally section (a grid of tally marks read in 
 - **Tally Option**: One allowed mark in a Tally column. Has a one-character mark and an optional description of what it means.
 - **Tally Summary**: What a tally is saved as: its marks in order, a count per tally option, the total number of marks, and each option's percentage of the total.
 - **Workbook Key**: The one tab in a Student Session Workbook that lists every choice and tally option of its template with its description. It is not a Session Tab.
+- **Form Field Definition**: One expected field in a Simple Form section. Has a name and a Field Type (any Column Type except Tally); a Choice field also has an ordered list of Choice Options.
 - **Typed Cell Value**: The value read from one cell, following its column's type: a text, whole number, decimal number, true/false, date, choice, or sequence of tally marks, or empty.
 
 ## Success Criteria *(mandatory)*
@@ -207,17 +235,17 @@ The SLP's templates with a Running Tally section (a grid of tally marks read in 
 - **SC-002**: For a sheet whose cells are all valid for their types, 100% of Integer, Decimal, Date, and True/False values arrive in the workbook as values that can be totaled, averaged, or sorted chronologically with no manual conversion.
 - **SC-003**: 100% of templates saved before this feature load and import with the same workbook results as before the update.
 - **SC-004**: 100% of sheets with a cell that doesn't match its column's type fail with a reason naming every such cell's column, row, and value; no such value is ever saved.
-- **SC-006**: For every Tally column and Running Tally section, the SLP can read each option's count, the total, and each option's percentage straight from the workbook, with no counting or formulas of their own.
 - **SC-005**: Someone who did not build a template can tell what every choice and tally mark means from the template's details, or from the workbook's Workbook Key alone, without asking the SLP.
+- **SC-006**: For every Tally column and Running Tally section, the SLP can read each option's count, the total, and each option's percentage straight from the workbook, with no counting or formulas of their own.
 
 ## Assumptions
 
-- Column types apply only to columns of table sections. Running Tally sections gain described tally options and the Tally saving format (FR-020 to FR-023) but no column types. Simple Form fields are not changed by this feature.
+- Table columns get all seven types. Simple Form fields get every type except Tally (FR-026 to FR-029). Running Tally sections gain described tally options and the Tally saving format (FR-020 to FR-023), but no type picker.
 - Descriptions are optional, free text, and shown wherever the template is shown, and in each workbook's Workbook Key (FR-024).
 - Descriptions, like Template Descriptions, describe the sheet layout and MUST never identify a student.
 - Dates on sheets are written in US month/day/year order. Two-digit years are in the 2000s.
 - Choice values may be more than one character (e.g. `NR` for "no response"); tally options are always single marks, since a tally cell is read one mark at a time.
 - Columns are typed per table section; there is no shared library of column types or choice sets across templates.
-- The new domain terms (Column Type, Choice Option, Tally Option, Tally Summary, Workbook Key) will be added to the glossary as part of this feature, per Principle II, and the Template Structure entry will be updated to include Tally columns' tally options.
+- The new domain terms (Column Type, Field Type, Choice Option, Tally Option, Tally Summary, Workbook Key) will be added to the glossary as part of this feature, per Principle II, and the Template Structure entry will be updated to include Tally columns' tally options.
 - A sheet that fails because of a cell value is retried the same way as any other failed sheet: the SLP fixes the cause (for example, changes the column's type or adds a choice) and presses Import again.
 - Values in Session Tabs saved before a type change are not rewritten.
