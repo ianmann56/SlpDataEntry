@@ -1,31 +1,42 @@
 from __future__ import annotations
 
-from collections import namedtuple
+from datetime import date
 from enum import Enum
 import json
-from typing import TYPE_CHECKING, NotRequired, TypedDict
+from typing import TYPE_CHECKING, NamedTuple, NotRequired, TypedDict
 
 if TYPE_CHECKING:
   # Imported for type checking only: the template module imports the interpreters, which import this module
   from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
 
-"""
-Represents a scalar in a student session data sheet.
-
-Properties:
-  key: The name of the scalar field
-  value: The value of the scalar field
-  type: The type that the scalar field value takes on (like int, vs choice, vs date).
-  choice_options: The options that this scalar could be. This is only applicable if type is CHOICE.
-"""
-DataSheetScalarDto = namedtuple('DataSheetScalarDto', ['key', 'value', 'type', 'choice_options'])
+# A value read from a sheet, in its type. None for a blank cell, or a blank percentage.
+TypedValue = int | float | bool | date | str | None
 
 class DataSheetScalarType(Enum):
   TEXT = 'text' # For plain text
   INT = 'int'
+  DECIMAL = 'decimal'
   CHOICE = 'choice' # When field contains a selection out of discrete choices
   DATE = 'date'
   BOOLEAN = 'boolean'
+  PERCENT = 'percent' # A fraction (0.5), saved formatted as a percentage
+
+class DataSheetScalarDto(NamedTuple):
+  """
+  Represents a scalar in a student session data sheet.
+
+  Properties:
+    key: The name of the scalar field
+    value: The value of the scalar field, as read (for a derived tally key, the formatted number)
+    type: The type that the scalar field value takes on (like int, vs choice, vs date).
+    choice_options: The options that this scalar could be. This is only applicable if type is CHOICE.
+    typed_value: The value in its type. None for a blank cell, or a blank percentage.
+  """
+  key: str
+  value: str
+  type: DataSheetScalarType
+  choice_options: list[str] | None = None
+  typed_value: TypedValue = None
 
 class DataSheetTable(TypedDict):
   """
@@ -61,7 +72,7 @@ class StudentDataSheet:
     self._template = template
     # Created per instance so sheets never share tables or scalars
     self._tables: list[DataSheetTable] = []
-    self._scalars: dict[str, DataSheetScalarDto | str] = {}  # SimpleFormInterpreter stores the raw form text
+    self._scalars: dict[str, DataSheetScalarDto] = {}
 
   @property
   def student_key(self) -> str:
@@ -111,10 +122,10 @@ class StudentDataSheet:
     self._tables.append({**table, "section_id": section_id})
   
   @property
-  def scalars(self) -> dict[str, DataSheetScalarDto | str]:
+  def scalars(self) -> dict[str, DataSheetScalarDto]:
     return self._scalars
   
-  def register_scalar(self, scalar_name: str, scalar_dto: DataSheetScalarDto | str) -> None:  # SimpleFormInterpreter stores the raw form text
+  def register_scalar(self, scalar_name: str, scalar_dto: DataSheetScalarDto) -> None:
     self._scalars[scalar_name] = scalar_dto
 
   def debug(self) -> None:
@@ -133,7 +144,8 @@ class StudentDataSheet:
     print('=================================\nMeasure:')
     print(self.measure)
     print('=================================\nOther Scalars:')
-    print(self.scalars)
+    for scalar in self.scalars.values():
+      print(f'{scalar.key}: {scalar.value!r} ({scalar.type.name}) -> {scalar.typed_value!r}')
     print('=================================\nTables:')
-    print(json.dumps(self.tables, indent=4, default=lambda o: o.to_json() if 'to_json' in dir(o) else o.value))
+    print(json.dumps(self.tables, indent=4, default=lambda o: o.to_json() if 'to_json' in dir(o) else getattr(o, 'value', str(o))))
     print('======== End Data Sheet =========')

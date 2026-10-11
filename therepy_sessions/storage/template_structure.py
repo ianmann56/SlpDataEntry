@@ -3,8 +3,13 @@ The Template Structure: the shape of a template that decides which Student Sessi
 Workbook its sessions are saved to.
 
 A template's structure is its sections and, within each, its set of keys, compared
-without regard to order. The template's name, description, and ids, and its value types
-and choice options, are not part of it.
+without regard to order. The template's name, description, and ids, its value types,
+its choices, and every option description are not part of it.
+
+Tally options are part of it, through the keys: a Tally column or Running Tally section
+contributes its Tally Summary keys (one per option) to `section_keys()`, so adding,
+removing, or renaming a tally option, or switching a column to or from Tally, starts a
+new workbook.
 
 This module is pure: no I/O. It reads only the interpreters' public `id`, `title`,
 `section_kind`, and `section_keys()`, and never checks interpreter types.

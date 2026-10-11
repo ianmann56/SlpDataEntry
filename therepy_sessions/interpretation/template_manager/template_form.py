@@ -319,12 +319,18 @@ class TemplateForm:
             return True
         config, index = self._form
         values = self._forms[config.name]["get_config"]()
+        interpreter_id = str(uuid.uuid4()) if index is None else self._draft.interpreters[index].id
+        interpreter = config.construct_interpreter(interpreter_id, values)
+        problems = interpreter.config_problems()
+        if problems:
+            messagebox.showerror("Fix the Section", "\n".join(problems), parent=self.frame.winfo_toplevel())
+            return False
         try:
             if index is None:
-                self._draft.add(config.construct_interpreter(str(uuid.uuid4()), values))
+                self._draft.add(interpreter)
                 index = len(self._draft.interpreters) - 1
             else:
-                self._draft.replace(index, config.construct_interpreter(self._draft.interpreters[index].id, values))
+                self._draft.replace(index, interpreter)
         except TitleConflictError as e:
             messagebox.showerror("Duplicate Title", str(e), parent=self.frame.winfo_toplevel())
             return False

@@ -213,7 +213,8 @@ def _extract_table_from_block(response, table_block):
 
 def _get_cell_text(response, cell_block):
     """
-    Extracts text from a cell block.
+    Extracts text from a cell block. A ticked checkbox in the cell is written as "✓", and
+    an unticked one adds nothing; what a checkmark means is decided by interpretation.
     
     Args:
         response: Full Textract response
@@ -232,5 +233,7 @@ def _get_cell_text(response, cell_block):
                     word_block = blocks[word_id]
                     if word_block['BlockType'] == 'WORD':
                         cell_text += word_block['Text'] + ' '
+                    elif word_block['BlockType'] == 'SELECTION_ELEMENT' and word_block.get('SelectionStatus') == 'SELECTED':
+                        cell_text += '✓ '
     
     return cell_text.strip()

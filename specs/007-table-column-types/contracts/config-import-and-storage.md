@@ -6,7 +6,8 @@
 
 ```python
 class OptionListEditor:
-    def __init__(self, parent: tk.Misc, mode: ColumnType) -> None   # CHOICE or TALLY
+    def __init__(self, parent: tk.Misc, mode: ColumnType,
+                 on_change: Callable[[], None] | None = None) -> None   # CHOICE or TALLY
     frame: ttk.Frame
     def get(self) -> list[tuple[str, str]]        # (value or mark, description), in order
     def set(self, options: Sequence[tuple[str, str]]) -> None
@@ -18,6 +19,8 @@ class OptionListEditor:
   entries and **Add**, **Update**, **Remove**, **Up**, and **Down** buttons.
 - Add and Update call `option_rules.check_new_option` and show its message instead of
   adding (US3-2). The widget holds no rules of its own.
+- `on_change` is called after every change the SLP makes to the list, so
+  `TypedItemEditor` can keep the selected item's options current.
 
 ### `typed_item_editor.py` (NEW)
 
@@ -47,6 +50,11 @@ class TypedItemEditor:
 | `TableInterpreterConfig` | Title + `TypedItemEditor("Column", all 7 types)` | `{"title", "columns": list[TypedItem]}` | `ColumnDefinition`s from items | `Accuracy — Choice: + (correct), - (incorrect)`; `Trials — Integer` |
 | `SimpleFormInterpreterConfig` | Title + `TypedItemEditor("Field", FIELD_TYPES)` | `{"title", "fields": list[TypedItem]}` | `FieldConfiguration`s, in order | `Prompts given — Integer` |
 | `RunningTallyInterpreterConfig` | Title + `OptionListEditor(TALLY)` | `{"title", "tally_options": list[(mark, description)]}` | `RunningTallyInterpreter(id, title, [TallyOption…])` | `Tally options: Y (yes), N (no), P (prompted)` |
+
+`SimpleFormInterpreterConfig.construct_interpreter` keys fields by name. A second field
+with the same name is kept under a stand-in key (`"<name>#<position>"`), so
+`config_problems()` reports the duplicate and the form refuses to apply; the stand-in key
+is never saved.
 
 `load(interpreter)` fills each form from a saved interpreter, so every saved type,
 option, and description round-trips through the form (interpreters rule 7 still

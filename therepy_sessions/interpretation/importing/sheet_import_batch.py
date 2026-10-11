@@ -26,6 +26,7 @@ from collection.collection_headers import StudentDataSheetImport
 from interpretation.data_sheet_store import DataSheetStore, SavedDataSheet
 from interpretation.student_data_sheet import StudentDataSheet
 from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
+from interpretation.value_types import InvalidValuesError
 from students.student import UnreadableStudentRecordsError
 from students.student_store import StudentStore
 
@@ -47,6 +48,7 @@ class FailureReason(Enum):
     STUDENT_RECORDS_UNREADABLE = "student_records_unreadable"
     MISSING_DATE = "missing_date"
     SAVE_FAILED = "save_failed"
+    INVALID_VALUES = "invalid_values"
 
 
 class SheetOutcome(NamedTuple):
@@ -134,6 +136,7 @@ _FAILURE_MESSAGES: dict[FailureReason, str] = {
     FailureReason.STUDENT_RECORDS_UNREADABLE: "The student records could not be read. Fix them in Setup → Students.",
     FailureReason.MISSING_DATE: "No session Date was found on the sheet. Fill in the Date and retake the photo.",
     FailureReason.SAVE_FAILED: "Could not save to Google Drive: {detail}. Press Import again to retry.",
+    FailureReason.INVALID_VALUES: 'Some values on the sheet don\'t fit template "{template_name}": {detail}. Fix the template, or retake the photo.',
 }
 
 
@@ -299,6 +302,14 @@ class SheetImportBatch:
                 student_key=student_key,
                 template_name=template.name,
                 detail=_mismatch_detail(e),
+            ) from e
+        except InvalidValuesError as e:
+            # Every bad value is listed, so they can all be fixed at once (FR-012)
+            raise _SheetFailed(
+                FailureReason.INVALID_VALUES,
+                student_key=student_key,
+                template_name=template.name,
+                detail=str(e),
             ) from e
         except Exception as e:
             raise _SheetFailed(

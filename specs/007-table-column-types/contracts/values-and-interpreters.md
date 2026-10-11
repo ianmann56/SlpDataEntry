@@ -21,7 +21,7 @@ class TallySummary(NamedTuple):
     marks: str; counts: dict[str, int]; total: int; percentages: dict[str, float | None]
 
 class ValueReadError(ValueError):     expected: str; found: str = ""
-class ValueProblem(NamedTuple):       section: str; item: str; row: str; value: str; expected: str
+class ValueProblem(NamedTuple):       section: str; item: str; row: str; value: str; expected: str; item_kind: str = "column"
 class InvalidValuesError(ValueError): problems: list[ValueProblem]
 class OptionDescription(NamedTuple):  section: str; item: str; item_type: str; option: str; description: str
 
@@ -44,6 +44,12 @@ Behavior:
     mark as configured
   - a non-option character → `ValueReadError("only the marks Y, N, P", found="X")`, naming the
     first bad mark, so a Running Tally error can name the mark read (FR-021)
+- `ValueProblem.message()` renders `"Words", column "Trials", row 3: "l" is not a whole number`.
+  `item_kind` is the word before the item: `"column"` by default, and `"field"` for Simple
+  Form fields (FR-028).
+- A Tally column's problem names the whole cell (`value="YXN"`) and the bad mark in
+  `expected` (`made of only the marks Y, N, P ("X" is not one)`), per US3-5. A Running
+  Tally problem names only the bad mark read (FR-021).
 - `tally_keys` returns, in order: `base`, then `f"{base} {mark}"` for each option, then
   `f"{base} Total"`, then `f"{base} {mark} %"` for each option (R3).
 - `tally_scalars` returns exactly the keys from `tally_keys`, typed TEXT / INT / INT /

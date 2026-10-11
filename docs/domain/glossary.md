@@ -22,7 +22,7 @@ use the same name.
 | --- | --- |
 | **Student Data Sheet** | The physical sheet the SLP fills out during a session: a header (Student Key, Date, Time IN/OUT, Goal, Measure), then a **Data** section. |
 | **Data section** | The part of the sheet holding session observations: tables, tallies, or form fields. |
-| **Tally** | A running mark recorded each time the student attempts something, e.g. `Y` (yes), `N` (no), `P` (prompted). A **running tally** is a grid of these, read in order. |
+| **Tally** | A running mark recorded each time the student attempts something, e.g. `Y` (yes), `N` (no), `P` (prompted). A **running tally** is a grid of these, read in order. A table cell can hold a tally too (a **Tally column**). Either way, a tally is saved as its **Tally Summary**. |
 | **Prompted / w/out Prompt** | Whether the student needed a cue from the SLP. It is a core metric in the summaries the tool produces. |
 
 ## Software concepts
@@ -31,8 +31,15 @@ use the same name.
 | --- | --- | --- |
 | **Import** | `StudentDataSheetImport` | Raw OCR output for one sheet: `form_data` (label → text), `tables` (list of 2D string arrays), and `table_titles` (the title printed above each table, or `""`). It carries no meaning yet. |
 | **Interpretation** | `StudentDataSheet` | The meaningful result: header fields plus typed tables and scalars. |
-| **Scalar** | `DataSheetScalarDto` | One typed value (`key`, `value`, `type`, `choice_options`). |
-| **Scalar Type** | `DataSheetScalarType` | `TEXT`, `INT`, `CHOICE`, `DATE`, `BOOLEAN`. |
+| **Scalar** | `DataSheetScalarDto` | One typed value (`key`, `value`, `type`, `choice_options`, `typed_value`). `value` is the text as read; the **Typed Value** (`typed_value`) is that value in its type (`int`, `float`, `bool`, `date`, or `str`), or `None` when blank. |
+| **Scalar Type** | `DataSheetScalarType` | How one emitted value is saved: `TEXT`, `INT`, `DECIMAL`, `CHOICE`, `DATE`, `BOOLEAN`, `PERCENT`. Not the same as a Column Type: a Tally column emits several scalars. |
+| **Column Type** | `ColumnType` | The type the SLP gives a table column: Text, Integer, Decimal, True/False, Date, Choice, or Tally. It decides how each cell is read, and which Scalars it emits. |
+| **Column Definition** | `ColumnDefinition` | One column of a table section: its name, its Column Type, and its Choice Options or Tally Options. |
+| **Field Type** | `FIELD_TYPES` | The Column Types a Simple Form field may have: every Column Type except Tally. |
+| **Field Configuration** | `FieldConfiguration` | One field of a Simple Form section: its name, its Field Type (`field_type`), and its Choice Options. |
+| **Choice Option** | `ChoiceOption` | One allowed code of a Choice column or field (`value`, e.g. `+`, `NR`), with an optional description of what it means (e.g. "correct"). A description never identifies a student. |
+| **Tally Option** | `TallyOption` | One allowed mark of a Tally column or Running Tally section (`mark`, exactly one character), with an optional description. |
+| **Tally Summary** | `TallySummary` | What a tally is saved as: the marks in order, a count per Tally Option, the total, and a percentage per option. Each is its own key (e.g. `Attempts`, `Attempts Y`, `Attempts Total`, `Attempts Y %`). |
 | **Section Interpreter** | `SessionDataSectionInterpreterBase` | Gives meaning to one kind of data section. Current kinds: `TableInterpreter`, `RunningTallyInterpreter`, `SimpleFormInterpreter`. |
 | **Data Sheet Template** | `StudentDataSheetTemplate` | A named, saved set of configured section interpreters describing one sheet layout. An SLP reuses it for every sheet with that layout. |
 | **Interpreter Config** | `InterpreterConfig` | The UI form that lets the SLP configure a section interpreter while building a template. |
@@ -51,11 +58,12 @@ use the same name.
 | **Import Run** | | The Selected Files processed by one press of Import (those not yet succeeded). |
 | **Sheet Outcome** | `SheetOutcome` | One file's result: *not imported*, *succeeded*, or *failed* with a reason that names the fix. |
 | **Data Sheet Store** | `DataSheetStore` | The storage mechanism for interpreted data sheets. The import code and its window save sheets only through it. The current implementation, `GoogleDriveDataSheetStore`, saves to Student Session Workbooks. |
-| **Template Structure** | `TemplateShape.structure_identity()` | The shape of a template that decides where its sessions are saved: its sections and, within each, the set of field, column, and tally keys, compared without regard to order. A template's name, description, ids, value types, and choice options are not part of it. |
+| **Template Structure** | `TemplateShape.structure_identity()` | The shape of a template that decides where its sessions are saved: its sections and, within each, the set of field, column, and tally keys, compared without regard to order. A template's name, description, ids, Column Types, choices, and option descriptions are not part of it. Tally Options are, through the Tally Summary keys they add. |
 | **Student Session Workbook** | `GoogleDriveDataSheetStore` | The Google Sheet holding every saved session for one Student Key and one Template Structure, in the Therapy Data Folder. It is named from the Student Key and the name of the template that started it, and found by a hidden label, so renaming it does not lose it. |
 | **Session Tab** | | One tab in a Student Session Workbook, holding the values of one imported sheet. It is named with that sheet's Session Moment. |
 | **Session Moment** | `SessionMoment` | A sheet's session Date plus its Time IN, as read from the sheet. It names a Session Tab and identifies the session within its workbook. A sheet with a blank Time IN has a date-only Session Moment, which never identifies a duplicate. |
 | **Workbook Layout Order** | `WorkbookLayout` | The order of sections, form fields, and columns taken from the template that started a workbook. Every tab in that workbook uses it. |
+| **Workbook Key** | `WORKBOOK_KEY_TAB_NAME` | The last tab of every Student Session Workbook, listing each Choice and Tally code of the template with what it means. It is rebuilt with every new Session Tab, holds only template text, and is never a Session Tab. |
 | **Therapy Data Folder** | `DATA_FOLDER_PATH` | The Google Drive folder `SLP Therepy Data/Current Year` holding every Student Session Workbook. |
 
 ## Pipeline in one line

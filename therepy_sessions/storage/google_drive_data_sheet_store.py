@@ -4,7 +4,8 @@ Student Session Workbook, a Google Sheet in the Therapy Data Folder.
 
 There is one workbook per Student Key and Template Structure. A workbook is found by its
 hidden Drive label (`appProperties`), so renaming it in Drive does not lose it. Its
-Workbook Layout Order is kept in the spreadsheet's developer metadata.
+Workbook Layout Order is kept in the spreadsheet's developer metadata. Its last tab is the
+Workbook Key, found by its own developer metadata and rebuilt with every new session tab.
 
 Every Drive and Sheets request body lives in this module. Google errors are translated
 into DataSheetStoreError, with messages that name students only by Student Key.
@@ -24,8 +25,10 @@ from oauthlib.oauth2.rfc6749.errors import OAuth2Error
 from interpretation.data_sheet_store import DataSheetStore, DataSheetStoreError, SavedDataSheet
 from interpretation.student_data_sheet import StudentDataSheet
 from storage.session_layout import (
+    CellNumberFormat,
     CellValue,
     SessionMoment,
+    WORKBOOK_KEY_TAB_NAME,
     WorkbookLayout,
     insert_index,
     moment_from_rows,
@@ -33,6 +36,7 @@ from storage.session_layout import (
     session_rows,
     tab_base_name,
     unique_tab_name,
+    workbook_key_rows,
     workbook_name,
 )
 from storage.template_structure import TemplateShape, shape_of
@@ -49,6 +53,8 @@ LABEL_STUDENT_KEY: str = "slpStudentKey"
 LABEL_STRUCTURE: str = "slpStructure"
 # The developer metadata key holding a workbook's Workbook Layout Order
 LAYOUT_METADATA_KEY: str = "slpWorkbookLayout"
+# The developer metadata key marking a workbook's Workbook Key tab
+KEY_TAB_METADATA_KEY: str = "slpWorkbookKey"
 
 # The client library backs off and retries 429 and 5xx responses this many times
 _NUM_RETRIES: int = 3
@@ -63,10 +69,22 @@ def _quote(value: str) -> str:
     return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
+# How each number format is shown in Sheets
+_NUMBER_FORMATS: dict[CellNumberFormat, dict[str, str]] = {
+    CellNumberFormat.DATE: {"type": "DATE", "pattern": "m/d/yyyy"},
+    CellNumberFormat.PERCENT: {"type": "PERCENT", "pattern": "0%"},
+}
+
+
 def _cell_payload(cell: CellValue) -> dict[str, Any]:
     """The Sheets CellData for one cell. Text is never parsed as a date, number, or formula."""
+    if cell.boolean is not None:
+        return {"userEnteredValue": {"boolValue": cell.boolean}}
     if cell.number is not None:
-        return {"userEnteredValue": {"numberValue": cell.number}}
+        payload: dict[str, Any] = {"userEnteredValue": {"numberValue": cell.number}}
+        if cell.number_format is not None:
+            payload["userEnteredFormat"] = {"numberFormat": dict(_NUMBER_FORMATS[cell.number_format])}
+        return payload
     if cell.text is not None:
         return {"userEnteredValue": {"stringValue": cell.text}}
     return {}
@@ -213,7 +231,8 @@ class GoogleDriveDataSheetStore(DataSheetStore):
         moment: SessionMoment,
     ) -> SavedDataSheet:
         """
-        Create a labeled workbook in the folder holding just this session's tab.
+        Create a labeled workbook in the folder holding just this session's tab, followed
+        by its Workbook Key tab.
 
         If filling it fails, the new file is deleted so nothing partial remains (FR-002).
         If that delete fails too, the next save to it repairs it.
@@ -237,7 +256,10 @@ class GoogleDriveDataSheetStore(DataSheetStore):
 
             sheet_id = self._new_sheet_id(default_sheet_ids)
             title = tab_base_name(moment)
+            key_sheet_id = self._new_sheet_id([*default_sheet_ids, sheet_id])
+            key_title = unique_tab_name(WORKBOOK_KEY_TAB_NAME, [title])
             requests = self._add_tab_requests(sheet_id, title, 0, session_rows(sheet, layout))
+            requests += self._key_tab_requests(key_sheet_id, key_title, 1, workbook_key_rows(sheet.template))
             requests += [{"deleteSheet": {"sheetId": default_id}} for default_id in default_sheet_ids]
             requests.append(self._layout_metadata_request(layout))
             self._batch_update(spreadsheet_id, requests)
@@ -267,13 +289,21 @@ class GoogleDriveDataSheetStore(DataSheetStore):
         workbook is never renamed (FR-011). A workbook with no stored layout was left by a
         failed create, so this save also completes it: it stores the layout and removes
         its empty tabs (FR-019).
+
+        The Workbook Key tab is never treated as a session: it is never a duplicate, never
+        removed as empty, and never counted when placing the new tab. In the same batch as
+        the new tab, it is deleted and added again last, so it lists the template's
+        current options (FR-024, FR-025). A workbook made before it existed gets one.
         """
         spreadsheet = self._sheets.spreadsheets().get(
             spreadsheetId=spreadsheet_id,
-            fields="properties.title,sheets.properties(sheetId,title,index),developerMetadata",
+            fields="properties.title,sheets(properties(sheetId,title,index),developerMetadata),developerMetadata",
         ).execute(num_retries=_NUM_RETRIES)
         workbook_title = spreadsheet["properties"]["title"]
-        tabs = sorted((tab["properties"] for tab in spreadsheet.get("sheets", [])), key=lambda tab: tab["index"])
+        all_tabs = sorted((tab["properties"] for tab in spreadsheet.get("sheets", [])), key=lambda tab: tab["index"])
+        key_tab_ids = self._key_tab_ids(spreadsheet)
+        key_tab_titles = [tab["title"] for tab in all_tabs if tab["sheetId"] in key_tab_ids]
+        tabs = [tab for tab in all_tabs if tab["sheetId"] not in key_tab_ids]
 
         layout, layout_missing = self._stored_layout(spreadsheet, shape)
         tab_tops = self._tab_tops(spreadsheet_id, tabs)
@@ -290,16 +320,24 @@ class GoogleDriveDataSheetStore(DataSheetStore):
             empty_tab_ids = self._empty_tab_ids(spreadsheet_id, tabs, tab_tops)
         kept = [(tab, tab_moment) for tab, tab_moment in zip(tabs, moments) if tab["sheetId"] not in empty_tab_ids]
 
-        sheet_id = self._new_sheet_id([tab["sheetId"] for tab in tabs])
-        title = unique_tab_name(tab_base_name(moment), [tab["title"] for tab, _ in kept])
+        all_tab_ids = [tab["sheetId"] for tab in all_tabs]
+        sheet_id = self._new_sheet_id(all_tab_ids)
+        # The old key tab still exists when the new tab is added, so its name is taken too
+        title = unique_tab_name(tab_base_name(moment), [tab["title"] for tab, _ in kept] + key_tab_titles)
         # Placed among the tabs that stay; empty tabs being removed don't count
         position = insert_index(moment, [tab_moment for _, tab_moment in kept])
-        index = kept[position][0]["index"] if position < len(kept) else len(tabs)
+        index = kept[position][0]["index"] if position < len(kept) else len(all_tabs)
 
+        # Indexes refer to the tabs as they are when each request runs: the new tab is
+        # added first, then tabs are removed, and the new key tab goes after all that remain
         requests = self._add_tab_requests(sheet_id, title, index, session_rows(sheet, layout))
         if layout_missing:
             requests.append(self._layout_metadata_request(layout))
             requests += [{"deleteSheet": {"sheetId": tab_id}} for tab_id in sorted(empty_tab_ids)]
+        requests += [{"deleteSheet": {"sheetId": tab_id}} for tab_id in sorted(key_tab_ids)]
+        key_sheet_id = self._new_sheet_id([*all_tab_ids, sheet_id])
+        key_title = unique_tab_name(WORKBOOK_KEY_TAB_NAME, [tab["title"] for tab, _ in kept] + [title])
+        requests += self._key_tab_requests(key_sheet_id, key_title, len(kept) + 1, workbook_key_rows(sheet.template))
         self._batch_update(spreadsheet_id, requests)
         return SavedDataSheet(_tab_url(spreadsheet_id, sheet_id), f"{workbook_title} › {title}", already_saved=False)
 
@@ -323,6 +361,15 @@ class GoogleDriveDataSheetStore(DataSheetStore):
         except ValueError as e:
             print(f"A workbook's stored layout could not be read ({e}); using the template's order.")
             return WorkbookLayout.from_shape(shape), False
+
+    @staticmethod
+    def _key_tab_ids(spreadsheet: dict[str, Any]) -> set[int]:
+        """The ids of the tabs marked as the Workbook Key."""
+        return {
+            tab["properties"]["sheetId"]
+            for tab in spreadsheet.get("sheets", [])
+            if any(entry.get("metadataKey") == KEY_TAB_METADATA_KEY for entry in tab.get("developerMetadata", []))
+        }
 
     def _tab_tops(self, spreadsheet_id: str, tabs: list[dict[str, Any]]) -> list[list[list[str]]]:
         """The A1:B6 values of each tab, in the order given, read in one call."""
@@ -383,7 +430,23 @@ class GoogleDriveDataSheetStore(DataSheetStore):
                 "updateCells": {
                     "start": {"sheetId": sheet_id, "rowIndex": 0, "columnIndex": 0},
                     "rows": [{"values": [_cell_payload(cell) for cell in row]} for row in rows],
-                    "fields": "userEnteredValue",
+                    "fields": "userEnteredValue,userEnteredFormat.numberFormat",
+                },
+            },
+        ]
+
+    @classmethod
+    def _key_tab_requests(cls, sheet_id: int, title: str, index: int, rows: list[list[CellValue]]) -> list[dict[str, Any]]:
+        """The requests that add the Workbook Key tab, write its rows, and mark it with its metadata."""
+        return cls._add_tab_requests(sheet_id, title, index, rows) + [
+            {
+                "createDeveloperMetadata": {
+                    "developerMetadata": {
+                        "metadataKey": KEY_TAB_METADATA_KEY,
+                        "metadataValue": "1",
+                        "location": {"sheetId": sheet_id},
+                        "visibility": "DOCUMENT",
+                    },
                 },
             },
         ]

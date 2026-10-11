@@ -57,8 +57,9 @@ def validate_template(name: str, interpreters: list[SessionDataSectionInterprete
     """
     Return every problem that stops a template from being saved, in order, or [] when it is valid.
 
-    A name is required, at least one interpreter is required, and no two interpreters
-    may share a non-blank title.
+    A name is required, at least one interpreter is required, no two interpreters may
+    share a non-blank title, and each interpreter's own configuration must be valid
+    (its `config_problems()`, in template order).
     """
     problems: list[str] = []
     if not name.strip():
@@ -76,6 +77,9 @@ def validate_template(name: str, interpreters: list[SessionDataSectionInterprete
             problems.append(f'The title "{title}" is used by more than one interpreter.')
             reported.add(title)
         seen.add(title)
+
+    for interpreter in interpreters:
+        problems.extend(interpreter.config_problems())
     return problems
 
 

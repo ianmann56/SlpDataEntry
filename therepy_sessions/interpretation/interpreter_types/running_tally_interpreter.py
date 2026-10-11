@@ -1,56 +1,62 @@
-from functools import reduce
 from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
-from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetScalarType
+from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetTable
+from interpretation.template_manager.option_rules import option_problems
+from interpretation.value_types import (
+  ColumnType,
+  InvalidValuesError,
+  OptionDescription,
+  TallyOption,
+  ValueProblem,
+  ValueReadError,
+  read_tally,
+  tally_keys,
+  tally_scalars,
+)
+from collection.collection_headers import StudentDataSheetImport
 
-# The one column a running tally emits
+# The base of the Tally Summary keys a running tally emits, e.g. "Tally", "Tally Y", "Tally Total"
 TALLY_COLUMN_NAME: str = 'Tally'
+
+# The section name used in messages and the Workbook Key when a running tally has no title
+_FALLBACK_SECTION_NAME: str = "Running Tally"
 
 class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
   """
-  Template implementation for data sheets containing a grid of tallys. Each tally could
-  be an int, a choice or a boolean.
+  Template implementation for data sheets containing a grid of tally marks, each one
+  character, written as things happen (like Y, N, or P for yes, no, or prompted).
 
   This assumes that all tables in the data sheet are running tallys. If you have
   multiple different tables, this will not work for that data sheet.
 
   Purpose: Handles data sheets where the tabular data is a list of instances that are
-  annotated as they happen (like in Yes, No or Prompted).
+  annotated as they happen. Each table is read as one tally, in reading order, and
+  becomes one row holding its Tally Summary: the marks, a count per option, the total,
+  and a percentage per option.
 
   Use case: Therapy session data sheets where a tally was tracked keeping track of how many
   times in the session the student did a particular thing (using yes, no or prompted for
   example).
   """
 
-  # The type that each tally can be interpreted as.
-  _tally_type = None
-
-  # The options that each tally could be. This is only applicable if the _tally_type is CHOICE.
-  _tally_choice_options = None
-
-  def __init__(self, id, title, tally_type, tally_choice_options):
+  def __init__(self, id: str, title: str, tally_options: list[TallyOption]) -> None:
+    """
+    :param id: The unique id identifying this specific interpreter instance within a template.
+    :param title: The user-facing title identifying this interpreter within a template.
+    :param tally_options: The marks that may be written in the grid, with what each means.
+    """
     super().__init__(id, title)
-    self._tally_type = tally_type
-    self._tally_choice_options = tally_choice_options
+    # Copied per instance so interpreters never share option lists
+    self._tally_options: list[TallyOption] = list(tally_options)
 
   @property
-  def tally_type(self):
-    """
-    Get the tally type for this interpreter.
-    
-    Returns:
-        DataSheetScalarType: The type that each tally can be interpreted as
-    """
-    return self._tally_type
+  def tally_options(self) -> list[TallyOption]:
+    """The marks that may be written in the grid, with what each means, in order."""
+    return self._tally_options
 
   @property
-  def tally_choice_options(self):
-    """
-    Get the tally choice options for this interpreter.
-    
-    Returns:
-        list: The options that each tally could be (only applicable if tally_type is CHOICE)
-    """
-    return self._tally_choice_options
+  def tally_choice_options(self) -> list[str]:
+    """The marks, in order."""
+    return [option.mark for option in self._tally_options]
 
   @property
   def consumes_tables(self) -> bool:
@@ -61,13 +67,25 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
 
   def section_keys(self) -> list[str]:
     """
-    The one column a running tally emits.
+    The Tally Summary keys, so the tally options are part of the Template Structure.
     """
-    return [TALLY_COLUMN_NAME]
+    return tally_keys(TALLY_COLUMN_NAME, self._tally_options)
 
-  def interpret_student_data_sheet_content(self, data_sheet_content):
+  def config_problems(self) -> list[str]:
+    """No options, or blank, repeated, or too-long marks."""
+    return option_problems(self.title, ColumnType.TALLY, self.tally_choice_options, kind="running tally section")
+
+  def option_descriptions(self) -> list[OptionDescription]:
+    """Every tally option, in order."""
+    section = self.title or _FALLBACK_SECTION_NAME
+    return [
+      OptionDescription(section, "", "Tally", option.mark, option.description)
+      for option in self._tally_options
+    ]
+
+  def interpret_student_data_sheet_content(self, data_sheet_content: StudentDataSheetImport) -> DataSheetInterpretationDto:
     """
-    Processes multiple tables from the data sheet using column-based interpretation.
+    Reads each table as one running tally.
 
     This assumes that all tables in the data sheet are running tallys. If you have
     multiple different tables, this will not work for that data sheet.
@@ -79,32 +97,34 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
       tables: List of 2D arrays representing tables from the data sheet
       form_data: A list of key value pairs where the key is the field name and the
                  value is the value name.
+    :raises InvalidValuesError: If any table holds a mark that isn't an option, after
+      every table is read
     """
-    tables = [
-      self._interpret_single_student_data_sheet_table(raw_table)
-      for raw_table
-      in data_sheet_content.tables
-    ]
+    problems: list[ValueProblem] = []
+    several_tables = len(data_sheet_content.tables) > 1
+    tables: list[DataSheetTable] = []
+    for table_number, raw_table in enumerate(data_sheet_content.tables, start=1):
+      where = f"table {table_number}" if several_tables else ""
+      try:
+        tables.append(self._interpret_single_student_data_sheet_table(raw_table))
+      except ValueReadError as e:
+        problems.append(ValueProblem(self.title or _FALLBACK_SECTION_NAME, "", where, e.found, e.expected))
+    if problems:
+      raise InvalidValuesError(problems)
 
     return DataSheetInterpretationDto(tables, {})
 
-  def _interpret_single_student_data_sheet_table(self, data_sheet_table):
-    print(data_sheet_table)
+  def _interpret_single_student_data_sheet_table(self, data_sheet_table: list[list[str]]) -> DataSheetTable:
+    """
+    Read every cell in reading order (row by row) as one tally.
 
-    tally_string = ''
-    for row in data_sheet_table:
-      letters_string = reduce(lambda acc, s: acc + s, row, '')
-      tally_string = tally_string + letters_string
-
-    tally_column_name = TALLY_COLUMN_NAME
-
-    tally_as_rows = [
-      { tally_column_name: DataSheetScalarDto(tally_column_name, letter, self._tally_type, self._tally_choice_options) }
-      for letter
-      in tally_string
-    ]
+    :raises ValueReadError: At the first mark that isn't an option
+    """
+    tally_string = ''.join(''.join(row) for row in data_sheet_table)
+    summary = read_tally(tally_string, self._tally_options)
+    row: dict[str, DataSheetScalarDto] = tally_scalars(TALLY_COLUMN_NAME, summary, self._tally_options)
 
     return {
-      "columns": [tally_column_name],
-      "data": tally_as_rows
+      "columns": list(row.keys()),
+      "data": [row]
     }
