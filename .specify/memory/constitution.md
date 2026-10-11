@@ -1,5 +1,37 @@
 <!--
 Sync Impact Report
+- Version change: 1.7.0 → 1.8.0 (MINOR: a new rule in a referenced doc, and glossary
+  additions)
+- Modified principles: none
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/conventions/architecture/interpreters.md: a new interpreter type may
+    override config_problems() and option_descriptions(). Rule 8 notes that Tally
+    Options feed the section keys. New rule 10: values are read through
+    interpretation/value_types.py, and every bad value in a section is collected into
+    one InvalidValuesError, never skipped.
+  - Updated docs/domain/glossary.md: adds Column Type, Column Definition, Field Type,
+    Field Configuration, Choice Option, Tally Option, Tally Summary, and Workbook Key;
+    Scalar and Scalar Type add DECIMAL, PERCENT, and the Typed Value; Template Structure
+    says Tally Options count through their keys; Tally mentions Tally columns.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.7.0 (2026-10-05) added layers.md rule 11 (workspace/) and amended
+    dependency-injection rule 6 for the Workspace
+  - 1.6.0 (2026-10-03) amended layers.md rules 1, 2 and 10, dependency-injection rule 6,
+    and interpreters.md, and added Data Sheet Store and storage glossary terms
+  - 1.5.0 (2026-10-01) amended dependency-injection rule 6 and interpreters.md, and added
+    template glossary terms
+  - 1.4.0 (2026-10-01) added layers.md rule 9 and expanded dependency-injection rule 6
+  - 1.3.0 (2026-09-30) added `students/` and rule 8 to layers.md
+  - 1.2.0 (2026-09-30) added `app_shell/` and rule 7 to layers.md
+  - 1.1.0 (2026-09-26) added Principle VI. Typed Public Interfaces
+  - 1.0.0 (2026-09-26) initial ratification with Principles I–V
+
+Previous report (1.7.0):
 - Version change: 1.6.0 → 1.7.0 (MINOR: new rules in referenced docs, and glossary
   additions)
 - Modified principles: none
@@ -19,16 +51,6 @@ Sync Impact Report
 - Other edits: Technology Constraints says the local JSON files live in the Workspace.
 - Templates requiring updates: none
 - Deferred TODOs: none
-- Prior history:
-  - 1.6.0 (2026-10-03) amended layers.md rules 1, 2 and 10, dependency-injection rule 6,
-    and interpreters.md, and added Data Sheet Store and storage glossary terms
-  - 1.5.0 (2026-10-01) amended dependency-injection rule 6 and interpreters.md, and added
-    template glossary terms
-  - 1.4.0 (2026-10-01) added layers.md rule 9 and expanded dependency-injection rule 6
-  - 1.3.0 (2026-09-30) added `students/` and rule 8 to layers.md
-  - 1.2.0 (2026-09-30) added `app_shell/` and rule 7 to layers.md
-  - 1.1.0 (2026-09-26) added Principle VI. Typed Public Interfaces
-  - 1.0.0 (2026-09-26) initial ratification with Principles I–V
 
 Previous report (1.6.0):
 - Version change: 1.5.0 → 1.6.0 (MINOR: new rules in referenced docs, and glossary
@@ -314,4 +336,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.7.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-05
+**Version**: 1.8.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-11

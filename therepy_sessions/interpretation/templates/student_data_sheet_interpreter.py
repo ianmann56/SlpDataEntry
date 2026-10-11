@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from typing import TYPE_CHECKING
 
-import ipdb
 from interpretation.student_data_sheet import StudentDataSheet
+from interpretation.value_types import InvalidValuesError, OptionDescription, ValueProblem
 from collection.collection_headers import StudentDataSheetImport
 
 if TYPE_CHECKING:
@@ -78,6 +78,21 @@ class SessionDataSectionInterpreterBase(ABC):
     Workbook a template's sessions are saved to.
     """
     pass
+
+  def config_problems(self) -> list[str]:
+    """
+    Every problem with this section's configuration that stops its template from being
+    saved, e.g. a Choice column with no choices. validate_template and the template form
+    refuse a section with any. [] when the configuration is valid.
+    """
+    return []
+
+  def option_descriptions(self) -> list[OptionDescription]:
+    """
+    Every choice and tally option this section reads, with what it means, in template
+    order. Storage writes them to the Workbook Key without checking interpreter types.
+    """
+    return []
 
   @abstractmethod
   def interpret_student_data_sheet_content(self, data_sheet_content: StudentDataSheetImport) -> DataSheetInterpretationDto:
@@ -188,6 +203,8 @@ class StudentDataSheetInterpreter:
 
     :return: The interpreted sheet. It carries the template it was interpreted with, and
       each of its tables is tagged with the id of the interpreter that produced it.
+    :raises InvalidValuesError: If any value doesn't fit its column or field, holding every
+      such value from every section
     """
     student_key = data_sheet_content.form_data['Student Key']
     date = data_sheet_content.form_data['Date']
@@ -201,14 +218,21 @@ class StudentDataSheetInterpreter:
     # Each table section sees only the tables assigned to it, so no table is read twice
     tables_by_section = self._assign_tables(data_sheet_content)
 
-    # Each interpretation is paired with the interpreter that produced it, so tables can be tagged
-    data_sheet_interpretations = [
-      (interpreter, interpreter.interpret_student_data_sheet_content(
-        tables_by_section.get(interpreter.id, data_sheet_content)
-      ))
-      for interpreter
-      in self.session_data_templates
-    ]
+    # Each interpretation is paired with the interpreter that produced it, so tables can be tagged.
+    # Bad values from every section are collected, so the SLP sees them all at once.
+    data_sheet_interpretations: list[tuple[SessionDataSectionInterpreterBase, DataSheetInterpretationDto]] = []
+    problems: list[ValueProblem] = []
+    for interpreter in self.session_data_templates:
+      try:
+        interpretation = interpreter.interpret_student_data_sheet_content(
+          tables_by_section.get(interpreter.id, data_sheet_content)
+        )
+      except InvalidValuesError as e:
+        problems.extend(e.problems)
+        continue
+      data_sheet_interpretations.append((interpreter, interpretation))
+    if problems:
+      raise InvalidValuesError(problems)
 
     for interpreter, interpretation in data_sheet_interpretations:
       for table in interpretation.tables:

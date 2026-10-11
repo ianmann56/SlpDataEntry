@@ -1,0 +1,42 @@
+{
+  "form_data": {
+    "Student Key": "ZZ",
+    "Date": "10/3/2026",
+    "Time IN": "11:00 AM",
+    "Time OUT": "11:25 AM",
+    "Goal": "Synthetic goal for testing.",
+    "Measure": "Synthetic measure.",
+    "Prompts given": "12"
+  },
+  "tables": [
+    [
+      [
+        "Word",
+        "Trials",
+        "Score",
+        "Done",
+        "When",
+        "Accuracy",
+        "Attempts"
+      ],
+      [
+        "cat",
+        "1",
+        "1",
+        "y",
+        "10/3/2026",
+        "+",
+        "Y"
+      ]
+    ],
+    [
+      [
+        "Y"
+      ]
+    ]
+  ],
+  "table_titles": [
+    "Words",
+    "Tally Grid"
+  ]
+}

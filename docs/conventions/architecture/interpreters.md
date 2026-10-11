@@ -30,7 +30,7 @@ A new interpreter type is complete only when all four of these exist:
 
 | Piece | Location | Responsibility |
 | --- | --- | --- |
-| Interpreter | `interpretation/interpreter_types/<name>_interpreter.py` | Subclass `SessionDataSectionInterpreterBase`. Take `id` and `title` plus its own config. Implement `interpret_student_data_sheet_content`, returning `DataSheetInterpretationDto`, and `section_keys()`, returning the field, column, or tally keys it produces, in template order. `section_kind` defaults to the class name; if the class is renamed, override it to keep the old name. A type that reads tables from the sheet overrides `consumes_tables` to return `True`. A type that emits form scalars rather than tables is also listed in `FORM_SECTION_KINDS` in `storage/session_layout.py`. |
+| Interpreter | `interpretation/interpreter_types/<name>_interpreter.py` | Subclass `SessionDataSectionInterpreterBase`. Take `id` and `title` plus its own config. Implement `interpret_student_data_sheet_content`, returning `DataSheetInterpretationDto`, and `section_keys()`, returning the field, column, or tally keys it produces, in template order. Optionally override `config_problems()` (configuration problems that stop the template from being saved; default none) and `option_descriptions()` (the codes and meanings listed in the Workbook Key; default none). `section_kind` defaults to the class name; if the class is renamed, override it to keep the old name. A type that reads tables from the sheet overrides `consumes_tables` to return `True`. A type that emits form scalars rather than tables is also listed in `FORM_SECTION_KINDS` in `storage/session_layout.py`. |
 | Config UI | `interpretation/template_manager/interpreter_configs.py` | Subclass `InterpreterConfig`. Implement `name`, `interpreter_type`, `create_config_form` (returning a `ConfigForm` with `frame`, `get_config`, `reset`, and `load`), `construct_interpreter`, and `describe` (readable lines for view mode). `load` fills the form from a saved interpreter so it can be edited. |
 | Serializer | `interpretation/template_manager/storage/serialization.py` | Subclass `InterpreterSerializer` and register it. The output has the shape `{"type", "id", "title", "config"}`. |
 | Registration | the config list passed to the management window, and the serializer registry | Makes the type visible in the UI and loadable from disk. |
@@ -48,7 +48,10 @@ A new interpreter type is complete only when all four of these exist:
    the SLP and are not regenerated.
 5. **Fail loudly on a mismatched sheet.** When a sheet does not match its template (a
    missing column, a missing header label), raise an exception naming what was expected
-   and what was found, as `TableInterpreter` does. Never skip data silently.
+   and what was found, as `TableInterpreter` does. Never skip data silently. One
+   exception: a table row with fewer cells than the header row is read with the missing
+   cells blank, because OCR can leave out trailing empty cells. A blank cell is still read
+   by its column's rules (it is empty, or a Tally with no marks), never guessed at.
 6. **Ids are stable.** Template ids and interpreter ids are strings, unique within their
    scope, and never reused after deletion. `TemplateStore.generate_new_id` owns template ids.
    The templates file records `last_template_id`, the highest id ever given out, so a
@@ -60,7 +63,8 @@ A new interpreter type is complete only when all four of these exist:
 8. **Section keys decide the workbook.** `section_keys()` and `section_kind` feed the
    Template Structure. Changing what they return for an existing type changes which
    Student Session Workbook its templates' sessions go to, so treat that like a
-   serialization change (rule 4).
+   serialization change (rule 4). Tally Options feed the section keys through the Tally
+   Summary keys (`tally_keys`), so changing a tally's options starts a new workbook.
 9. **Each table is read by one section.** `StudentDataSheetInterpreter` decides which
    tables each section whose `consumes_tables` is `True` receives; the section reads
    only those. A template with one such section gets every table. A template with
@@ -68,3 +72,8 @@ A new interpreter type is complete only when all four of these exist:
    sheet, ignoring letter case, spacing, and a trailing `:`. A table with no title or no
    matching section, a section with no table, or two such sections with the same title
    fails the sheet (rule 5).
+10. **Values are read through `value_types`.** Every value an interpreter reads from the
+    sheet goes through `interpretation/value_types.py` (`read_value`, `read_tally`), so a
+    type is read the same way everywhere. A value that doesn't fit its type is never
+    skipped or saved as-is: each section collects every such value into one
+    `InvalidValuesError`, and the sheet fails naming all of them (FR-012).

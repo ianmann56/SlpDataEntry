@@ -1,23 +1,69 @@
 from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
+from interpretation.student_data_sheet import DataSheetScalarDto
+from interpretation.template_manager.option_rules import name_problems, option_problems
+from interpretation.value_types import (
+  COLUMN_TYPE_LABELS,
+  FIELD_TYPES,
+  ChoiceOption,
+  ColumnType,
+  InvalidValuesError,
+  OptionDescription,
+  ValueProblem,
+  ValueReadError,
+  read_value,
+  scalar_type_for,
+)
+from collection.collection_headers import StudentDataSheetImport
+
+# The section name used in messages and the Workbook Key when a form section has no title
+_FALLBACK_SECTION_NAME: str = "Form"
 
 
 class FieldConfiguration:
-  # The name of the field
-  name = ""
+  """
+  One field of a form section, with its Field Type.
 
-  # The DataSheetScalarType representing the type of value in this field.
-  fieldType = None
+  Properties:
+    name: The field's label on the sheet.
+    field_type: How its value is read. One of FIELD_TYPES.
+    choices: The choices of a Choice field. Empty otherwise.
+  """
 
-  def __init__(self, name, fieldType):
-    self.name = name
-    self.fieldType = fieldType
+  def __init__(
+    self,
+    name: str,
+    field_type: ColumnType = ColumnType.TEXT,
+    choices: list[ChoiceOption] | None = None,
+  ) -> None:
+    self._name = name
+    self._field_type = field_type
+    # Copied per instance so fields never share option lists
+    self._choices: list[ChoiceOption] = list(choices or [])
+
+  @property
+  def name(self) -> str:
+    return self._name
+
+  @property
+  def field_type(self) -> ColumnType:
+    return self._field_type
+
+  @property
+  def fieldType(self) -> ColumnType:
+    """The field type, by its older name."""
+    return self._field_type
+
+  @property
+  def choices(self) -> list[ChoiceOption]:
+    return self._choices
+
 
 class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
   """
   Template implementation for data sheets containing form fields with specific names.
 
   Purpose: Handles data sheets where the form data follows a predictable key-value
-  format.
+  format. Each field's value is read as its Field Type.
 
   Use case: Therapy session data sheets with consistent form feilds like 'Total Repetitions',
   'Times w/Prompting', 'Times w/o Prompting', etc.
@@ -42,10 +88,10 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
     self._fields: dict[str, FieldConfiguration] = fields
 
   @property
-  def fields(self):
+  def fields(self) -> dict[str, FieldConfiguration]:
     """
     Get the field configurations for this interpreter.
-    
+
     Returns:
         dict: Dictionary of field names to FieldConfiguration objects
     """
@@ -57,23 +103,58 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
     """
     return list(self._fields.keys())
 
-  def interpret_student_data_sheet_content(self, data_sheet_content):
+  def config_problems(self) -> list[str]:
+    """
+    Blank or repeated field names, a type a field can't have, and Choice fields with
+    missing, blank, or repeated choices.
+    """
+    problems = name_problems("field", [field.name for field in self._fields.values()])
+    for field in self._fields.values():
+      if field.field_type not in FIELD_TYPES:
+        problems.append(f'Field "{field.name}" can\'t be a {COLUMN_TYPE_LABELS[field.field_type]} field.')
+      elif field.field_type is ColumnType.CHOICE:
+        problems.extend(option_problems(field.name, ColumnType.CHOICE, [c.value for c in field.choices], kind="field"))
+    return problems
+
+  def option_descriptions(self) -> list[OptionDescription]:
+    """Every Choice field's choices, in field order then choice order."""
+    section = self.title or _FALLBACK_SECTION_NAME
+    return [
+      OptionDescription(section, field.name, "Choice", choice.value, choice.description)
+      for field in self._fields.values()
+      if field.field_type is ColumnType.CHOICE
+      for choice in field.choices
+    ]
+
+  def interpret_student_data_sheet_content(self, data_sheet_content: StudentDataSheetImport) -> DataSheetInterpretationDto:
     """
     Processes multiple form fields from the data sheet.
 
-    Purpose: Implements the abstract method from the base class to handle forms.
+    Purpose: Implements the abstract method from the base class to handle forms. Each
+    configured field found on the sheet is read as its Field Type.
 
     :param data_sheet_content: A dictionary with 2 properties:
       tables: List of 2D arrays representing tables from the data sheet
       form_data: A list of key value pairs where the key is the field name and the
                  value is the value name.
     :return: a DataSheetInterpretationDto representing the interpreted data
+    :raises InvalidValuesError: If any field's value doesn't fit its type, holding every such field
     """
-    scalars = {
-      field_key: data_sheet_content.form_data[field_key]
-      for field_key
-      in data_sheet_content.form_data
-      if field_key in self._fields.keys()
-    }
+    section = self.title or _FALLBACK_SECTION_NAME
+    problems: list[ValueProblem] = []
+    scalars: dict[str, DataSheetScalarDto] = {}
+    for field_key, field in self._fields.items():
+      if field_key not in data_sheet_content.form_data:
+        continue
+      text = data_sheet_content.form_data[field_key]
+      try:
+        typed_value = read_value(field.field_type, text, field.choices)
+      except ValueReadError as e:
+        problems.append(ValueProblem(section, field.name, "", e.found or text, e.expected, item_kind="field"))
+        continue
+      choice_values = [choice.value for choice in field.choices]
+      scalars[field_key] = DataSheetScalarDto(field_key, text, scalar_type_for(field.field_type), choice_values or None, typed_value)
+    if problems:
+      raise InvalidValuesError(problems)
 
     return DataSheetInterpretationDto([], scalars)

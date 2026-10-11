@@ -7,10 +7,10 @@ It decides:
 - the Session Moment of a sheet (its Date and Time IN)
 - tab and workbook names
 - the Workbook Layout Order, and the rows a session tab holds
+- the rows of the Workbook Key tab
 """
 
 import json
-import re
 import unicodedata
 from collections.abc import Collection, Sequence
 from datetime import date, datetime, time
@@ -18,6 +18,7 @@ from enum import Enum
 from typing import NamedTuple
 
 from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetScalarType, StudentDataSheet
+from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
 from storage.template_structure import SectionShape, TemplateShape, shape_of
 
 # The longest tab name Google Sheets allows
@@ -32,6 +33,12 @@ _FALLBACK_TAB_NAME: str = "Session"
 # Header fields, in the order they are written at the top of every tab (FR-021)
 HEADER_LABELS: tuple[str, ...] = ("Student Key", "Date", "Time IN", "Time OUT", "Goal", "Measure")
 
+# The name of the tab listing every choice and tally code with its meaning
+WORKBOOK_KEY_TAB_NAME: str = "Workbook Key"
+WORKBOOK_KEY_HEADERS: tuple[str, ...] = ("Section", "Column or Field", "Type", "Code", "Meaning")
+# The one row of a Workbook Key whose template has no codes
+WORKBOOK_KEY_EMPTY_TEXT: str = "This template has no choice or tally codes to explain."
+
 # Section kinds whose keys are form fields, written in the vertical field list. Every
 # other kind produces table blocks. A new interpreter type that emits form scalars
 # instead of tables must be added here.
@@ -41,32 +48,53 @@ FORM_SECTION_KINDS: frozenset[str] = frozenset({"SimpleFormInterpreter"})
 class CellKind(Enum):
     """How a value is written to its cell."""
     NUMBER = "number"
+    BOOLEAN = "boolean"
+    DATE = "date"
+    PERCENT = "percent"
     TEXT = "text"
 
 
-# How each interpreted type is saved (FR-024a). Only INT values become numbers.
+# How each interpreted type is saved (FR-014): numbers, booleans, and dates natively, so
+# the SLP can sort, total, and chart them.
 CELL_KIND_BY_TYPE: dict[DataSheetScalarType, CellKind] = {
-    scalar_type: CellKind.NUMBER if scalar_type is DataSheetScalarType.INT else CellKind.TEXT
-    for scalar_type in DataSheetScalarType
+    DataSheetScalarType.TEXT: CellKind.TEXT,
+    DataSheetScalarType.CHOICE: CellKind.TEXT,
+    DataSheetScalarType.INT: CellKind.NUMBER,
+    DataSheetScalarType.DECIMAL: CellKind.NUMBER,
+    DataSheetScalarType.BOOLEAN: CellKind.BOOLEAN,
+    DataSheetScalarType.DATE: CellKind.DATE,
+    DataSheetScalarType.PERCENT: CellKind.PERCENT,
 }
 
-_INTEGER_PATTERN = re.compile(r"[+-]?\d+")
+# Day 0 of a spreadsheet date serial number
+_SERIAL_DATE_EPOCH: date = date(1899, 12, 30)
 
 # Formats US school sheets use, tried in order. Used only to order tabs (FR-018a).
 _DATE_FORMATS: tuple[str, ...] = ("%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y", "%m-%d-%y")
 _TIME_FORMATS: tuple[str, ...] = ("%I:%M %p", "%I:%M%p", "%I %p", "%H:%M")
 
 
+class CellNumberFormat(Enum):
+    """How a number cell is displayed."""
+    DATE = "date"
+    PERCENT = "percent"
+
+
 class CellValue(NamedTuple):
     """
-    One cell of a session tab.
+    One cell of a session tab. Exactly one of text, number, or boolean is set, or none of
+    them for an empty cell.
 
     Properties:
-      text: The text written, or None for an empty cell.
-      number: The number written, set only when the value is saved as a number.
+      text: The text written.
+      number: The number written. A date is its serial day number.
+      boolean: The TRUE or FALSE written.
+      number_format: How a number is displayed: as a date, or as a percentage.
     """
     text: str | None
-    number: int | None
+    number: int | float | None
+    boolean: bool | None = None
+    number_format: CellNumberFormat | None = None
 
 
 EMPTY_CELL: CellValue = CellValue(None, None)
@@ -270,17 +298,16 @@ def workbook_name(student_key: str, template_name: str) -> str:
 
 def cell_for(value: DataSheetScalarDto | str | None) -> CellValue:
     """
-    The cell for one interpreted value (FR-024, FR-024a, FR-024b).
+    The cell for one interpreted value (FR-014, FR-024, FR-024a, FR-024b).
 
     - None or blank: an empty cell, so the values after it keep their place.
-    - A raw str (form text, header values): text, exactly as read.
-    - A scalar whose type saves as a number (CELL_KIND_BY_TYPE), and whose text is an
-      integer: that number.
-    - Anything else: text, exactly as read. A number-typed value that isn't an integer is
-      kept as text rather than dropped.
+    - A raw str (header values): text, exactly as read.
+    - A scalar with no typed value but non-blank text: that text, so a value is never dropped.
+    - Otherwise, by the scalar's type (CELL_KIND_BY_TYPE): INT and DECIMAL as numbers,
+      BOOLEAN as TRUE/FALSE, DATE as a serial day number shown as a date, PERCENT as a
+      fraction shown as a percentage, and TEXT and CHOICE as text.
 
-    The decision comes only from the interpreted type, never from the content. This is
-    the single place a later per-field save setting on the template plugs in.
+    The decision comes only from the interpreted type, never from the content.
     """
     if value is None:
         return EMPTY_CELL
@@ -288,12 +315,24 @@ def cell_for(value: DataSheetScalarDto | str | None) -> CellValue:
         return CellValue(value, None) if value.strip() else EMPTY_CELL
 
     text = "" if value.value is None else str(value.value)
-    if not text.strip():
-        return EMPTY_CELL
-    kind = CELL_KIND_BY_TYPE.get(value.type, CellKind.TEXT) if isinstance(value.type, DataSheetScalarType) else CellKind.TEXT
-    if kind is CellKind.NUMBER and _INTEGER_PATTERN.fullmatch(text.strip()):
-        return CellValue(None, int(text.strip()))
-    return CellValue(text, None)
+    typed = value.typed_value
+    if typed is None:
+        return CellValue(text, None) if text.strip() else EMPTY_CELL
+
+    kind = CELL_KIND_BY_TYPE.get(value.type, CellKind.TEXT)
+    is_number = isinstance(typed, (int, float)) and not isinstance(typed, bool)
+    if kind is CellKind.NUMBER and is_number:
+        return CellValue(None, typed)
+    if kind is CellKind.BOOLEAN and isinstance(typed, bool):
+        return CellValue(None, None, typed)
+    if kind is CellKind.DATE and isinstance(typed, date):
+        return CellValue(None, (typed - _SERIAL_DATE_EPOCH).days, None, CellNumberFormat.DATE)
+    if kind is CellKind.PERCENT and is_number:
+        return CellValue(None, typed, None, CellNumberFormat.PERCENT)
+    if kind is CellKind.TEXT and isinstance(typed, str):
+        return CellValue(typed, None)
+    # A typed value that doesn't fit its type is kept as the text read
+    return CellValue(text, None) if text.strip() else EMPTY_CELL
 
 
 def _structure_key(kind: str, title: str, keys: Collection[str]) -> tuple[str, str, tuple[str, ...]]:
@@ -377,4 +416,22 @@ def session_rows(sheet: StudentDataSheet, layout: WorkbookLayout) -> list[list[C
             rows.append([cell_for(data_row.get(key)) for key in keys])
         rows.append([])
 
+    return rows
+
+
+def workbook_key_rows(template: StudentDataSheetTemplate) -> list[list[CellValue]]:
+    """
+    The rows of the Workbook Key tab (FR-024): a header row, then one row per choice and
+    tally option in template order, from each interpreter's `option_descriptions()`. A
+    template with none gets a single row saying so.
+
+    Only template text is written, never student data. No interpreter types are checked.
+    """
+    rows: list[list[CellValue]] = [[CellValue(header, None) for header in WORKBOOK_KEY_HEADERS]]
+    for interpreter in template.interpreters:
+        for described in interpreter.option_descriptions():
+            texts = (described.section, described.item, described.item_type, described.option, described.description)
+            rows.append([CellValue(text, None) if text else EMPTY_CELL for text in texts])
+    if len(rows) == 1:
+        rows.append([CellValue(WORKBOOK_KEY_EMPTY_TEXT, None)])
     return rows

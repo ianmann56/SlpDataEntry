@@ -8,14 +8,17 @@ interpreter types injectable and extensible.
 import tkinter as tk
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from tkinter import ttk, messagebox
+from collections.abc import Sequence
+from tkinter import ttk
 from typing import Any, TypedDict
 
-from interpretation.student_data_sheet import DataSheetScalarType
 from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
 from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
 from interpretation.interpreter_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
 from interpretation.interpreter_types.table_interpreter import ColumnDefinition, TableInterpreter
+from interpretation.template_manager.option_list_editor import OptionListEditor
+from interpretation.template_manager.typed_item_editor import TypedItem, TypedItemEditor
+from interpretation.value_types import COLUMN_TYPE_LABELS, FIELD_TYPES, ChoiceOption, ColumnType, TallyOption
 
 
 class ConfigForm(TypedDict):
@@ -91,15 +94,36 @@ def _join_or_none(items: list[str]) -> str:
     return ", ".join(items) if items else "(none)"
 
 
-def _fill_listbox(listbox: tk.Listbox, items: list[str]) -> None:
-    """Replace a config form listbox's items."""
-    listbox.delete(0, tk.END)
-    for item in items:
-        listbox.insert(tk.END, item)
+def _describe_options(options: Sequence[tuple[str, str]]) -> str:
+    """Options for a description line, e.g. "+ (correct), - (incorrect), P"."""
+    return _join_or_none([f"{code} ({meaning})" if meaning else code for code, meaning in options])
+
+
+def _describe_item(name: str, item_type: ColumnType, options: Sequence[tuple[str, str]]) -> str:
+    """One column or field for view mode, e.g. "Trials — Integer" or "Accuracy — Choice: + (correct), -"."""
+    label = COLUMN_TYPE_LABELS[item_type]
+    if item_type in (ColumnType.CHOICE, ColumnType.TALLY):
+        return f"{name} — {label}: {_describe_options(options)}"
+    return f"{name} — {label}"
+
+
+def _column_options(column: ColumnDefinition) -> list[tuple[str, str]]:
+    """A column's choices or tally options as (value, meaning)."""
+    if column.column_type is ColumnType.TALLY:
+        return [(option.mark, option.description) for option in column.tally_options]
+    return [(choice.value, choice.description) for choice in column.choices]
+
+
+def _title_row(frame: ttk.Frame) -> tk.StringVar:
+    """Add the Title entry at the top of a config form."""
+    ttk.Label(frame, text="Title:").grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
+    title_var = tk.StringVar()
+    ttk.Entry(frame, textvariable=title_var, width=20).grid(row=0, column=1, sticky=(tk.W, tk.E), pady=(0, 5))
+    return title_var
 
 
 class TableInterpreterConfig(InterpreterConfig):
-    """Configuration for Table Interpreter - manages column names."""
+    """Configuration for Table Interpreter - manages its columns and their types."""
     
     @property
     def name(self) -> str:
@@ -112,52 +136,30 @@ class TableInterpreterConfig(InterpreterConfig):
     def create_config_form(self, parent_frame: tk.Misc) -> ConfigForm:
         """Create configuration form for Table Interpreter."""
         frame = ttk.Frame(parent_frame)
+        frame.columnconfigure(1, weight=1)
+        title_var = _title_row(frame)
 
-        ttk.Label(frame, text="Title:").grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
-        title_var = tk.StringVar()
-        title_entry = ttk.Entry(frame, textvariable=title_var, width=20)
-        title_entry.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
-
-        ttk.Label(frame, text="Column Names:").grid(row=1, column=0, sticky=tk.W, pady=(0, 5))
-
-        # Listbox for columns
-        columns_listbox = tk.Listbox(frame, height=3)
-        columns_listbox.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 5))
-
-        # Entry and button for adding columns
-        column_var = tk.StringVar()
-        column_entry = ttk.Entry(frame, textvariable=column_var, width=20)
-        column_entry.grid(row=3, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
-
-        add_column_btn = ttk.Button(frame, text="Add Column",
-                                   command=lambda: self._add_config_item(columns_listbox, column_var))
-        add_column_btn.grid(row=3, column=1, padx=(0, 5))
-
-        remove_column_btn = ttk.Button(frame, text="Remove",
-                                      command=lambda: self._remove_config_item(columns_listbox))
-        remove_column_btn.grid(row=3, column=2)
-
-        frame.columnconfigure(0, weight=1)
+        ttk.Label(frame, text="Columns:").grid(row=1, column=0, sticky=(tk.W, tk.N), pady=(0, 5))
+        editor = TypedItemEditor(frame, "Column", list(ColumnType))
+        editor.frame.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=(0, 5))
 
         def reset() -> None:
             title_var.set('')
-            column_var.set('')
-            columns_listbox.delete(0, tk.END)
+            editor.reset()
 
         def load(interpreter: SessionDataSectionInterpreterBase) -> None:
             reset()
             title_var.set(interpreter.title or '')
-            _fill_listbox(columns_listbox, [column.column_name for column in interpreter.columns])
+            editor.set([
+                TypedItem(column.column_name, column.column_type, _column_options(column))
+                for column in interpreter.columns
+            ])
 
         return {
             'frame': frame,
             'get_config': lambda: {
                 'title': title_var.get().strip(),
-                'columns': [
-                    ColumnDefinition(column_name, [])
-                    for column_name
-                    in columns_listbox.get(0, tk.END)
-                ]
+                'columns': editor.get(),
             },
             'reset': reset,
             'load': load,
@@ -168,41 +170,32 @@ class TableInterpreterConfig(InterpreterConfig):
         Constructs a TableInterpreter from the configuration values.
 
         :param id: The unique id to assign to the constructed interpreter.
-        :param config_values: Dictionary containing 'title' and 'columns' list
+        :param config_values: Dictionary containing 'title' and 'columns', a list of TypedItem
         :return: TableInterpreter instance configured with the specified columns
         """
         title = config_values.get('title', '')
-        column_defs: list[ColumnDefinition] = config_values.get('columns', [])
+        items: list[TypedItem] = config_values.get('columns', [])
+        column_defs = [
+            ColumnDefinition(
+                item.name.strip(),
+                item.item_type,
+                choices=[ChoiceOption(v, d) for v, d in item.options] if item.item_type is ColumnType.CHOICE else None,
+                tally_options=[TallyOption(v, d) for v, d in item.options] if item.item_type is ColumnType.TALLY else None,
+            )
+            for item in items
+        ]
         return TableInterpreter(id, title, column_defs)
 
     def describe(self, interpreter: SessionDataSectionInterpreterBase) -> list[str]:
-        return ["Columns: " + _join_or_none([column.column_name for column in interpreter.columns])]
-    
-    def _add_config_item(self, listbox, entry_var):
-        """Add an item to the configuration listbox."""
-        item = entry_var.get().strip()
-        if item:
-            # Check for duplicates
-            items = list(listbox.get(0, tk.END))
-            if item not in items:
-                listbox.insert(tk.END, item)
-                entry_var.set("")  # Clear the entry
-            else:
-                messagebox.showwarning("Duplicate Item", f"'{item}' is already in the list.")
-        else:
-            messagebox.showwarning("Empty Item", "Please enter a value.")
-            
-    def _remove_config_item(self, listbox):
-        """Remove selected item from the configuration listbox."""
-        selection = listbox.curselection()
-        if selection:
-            listbox.delete(selection[0])
-        else:
-            messagebox.showwarning("No Selection", "Please select an item to remove.")
+        lines = [
+            _describe_item(column.column_name, column.column_type, _column_options(column))
+            for column in interpreter.columns
+        ]
+        return lines or ["Columns: (none)"]
 
 
 class RunningTallyInterpreterConfig(InterpreterConfig):
-    """Configuration for Running Tally Interpreter - manages tally characters."""
+    """Configuration for Running Tally Interpreter - manages its tally options."""
     
     @property
     def name(self) -> str:
@@ -215,48 +208,27 @@ class RunningTallyInterpreterConfig(InterpreterConfig):
     def create_config_form(self, parent_frame: tk.Misc) -> ConfigForm:
         """Create configuration form for Running Tally Interpreter."""
         frame = ttk.Frame(parent_frame)
+        frame.columnconfigure(1, weight=1)
+        title_var = _title_row(frame)
 
-        ttk.Label(frame, text="Title:").grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
-        title_var = tk.StringVar()
-        title_entry = ttk.Entry(frame, textvariable=title_var, width=20)
-        title_entry.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
-
-        ttk.Label(frame, text="Tally Characters:").grid(row=1, column=0, sticky=tk.W, pady=(0, 5))
-
-        # Listbox for tally characters
-        tally_listbox = tk.Listbox(frame, height=3)
-        tally_listbox.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 5))
-
-        # Entry and button for adding characters
-        char_var = tk.StringVar()
-        char_entry = ttk.Entry(frame, textvariable=char_var, width=20)
-        char_entry.grid(row=3, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
-
-        add_char_btn = ttk.Button(frame, text="Add Character",
-                                 command=lambda: self._add_config_item(tally_listbox, char_var))
-        add_char_btn.grid(row=3, column=1, padx=(0, 5))
-
-        remove_char_btn = ttk.Button(frame, text="Remove",
-                                    command=lambda: self._remove_config_item(tally_listbox))
-        remove_char_btn.grid(row=3, column=2)
-
-        frame.columnconfigure(0, weight=1)
+        ttk.Label(frame, text="Tally Options:").grid(row=1, column=0, sticky=(tk.W, tk.N), pady=(0, 5))
+        editor = OptionListEditor(frame, ColumnType.TALLY)
+        editor.frame.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=(0, 5))
 
         def reset() -> None:
             title_var.set('')
-            char_var.set('')
-            tally_listbox.delete(0, tk.END)
+            editor.set([])
 
         def load(interpreter: SessionDataSectionInterpreterBase) -> None:
             reset()
             title_var.set(interpreter.title or '')
-            _fill_listbox(tally_listbox, list(interpreter.tally_choice_options or []))
+            editor.set([(option.mark, option.description) for option in interpreter.tally_options])
 
         return {
             'frame': frame,
             'get_config': lambda: {
                 'title': title_var.get().strip(),
-                'tally_characters': list(tally_listbox.get(0, tk.END))
+                'tally_options': editor.get(),
             },
             'reset': reset,
             'load': load,
@@ -267,41 +239,20 @@ class RunningTallyInterpreterConfig(InterpreterConfig):
         Constructs a RunningTallyInterpreter from the configuration values.
 
         :param id: The unique id to assign to the constructed interpreter.
-        :param config_values: Dictionary containing 'title' and 'tally_characters' list
-        :return: RunningTallyInterpreter instance configured with CHOICE type and tally characters as choices
+        :param config_values: Dictionary containing 'title' and 'tally_options', a list of (mark, meaning)
+        :return: RunningTallyInterpreter instance configured with those tally options
         """
         title = config_values.get('title', '')
-        tally_characters = config_values.get('tally_characters', [])
-        return RunningTallyInterpreter(id, title, DataSheetScalarType.CHOICE, tally_characters)
+        tally_options = [TallyOption(mark, meaning) for mark, meaning in config_values.get('tally_options', [])]
+        return RunningTallyInterpreter(id, title, tally_options)
 
     def describe(self, interpreter: SessionDataSectionInterpreterBase) -> list[str]:
-        return ["Tally characters: " + _join_or_none(list(interpreter.tally_choice_options or []))]
-    
-    def _add_config_item(self, listbox, entry_var):
-        """Add an item to the configuration listbox."""
-        item = entry_var.get().strip()
-        if item:
-            # Check for duplicates
-            items = list(listbox.get(0, tk.END))
-            if item not in items:
-                listbox.insert(tk.END, item)
-                entry_var.set("")  # Clear the entry
-            else:
-                messagebox.showwarning("Duplicate Item", f"'{item}' is already in the list.")
-        else:
-            messagebox.showwarning("Empty Item", "Please enter a value.")
-            
-    def _remove_config_item(self, listbox):
-        """Remove selected item from the configuration listbox."""
-        selection = listbox.curselection()
-        if selection:
-            listbox.delete(selection[0])
-        else:
-            messagebox.showwarning("No Selection", "Please select an item to remove.")
+        options = [(option.mark, option.description) for option in interpreter.tally_options]
+        return ["Tally options: " + _describe_options(options)]
 
 
 class SimpleFormInterpreterConfig(InterpreterConfig):
-    """Configuration for Simple Form Interpreter - manages form field names."""
+    """Configuration for Simple Form Interpreter - manages its form fields and their types."""
     
     @property
     def name(self) -> str:
@@ -314,48 +265,30 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
     def create_config_form(self, parent_frame: tk.Misc) -> ConfigForm:
         """Create configuration form for Simple Form Interpreter."""
         frame = ttk.Frame(parent_frame)
+        frame.columnconfigure(1, weight=1)
+        title_var = _title_row(frame)
 
-        ttk.Label(frame, text="Title:").grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
-        title_var = tk.StringVar()
-        title_entry = ttk.Entry(frame, textvariable=title_var, width=20)
-        title_entry.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
-
-        ttk.Label(frame, text="Form Field Names:").grid(row=1, column=0, sticky=tk.W, pady=(0, 5))
-
-        # Listbox for field names
-        fields_listbox = tk.Listbox(frame, height=3)
-        fields_listbox.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 5))
-
-        # Entry and button for adding fields
-        field_var = tk.StringVar()
-        field_entry = ttk.Entry(frame, textvariable=field_var, width=20)
-        field_entry.grid(row=3, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
-
-        add_field_btn = ttk.Button(frame, text="Add Field",
-                                  command=lambda: self._add_config_item(fields_listbox, field_var))
-        add_field_btn.grid(row=3, column=1, padx=(0, 5))
-
-        remove_field_btn = ttk.Button(frame, text="Remove",
-                                     command=lambda: self._remove_config_item(fields_listbox))
-        remove_field_btn.grid(row=3, column=2)
-
-        frame.columnconfigure(0, weight=1)
+        ttk.Label(frame, text="Form Fields:").grid(row=1, column=0, sticky=(tk.W, tk.N), pady=(0, 5))
+        editor = TypedItemEditor(frame, "Field", FIELD_TYPES)
+        editor.frame.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=(0, 5))
 
         def reset() -> None:
             title_var.set('')
-            field_var.set('')
-            fields_listbox.delete(0, tk.END)
+            editor.reset()
 
         def load(interpreter: SessionDataSectionInterpreterBase) -> None:
             reset()
             title_var.set(interpreter.title or '')
-            _fill_listbox(fields_listbox, list(interpreter.fields.keys()))
+            editor.set([
+                TypedItem(field.name, field.field_type, [(choice.value, choice.description) for choice in field.choices])
+                for field in interpreter.fields.values()
+            ])
 
         return {
             'frame': frame,
             'get_config': lambda: {
                 'title': title_var.get().strip(),
-                'field_names': list(fields_listbox.get(0, tk.END))
+                'fields': editor.get(),
             },
             'reset': reset,
             'load': load,
@@ -366,44 +299,27 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
         Constructs a SimpleFormInterpreter from the configuration values.
 
         :param id: The unique id to assign to the constructed interpreter.
-        :param config_values: Dictionary containing 'title' and 'field_names' list
-        :return: SimpleFormInterpreter instance configured with FieldConfiguration dictionary
+        :param config_values: Dictionary containing 'title' and 'fields', a list of TypedItem
+        :return: SimpleFormInterpreter instance configured with FieldConfiguration dictionary, in field order
         """
         title = config_values.get('title', '')
-        field_names = config_values.get('field_names', [])
-
-        # Create FieldConfiguration dictionary with TEXT type as default
-        field_configs = {
-            name: FieldConfiguration(name, DataSheetScalarType.TEXT)
-            for name in field_names
-        }
-
+        items: list[TypedItem] = config_values.get('fields', [])
+        field_configs: dict[str, FieldConfiguration] = {}
+        for index, item in enumerate(items):
+            name = item.name.strip()
+            choices = [ChoiceOption(v, d) for v, d in item.options] if item.item_type is ColumnType.CHOICE else None
+            # A repeated name is kept under a stand-in key, so config_problems() reports it
+            # and the form refuses to apply, instead of one field silently replacing the other
+            key = name if name not in field_configs else f"{name}#{index}"
+            field_configs[key] = FieldConfiguration(name, item.item_type, choices)
         return SimpleFormInterpreter(id, title, field_configs)
 
     def describe(self, interpreter: SessionDataSectionInterpreterBase) -> list[str]:
-        return ["Fields: " + _join_or_none(list(interpreter.fields.keys()))]
-    
-    def _add_config_item(self, listbox, entry_var):
-        """Add an item to the configuration listbox."""
-        item = entry_var.get().strip()
-        if item:
-            # Check for duplicates
-            items = list(listbox.get(0, tk.END))
-            if item not in items:
-                listbox.insert(tk.END, item)
-                entry_var.set("")  # Clear the entry
-            else:
-                messagebox.showwarning("Duplicate Item", f"'{item}' is already in the list.")
-        else:
-            messagebox.showwarning("Empty Item", "Please enter a value.")
-            
-    def _remove_config_item(self, listbox):
-        """Remove selected item from the configuration listbox."""
-        selection = listbox.curselection()
-        if selection:
-            listbox.delete(selection[0])
-        else:
-            messagebox.showwarning("No Selection", "Please select an item to remove.")
+        lines = [
+            _describe_item(field.name, field.field_type, [(choice.value, choice.description) for choice in field.choices])
+            for field in interpreter.fields.values()
+        ]
+        return lines or ["Fields: (none)"]
 
 
 # Default configuration list - can be easily extended or modified

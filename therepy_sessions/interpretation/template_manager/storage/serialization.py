@@ -28,7 +28,7 @@ Usage:
 import json
 from abc import ABC, abstractmethod
 from typing import Any
-from interpretation.student_data_sheet import DataSheetScalarType
+from interpretation.value_types import ChoiceOption, ColumnType, TallyOption
 from interpretation.interpreter_types.table_interpreter import ColumnDefinition, TableInterpreter
 from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
 from interpretation.interpreter_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
@@ -65,6 +65,21 @@ class InterpreterSerializer(ABC):
         pass
 
 
+def _column_type_named(name: Any, default: ColumnType) -> ColumnType:
+    """The ColumnType with this member name, or `default` when it is missing or unknown."""
+    if isinstance(name, str) and name in ColumnType.__members__:
+        return ColumnType[name]
+    return default
+
+
+def _saved_options(data: dict[str, Any]) -> list[tuple[str, str]]:
+    """The (value, description) pairs saved under "options", or [] when there are none."""
+    return [
+        (str(option.get("value", "")), str(option.get("description", "")))
+        for option in data.get("options") or []
+    ]
+
+
 class TableInterpreterSerializer(InterpreterSerializer):
     """Serializer for TableInterpreter instances."""
     
@@ -94,6 +109,10 @@ class TableInterpreterSerializer(InterpreterSerializer):
         """
         Deserialize a dictionary to a TableInterpreter instance.
 
+        Reads the current column shape ("column_type" and "options") and the older one
+        ("column_choices" only): an older column is Choice when it has choices, and Text
+        otherwise (FR-018). An unknown type loads as Text.
+
         Args:
             data: Dictionary representation of the interpreter
 
@@ -102,14 +121,23 @@ class TableInterpreterSerializer(InterpreterSerializer):
         """
         column_defs_json: list[Any] = data['config']['columns']
 
-        column_defs: list[ColumnDefinition] = [
-            ColumnDefinition(col["column_name"], col["column_choices"])
-            for col
-            in column_defs_json
-        ]
+        column_defs: list[ColumnDefinition] = [self._column_from_json(col) for col in column_defs_json]
         
         title = data.get('title', '')
         return TableInterpreter(data['id'], title, column_defs)
+
+    @staticmethod
+    def _column_from_json(col: dict[str, Any]) -> ColumnDefinition:
+        old_choices = [str(choice) for choice in col.get("column_choices") or []]
+        default_type = ColumnType.CHOICE if old_choices else ColumnType.TEXT
+        column_type = _column_type_named(col.get("column_type"), default_type)
+        options = _saved_options(col) if "options" in col else [(choice, "") for choice in old_choices]
+
+        if column_type is ColumnType.CHOICE:
+            return ColumnDefinition(col["column_name"], column_type, choices=[ChoiceOption(v, d) for v, d in options])
+        if column_type is ColumnType.TALLY:
+            return ColumnDefinition(col["column_name"], column_type, tally_options=[TallyOption(v, d) for v, d in options])
+        return ColumnDefinition(col["column_name"], column_type)
 
 
 class RunningTallyInterpreterSerializer(InterpreterSerializer):
@@ -125,31 +153,24 @@ class RunningTallyInterpreterSerializer(InterpreterSerializer):
         Returns:
             dict: Dictionary containing type and tally configuration
         """
-        # Use the public properties
-        tally_type = interpreter.tally_type
-        tally_choice_options = interpreter.tally_choice_options
-        
-        # Convert DataSheetScalarType to string for serialization
-        tally_type_str = None
-        if tally_type is not None:
-            if hasattr(tally_type, 'name'):
-                tally_type_str = tally_type.name
-            else:
-                tally_type_str = str(tally_type)
-        
         return {
             'type': 'RunningTallyInterpreter',
             'id': interpreter.id,
             'title': interpreter.title,
             'config': {
-                'tally_type': tally_type_str,
-                'tally_choice_options': tally_choice_options if tally_choice_options else []
+                'tally_options': [
+                    {'mark': option.mark, 'description': option.description}
+                    for option in interpreter.tally_options
+                ]
             }
         }
 
     def deserialize(self, data: dict[str, Any]) -> SessionDataSectionInterpreterBase:
         """
         Deserialize a dictionary to a RunningTallyInterpreter instance.
+
+        Reads "tally_options", or else the older "tally_choice_options" strings with blank
+        descriptions. The older "tally_type" is ignored: it was always CHOICE (FR-023).
         
         Args:
             data: Dictionary representation of the interpreter
@@ -158,17 +179,16 @@ class RunningTallyInterpreterSerializer(InterpreterSerializer):
             RunningTallyInterpreter: The reconstructed RunningTallyInterpreter instance
         """
         config = data['config']
-        
-        # Convert string back to DataSheetScalarType
-        tally_type_str = config['tally_type']
-        tally_type = None
-        if tally_type_str:
-            tally_type = getattr(DataSheetScalarType, tally_type_str, None)
-        
-        tally_choice_options = config.get('tally_choice_options', [])
+        if 'tally_options' in config:
+            tally_options = [
+                TallyOption(str(option.get('mark', '')), str(option.get('description', '')))
+                for option in config['tally_options'] or []
+            ]
+        else:
+            tally_options = [TallyOption(str(mark)) for mark in config.get('tally_choice_options') or []]
         title = data.get('title', '')
 
-        return RunningTallyInterpreter(data['id'], title, tally_type, tally_choice_options)
+        return RunningTallyInterpreter(data['id'], title, tally_options)
 
 
 class SimpleFormInterpreterSerializer(InterpreterSerializer):
@@ -184,28 +204,17 @@ class SimpleFormInterpreterSerializer(InterpreterSerializer):
         Returns:
             dict: Dictionary containing type and field configurations
         """
-        # Use the public property
-        fields = interpreter.fields
-        
-        # Serialize field configurations
-        serialized_fields = {}
-        for field_name, field_config in fields.items():
-            # Extract FieldConfiguration properties
-            field_name_prop = getattr(field_config, 'name', field_name)
-            field_type = getattr(field_config, 'fieldType', None)
-            
-            # Convert fieldType to string for serialization
-            field_type_str = None
-            if field_type is not None:
-                if hasattr(field_type, 'name'):
-                    field_type_str = field_type.name
-                else:
-                    field_type_str = str(field_type)
-            
-            serialized_fields[field_name] = {
-                'name': field_name_prop,
-                'fieldType': field_type_str
+        serialized_fields = {
+            field_name: {
+                'name': field_config.name,
+                'fieldType': field_config.field_type.name,
+                'options': [
+                    {'value': choice.value, 'description': choice.description}
+                    for choice in field_config.choices
+                ],
             }
+            for field_name, field_config in interpreter.fields.items()
+        }
         
         return {
             'type': 'SimpleFormInterpreter',
@@ -219,6 +228,9 @@ class SimpleFormInterpreterSerializer(InterpreterSerializer):
     def deserialize(self, data: dict[str, Any]) -> SessionDataSectionInterpreterBase:
         """
         Deserialize a dictionary to a SimpleFormInterpreter instance.
+
+        A missing, null, or unknown "fieldType" loads as Text, and so does TALLY, which
+        only columns can have (FR-019).
         
         Args:
             data: Dictionary representation of the interpreter
@@ -229,14 +241,13 @@ class SimpleFormInterpreterSerializer(InterpreterSerializer):
         serialized_fields = data['config']['fields']
         
         # Reconstruct FieldConfiguration objects
-        fields = {}
+        fields: dict[str, FieldConfiguration] = {}
         for field_name, field_data in serialized_fields.items():
-            field_type_str = field_data['fieldType']
-            field_type = None
-            if field_type_str:
-                field_type = getattr(DataSheetScalarType, field_type_str, None)
-            
-            fields[field_name] = FieldConfiguration(field_data['name'], field_type)
+            field_type = _column_type_named(field_data.get('fieldType'), ColumnType.TEXT)
+            if field_type is ColumnType.TALLY:
+                field_type = ColumnType.TEXT
+            choices = [ChoiceOption(v, d) for v, d in _saved_options(field_data)] if field_type is ColumnType.CHOICE else []
+            fields[field_name] = FieldConfiguration(field_data.get('name', field_name), field_type, choices)
 
         title = data.get('title', '')
         return SimpleFormInterpreter(data['id'], title, fields)
