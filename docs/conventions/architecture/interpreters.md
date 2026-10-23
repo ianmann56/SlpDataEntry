@@ -72,8 +72,20 @@ A new interpreter type is complete only when all four of these exist:
    sheet, ignoring letter case, spacing, and a trailing `:`. A table with no title or no
    matching section, a section with no table, or two such sections with the same title
    fails the sheet (rule 5).
-10. **Values are read through `value_types`.** Every value an interpreter reads from the
-    sheet goes through `interpretation/value_types.py` (`read_value`, `read_tally`), so a
-    type is read the same way everywhere. A value that doesn't fit its type is never
-    skipped or saved as-is: each section collects every such value into one
-    `InvalidValuesError`, and the sheet fails naming all of them (FR-012).
+10. **Values are read through `value_types`, and never fail the sheet.** Every value an
+    interpreter reads from the sheet goes through `interpretation/value_types.py`
+    (`read_value_leniently`, `read_tally`), so a type is read the same way everywhere.
+    A value that doesn't fit its type is kept and reported, never failing the sheet and
+    never silently dropped:
+    - An Unreadable Value is emitted as a scalar with its text as read in `value` and no
+      `typed_value`, so the workbook cell shows what was written.
+    - A Rounded Value (a non-whole number in an Integer column or field) is emitted as
+      the whole number.
+    - An unknown tally mark is left out of the counts, and the tally's marks scalar then
+      holds the text as read.
+
+    Each section returns every such value, as a `ValueProblem`, in its
+    `DataSheetInterpretationDto.value_problems`. The sheet gathers them into
+    `StudentDataSheet.value_warnings`, and the sheet's Sheet Outcome is *succeeded with
+    warnings*, naming each one (feature 008). A layout that doesn't match the section,
+    such as a missing column, still raises (rule 5).

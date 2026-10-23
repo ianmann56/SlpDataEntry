@@ -6,11 +6,9 @@ from interpretation.value_types import (
   FIELD_TYPES,
   ChoiceOption,
   ColumnType,
-  InvalidValuesError,
   OptionDescription,
   ValueProblem,
-  ValueReadError,
-  read_value,
+  read_value_leniently,
   scalar_type_for,
 )
 from collection.collection_headers import StudentDataSheetImport
@@ -137,8 +135,8 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
       tables: List of 2D arrays representing tables from the data sheet
       form_data: A list of key value pairs where the key is the field name and the
                  value is the value name.
-    :return: a DataSheetInterpretationDto representing the interpreted data
-    :raises InvalidValuesError: If any field's value doesn't fit its type, holding every such field
+    :return: a DataSheetInterpretationDto representing the interpreted data. Every field
+      whose value doesn't fit its type is kept as read and listed in its value_problems.
     """
     section = self.title or _FALLBACK_SECTION_NAME
     problems: list[ValueProblem] = []
@@ -147,14 +145,15 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
       if field_key not in data_sheet_content.form_data:
         continue
       text = data_sheet_content.form_data[field_key]
-      try:
-        typed_value = read_value(field.field_type, text, field.choices)
-      except ValueReadError as e:
-        problems.append(ValueProblem(section, field.name, "", e.found or text, e.expected, item_kind="field"))
-        continue
+      # A value that doesn't fit keeps its text, with no typed value, so nothing written is lost
+      reading = read_value_leniently(field.field_type, text, field.choices)
+      if reading.expected:
+        problems.append(
+          ValueProblem(section, field.name, "", text, reading.expected, item_kind="field", saved_as=reading.saved_as)
+        )
       choice_values = [choice.value for choice in field.choices]
-      scalars[field_key] = DataSheetScalarDto(field_key, text, scalar_type_for(field.field_type), choice_values or None, typed_value)
-    if problems:
-      raise InvalidValuesError(problems)
+      scalars[field_key] = DataSheetScalarDto(
+        field_key, text, scalar_type_for(field.field_type), choice_values or None, reading.typed_value,
+      )
 
-    return DataSheetInterpretationDto([], scalars)
+    return DataSheetInterpretationDto([], scalars, problems)

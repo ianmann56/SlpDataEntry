@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
 from enum import Enum
 import json
@@ -8,8 +9,10 @@ from typing import TYPE_CHECKING, NamedTuple, NotRequired, TypedDict
 if TYPE_CHECKING:
   # Imported for type checking only: the template module imports the interpreters, which import this module
   from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
+  # Imported for type checking only: value_types imports this module
+  from interpretation.value_types import ValueProblem
 
-# A value read from a sheet, in its type. None for a blank cell, or a blank percentage.
+# A value read from a sheet, in its type. None for a blank cell, an Unreadable Value, or a blank percentage.
 TypedValue = int | float | bool | date | str | None
 
 class DataSheetScalarType(Enum):
@@ -30,7 +33,8 @@ class DataSheetScalarDto(NamedTuple):
     value: The value of the scalar field, as read (for a derived tally key, the formatted number)
     type: The type that the scalar field value takes on (like int, vs choice, vs date).
     choice_options: The options that this scalar could be. This is only applicable if type is CHOICE.
-    typed_value: The value in its type. None for a blank cell, or a blank percentage.
+    typed_value: The value in its type. None for a blank cell, an Unreadable Value (whose
+      text is still in `value`), or a blank percentage.
   """
   key: str
   value: str
@@ -73,6 +77,7 @@ class StudentDataSheet:
     # Created per instance so sheets never share tables or scalars
     self._tables: list[DataSheetTable] = []
     self._scalars: dict[str, DataSheetScalarDto] = {}
+    self._value_warnings: list[ValueProblem] = []
 
   @property
   def student_key(self) -> str:
@@ -128,6 +133,20 @@ class StudentDataSheet:
   def register_scalar(self, scalar_name: str, scalar_dto: DataSheetScalarDto) -> None:
     self._scalars[scalar_name] = scalar_dto
 
+  @property
+  def value_warnings(self) -> list[ValueProblem]:
+    """
+    Every Unreadable Value, Rounded Value, and unknown tally mark on the sheet, in
+    template order, then in reading order within each section. Empty when every value fit.
+    """
+    return list(self._value_warnings)
+
+  def add_value_warnings(self, problems: Sequence[ValueProblem]) -> None:
+    """
+    Add one section's value problems. Called by StudentDataSheetInterpreter only.
+    """
+    self._value_warnings.extend(problems)
+
   def debug(self) -> None:
     print('========== Data Sheet ===========\nStudent Key:')
     print(self.student_key)
@@ -148,4 +167,7 @@ class StudentDataSheet:
       print(f'{scalar.key}: {scalar.value!r} ({scalar.type.name}) -> {scalar.typed_value!r}')
     print('=================================\nTables:')
     print(json.dumps(self.tables, indent=4, default=lambda o: o.to_json() if 'to_json' in dir(o) else getattr(o, 'value', str(o))))
+    print('=================================\nValue Warnings:')
+    for problem in self.value_warnings:
+      print(problem.message())
     print('======== End Data Sheet =========')

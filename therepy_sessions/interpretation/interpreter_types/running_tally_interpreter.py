@@ -3,14 +3,13 @@ from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetTable
 from interpretation.template_manager.option_rules import option_problems
 from interpretation.value_types import (
   ColumnType,
-  InvalidValuesError,
   OptionDescription,
   TallyOption,
   ValueProblem,
-  ValueReadError,
   read_tally,
   tally_keys,
   tally_scalars,
+  unknown_mark_phrase,
 )
 from collection.collection_headers import StudentDataSheetImport
 
@@ -97,34 +96,36 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
       tables: List of 2D arrays representing tables from the data sheet
       form_data: A list of key value pairs where the key is the field name and the
                  value is the value name.
-    :raises InvalidValuesError: If any table holds a mark that isn't an option, after
-      every table is read
+    :return: a DataSheetInterpretationDto with one table per tally. Each mark that isn't
+      an option is left out of the counts and listed in its value_problems.
     """
+    section = self.title or _FALLBACK_SECTION_NAME
     problems: list[ValueProblem] = []
     several_tables = len(data_sheet_content.tables) > 1
     tables: list[DataSheetTable] = []
     for table_number, raw_table in enumerate(data_sheet_content.tables, start=1):
       where = f"table {table_number}" if several_tables else ""
-      try:
-        tables.append(self._interpret_single_student_data_sheet_table(raw_table))
-      except ValueReadError as e:
-        problems.append(ValueProblem(self.title or _FALLBACK_SECTION_NAME, "", where, e.found, e.expected))
-    if problems:
-      raise InvalidValuesError(problems)
+      table, unknown_marks = self._interpret_single_student_data_sheet_table(raw_table)
+      tables.append(table)
+      problems.extend(
+        ValueProblem(section, "", where, mark, unknown_mark_phrase(self._tally_options))
+        for mark in unknown_marks
+      )
 
-    return DataSheetInterpretationDto(tables, {})
+    return DataSheetInterpretationDto(tables, {}, problems)
 
-  def _interpret_single_student_data_sheet_table(self, data_sheet_table: list[list[str]]) -> DataSheetTable:
+  def _interpret_single_student_data_sheet_table(self, data_sheet_table: list[list[str]]) -> tuple[DataSheetTable, str]:
     """
     Read every cell in reading order (row by row) as one tally.
 
-    :raises ValueReadError: At the first mark that isn't an option
+    :return: The table, and each mark that isn't an option, in reading order
     """
     tally_string = ''.join(''.join(row) for row in data_sheet_table)
     summary = read_tally(tally_string, self._tally_options)
     row: dict[str, DataSheetScalarDto] = tally_scalars(TALLY_COLUMN_NAME, summary, self._tally_options)
 
-    return {
+    table: DataSheetTable = {
       "columns": list(row.keys()),
       "data": [row]
     }
+    return table, summary.unknown_marks

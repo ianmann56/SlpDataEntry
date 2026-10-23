@@ -28,4 +28,4 @@ They are written for a template with three sections:
 | `valid_all_types.json` | Every column type reads as a typed value, including `p` matching the choice `P`, `✓` as true, and a blank row (empty cells, Attempts counts of 0, blank percentages). The grid reads as `YYNPY`. |
 | `running_tally.json` | The Running Tally grid `Y Y N / P Y` saves one row: `YYNPY`, Y=3 N=1 P=1, total 5, 60% / 20% / 20%. |
 | `simple_form.json` | `Prompts given` saves as the number 12. |
-| `bad_values.json` | The sheet fails with `INVALID_VALUES`, naming every bad value: `l` in Trials, `X` in Done, `2/30/2026` in When, `X` in Accuracy, `YQN` in Attempts (naming the bad mark `Q`), `Z` in the Running Tally, and `abc` in Prompts given. |
+| `bad_values.json` | Since feature 008, the sheet succeeds with warnings, naming every value that didn't fit: `l` in Trials, `X` in Done, `2/30/2026` in When, `X` in Accuracy, `YQN` in Attempts (naming the unknown mark `Q`), `abc` in Prompts given, and `Z` in the Running Tally. Each of those cells holds its text as read. Attempts counts Y=1 N=1, total 2, and the grid counts one `Y`. |

@@ -1,5 +1,31 @@
 <!--
 Sync Impact Report
+- Version change: 1.8.0 → 1.9.0 (MINOR: a rule in a referenced doc changes meaning, and
+  glossary additions)
+- Modified principles: none. Principle V's "fail loudly" still applies to sheets whose
+  layout doesn't match their template; values that don't fit are still reported, now as
+  warnings.
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/conventions/architecture/interpreters.md rule 10: values are read
+    through read_value_leniently and read_tally, and a value that doesn't fit its type
+    never fails the sheet. It is kept (its text as read, with no typed value; a
+    non-whole Integer rounded; an unknown tally mark left out of the counts), returned
+    in DataSheetInterpretationDto.value_problems, and shown as a warning. A layout
+    mismatch still raises. InvalidValuesError is removed.
+  - Updated docs/domain/glossary.md: adds Unreadable Value and Rounded Value; Scalar's
+    Typed Value is None for a blank or Unreadable Value; Sheet Outcome adds *succeeded
+    with warnings*; Tally Summary leaves unknown marks out of the counts.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.8.0 (2026-10-11) added interpreters.md rule 10 and the column type glossary terms
+  - 1.7.0 (2026-10-05) added layers.md rule 11 (workspace/) and amended
+    dependency-injection rule 6 for the Workspace
+
+Previous report (1.8.0):
 - Version change: 1.7.0 → 1.8.0 (MINOR: a new rule in a referenced doc, and glossary
   additions)
 - Modified principles: none
@@ -336,4 +362,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.8.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-11
+**Version**: 1.9.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-22

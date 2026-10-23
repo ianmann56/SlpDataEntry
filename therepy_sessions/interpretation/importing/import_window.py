@@ -18,6 +18,8 @@ _STATUS_LABELS = {
     SheetStatus.FAILED: "✗ Failed",
 }
 _IMPORTING_LABEL = "… Importing"
+# A succeeded sheet with warnings: still succeeded, so only its label and color differ
+_WARNED_LABEL = "⚠ Succeeded with warnings"
 
 # Row tags, so each status has its own color as well as its own symbol
 _STATUS_TAGS = {
@@ -26,8 +28,19 @@ _STATUS_TAGS = {
     SheetStatus.FAILED: "failed",
 }
 _IMPORTING_TAG = "importing"
+_WARNED_TAG = "warned"
 # Readable on both the light and dark sv-ttk themes. Other tags keep the theme's color.
-_TAG_COLORS = {"succeeded": "#2e9d4f", "failed": "#d64545"}
+_TAG_COLORS = {"succeeded": "#2e9d4f", "failed": "#d64545", _WARNED_TAG: "#c98a00"}
+
+
+def _is_warned(outcome: SheetOutcome) -> bool:
+    """Whether the outcome is succeeded with warnings."""
+    return outcome.status == SheetStatus.SUCCEEDED and bool(outcome.warnings)
+
+
+def _with_warnings(count: int) -> str:
+    """The summary's " (N with warnings)" part, or "" when there are none."""
+    return f" ({count} with warnings)" if count else ""
 
 
 class ImportWindow:
@@ -80,6 +93,7 @@ class ImportWindow:
         self._run_total = 0
         self._run_started = 0
         self._run_succeeded = 0
+        self._run_with_warnings = 0
         self._run_failed = 0
 
         self._setup_window()
@@ -243,6 +257,7 @@ class ImportWindow:
         self._run_total = len(ids)
         self._run_started = 0
         self._run_succeeded = 0
+        self._run_with_warnings = 0
         self._run_failed = 0
         self._running = True
 
@@ -322,6 +337,8 @@ class ImportWindow:
     def _show_finished(self, identity: str, outcome: SheetOutcome) -> None:
         if outcome.status == SheetStatus.SUCCEEDED:
             self._run_succeeded += 1
+            if _is_warned(outcome):
+                self._run_with_warnings += 1
         else:
             self._run_failed += 1
         self._show_outcome(identity, outcome)
@@ -329,8 +346,12 @@ class ImportWindow:
 
     def _show_outcome(self, identity: str, outcome: SheetOutcome) -> None:
         """Show a file's outcome in its row."""
-        self._tree.set(identity, "status", _STATUS_LABELS[outcome.status])
-        self._tree.item(identity, tags=(_STATUS_TAGS[outcome.status],))
+        if _is_warned(outcome):
+            self._tree.set(identity, "status", _WARNED_LABEL)
+            self._tree.item(identity, tags=(_WARNED_TAG,))
+        else:
+            self._tree.set(identity, "status", _STATUS_LABELS[outcome.status])
+            self._tree.item(identity, tags=(_STATUS_TAGS[outcome.status],))
         self._tree.set(identity, "student_key", outcome.student_key or "")
         self._tree.set(identity, "template", outcome.template_name or "")
         self._tree.set(identity, "details", outcome.message)
@@ -344,8 +365,10 @@ class ImportWindow:
 
         totals = self._batch.totals()
         summary = (
-            f"This run: {self._run_succeeded} succeeded, {self._run_failed} failed · "
-            f"Whole list: {totals.succeeded} succeeded, {totals.failed} failed, {totals.not_imported} not imported"
+            f"This run: {self._run_succeeded} succeeded{_with_warnings(self._run_with_warnings)}, "
+            f"{self._run_failed} failed · "
+            f"Whole list: {totals.succeeded} succeeded{_with_warnings(totals.with_warnings)}, "
+            f"{totals.failed} failed, {totals.not_imported} not imported"
         )
         if cancelled:
             summary += " · Cancelled."
