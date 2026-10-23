@@ -211,9 +211,10 @@ marimo/_lsp/
 __marimo__/
 
 # Project Specific
-# Sample sheets may hold real student data (Principle I); only the synthetic 007 samples are tracked
+# Sample sheets may hold real student data (Principle I); only the synthetic samples below are tracked
 **/sample_data/*
 !therepy_sessions/sample_data/007/
+!therepy_sessions/sample_data/009/
 # Workspace files hold student records (Principle I)
 students.json
 templates.json

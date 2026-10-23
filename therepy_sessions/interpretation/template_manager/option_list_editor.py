@@ -4,6 +4,10 @@ The Option List Editor: a list of choices or tally marks, each with what it mean
 It is used for Choice columns and fields, Tally columns, and Running Tally sections. It
 holds no rules of its own: adding or changing an option asks `option_rules`, and only
 shows its message (layers rule 5).
+
+It remembers each option's loaded value (what it was when the list was set), so an option
+changed with Update counts as renamed, and calculations can follow it. An option removed
+and added again is a removal and an addition.
 """
 
 import tkinter as tk
@@ -34,6 +38,8 @@ class OptionListEditor:
         self._mode = mode
         self._on_change = on_change
         self._options: list[tuple[str, str]] = []
+        # Each option's value when the list was set, or None for an option added since
+        self._loaded: list[str | None] = []
 
         self.frame: ttk.Frame = ttk.Frame(parent)
         self.frame.columnconfigure(1, weight=1)
@@ -73,12 +79,35 @@ class OptionListEditor:
         """The options as (choice value or tally mark, meaning), in order."""
         return list(self._options)
 
-    def set(self, options: Sequence[tuple[str, str]]) -> None:
-        """Show these options, replacing the list and clearing the entries."""
+    def set(self, options: Sequence[tuple[str, str]], loaded: Sequence[str | None] | None = None) -> None:
+        """
+        Show these options, replacing the list and clearing the entries.
+
+        Args:
+            options: The options as (code, meaning)
+            loaded: Each option's loaded value, or None for one added since loading.
+                Omitted, every option counts as loaded as it is now.
+        """
         self._options = [(code, meaning) for code, meaning in options]
+        if loaded is None or len(loaded) != len(self._options):
+            self._loaded = [code for code, _ in self._options]
+        else:
+            self._loaded = list(loaded)
         self._code_var.set("")
         self._meaning_var.set("")
         self._render(None)
+
+    def loaded_values(self) -> list[str | None]:
+        """Each option's loaded value, in the current order, or None for an option added since loading."""
+        return list(self._loaded)
+
+    def renames(self) -> list[tuple[str, str]]:
+        """Every option changed in place, as (loaded value, current value)."""
+        return [
+            (loaded, code)
+            for (code, _), loaded in zip(self._options, self._loaded)
+            if loaded is not None and loaded.strip() != code.strip()
+        ]
 
     def set_mode(self, mode: ColumnType) -> None:
         """Switch between choices (CHOICE) and tally marks (TALLY)."""
@@ -116,6 +145,7 @@ class OptionListEditor:
             self._warn(problem)
             return
         self._options.append((code.strip(), self._meaning_var.get().strip()))
+        self._loaded.append(None)
         self._code_var.set("")
         self._meaning_var.set("")
         self._changed(None)
@@ -141,6 +171,7 @@ class OptionListEditor:
             self._warn("Select an option to remove first.")
             return
         del self._options[index]
+        del self._loaded[index]
         self._code_var.set("")
         self._meaning_var.set("")
         self._changed(None)
@@ -153,6 +184,7 @@ class OptionListEditor:
         if target < 0 or target >= len(self._options):
             return
         self._options[index], self._options[target] = self._options[target], self._options[index]
+        self._loaded[index], self._loaded[target] = self._loaded[target], self._loaded[index]
         self._changed(target)
 
     # ----- Helpers -----

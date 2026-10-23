@@ -7,7 +7,7 @@ editing the core flow.
 ## How it fits together
 
 ```
-StudentDataSheetTemplate(id, name, [interpreters...])
+StudentDataSheetTemplate(id, name, [interpreters...], analysis)
         │ to_data_sheet_interpreter()   (passes the interpreters and the template itself)
         ▼
 StudentDataSheetInterpreter
@@ -30,8 +30,8 @@ A new interpreter type is complete only when all four of these exist:
 
 | Piece | Location | Responsibility |
 | --- | --- | --- |
-| Interpreter | `interpretation/interpreter_types/<name>_interpreter.py` | Subclass `SessionDataSectionInterpreterBase`. Take `id` and `title` plus its own config. Implement `interpret_student_data_sheet_content`, returning `DataSheetInterpretationDto`, and `section_keys()`, returning the field, column, or tally keys it produces, in template order. Optionally override `config_problems()` (configuration problems that stop the template from being saved; default none) and `option_descriptions()` (the codes and meanings listed in the Workbook Key; default none). `section_kind` defaults to the class name; if the class is renamed, override it to keep the old name. A type that reads tables from the sheet overrides `consumes_tables` to return `True`. A type that emits form scalars rather than tables is also listed in `FORM_SECTION_KINDS` in `storage/session_layout.py`. |
-| Config UI | `interpretation/template_manager/interpreter_configs.py` | Subclass `InterpreterConfig`. Implement `name`, `interpreter_type`, `create_config_form` (returning a `ConfigForm` with `frame`, `get_config`, `reset`, and `load`), `construct_interpreter`, and `describe` (readable lines for view mode). `load` fills the form from a saved interpreter so it can be edited. |
+| Interpreter | `interpretation/interpreter_types/<name>_interpreter.py` | Subclass `SessionDataSectionInterpreterBase`. Take `id` and `title` plus its own config. Implement `interpret_student_data_sheet_content`, returning `DataSheetInterpretationDto`, and `section_keys()`, returning the field, column, or tally keys it produces, in template order. Optionally override `config_problems()` (configuration problems that stop the template from being saved; default none) and `option_descriptions()` (the codes and meanings listed in the Workbook Key; default none). `section_kind` defaults to the class name; if the class is renamed, override it to keep the old name. A type that reads tables from the sheet overrides `consumes_tables` to return `True`. Override `fallback_section_name` to name the section when it is untitled (its `section_name` is the title, or this). Optionally override `analysis_parts()` to offer table columns or Numeric Sheet Values to Data Sheet Analysis (default nothing). A type that emits form scalars rather than tables is also listed in `FORM_SECTION_KINDS` in `storage/session_layout.py`. |
+| Config UI | `interpretation/template_manager/interpreter_configs.py` | Subclass `InterpreterConfig`. Implement `name`, `interpreter_type`, `create_config_form` (returning a `ConfigForm` with `frame`, `get_config`, `reset`, and `load`), `construct_interpreter`, and `describe` (readable lines for view mode). `load` fills the form from a saved interpreter so it can be edited. If the form lets the SLP rename columns, fields, or options, override `renames()` to report them (default none), so calculations follow (rule 11). |
 | Serializer | `interpretation/template_manager/storage/serialization.py` | Subclass `InterpreterSerializer` and register it. The output has the shape `{"type", "id", "title", "config"}`. |
 | Registration | the config list passed to the management window, and the serializer registry | Makes the type visible in the UI and loadable from disk. |
 
@@ -89,3 +89,13 @@ A new interpreter type is complete only when all four of these exist:
     `StudentDataSheet.value_warnings`, and the sheet's Sheet Outcome is *succeeded with
     warnings*, naming each one (feature 008). A layout that doesn't match the section,
     such as a missing column, still raises (rule 5).
+
+11. **Data Sheet Analysis refers to parts by name.** A template's calculations name a
+    section by its Section Name, then its columns, fields, and options, and other
+    calculations by their names, matched ignoring letter case and surrounding spaces.
+    Sections describe what they offer through `analysis_parts()`, so the analysis code
+    never checks interpreter types. An editor that lets the SLP rename a part in place
+    reports it (`InterpreterConfig.renames()`, and the Template Form for a section's
+    title), and every calculation follows the new name. A removed or retyped part is
+    never followed: the template can't be saved until its calculations are fixed.
+    Analysis is never part of the Template Structure (rule 8).

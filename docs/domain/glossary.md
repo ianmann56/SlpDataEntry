@@ -43,7 +43,7 @@ use the same name.
 | **Tally Option** | `TallyOption` | One allowed mark of a Tally column or Running Tally section (`mark`, exactly one character), with an optional description. |
 | **Tally Summary** | `TallySummary` | What a tally is saved as: the marks in order, a count per Tally Option, the total, and a percentage per option. Each is its own key (e.g. `Attempts`, `Attempts Y`, `Attempts Total`, `Attempts Y %`). Unknown marks are left out of the counts, total, and percentages; the marks value then holds the text as read, unknown marks included. |
 | **Section Interpreter** | `SessionDataSectionInterpreterBase` | Gives meaning to one kind of data section. Current kinds: `TableInterpreter`, `RunningTallyInterpreter`, `SimpleFormInterpreter`. |
-| **Data Sheet Template** | `StudentDataSheetTemplate` | A named, saved set of configured section interpreters describing one sheet layout. An SLP reuses it for every sheet with that layout. |
+| **Data Sheet Template** | `StudentDataSheetTemplate` | A named, saved set of configured section interpreters describing one sheet layout, with an optional Data Sheet Analysis. An SLP reuses it for every sheet with that layout. |
 | **Interpreter Config** | `InterpreterConfig` | The UI form that lets the SLP configure a section interpreter while building a template. |
 | **Template Store** | `TemplateStore` | Saves templates to and loads them from `templates.json` in the Workspace. |
 | **Current Template** | `Student.current_template_id` | The Data Sheet Template used to interpret a student's data sheets. It is optional. Deleting a template from the app clears it from every student who used it. It may still refer to a template removed outside the app. |
@@ -67,6 +67,19 @@ use the same name.
 | **Workbook Layout Order** | `WorkbookLayout` | The order of sections, form fields, and columns taken from the template that started a workbook. Every tab in that workbook uses it. |
 | **Workbook Key** | `WORKBOOK_KEY_TAB_NAME` | The last tab of every Student Session Workbook, listing each Choice and Tally code of the template with what it means. It is rebuilt with every new Session Tab, holds only template text, and is never a Session Tab. |
 | **Therapy Data Folder** | `DATA_FOLDER_PATH` | The Google Drive folder `SLP Therepy Data/Current Year` holding every Student Session Workbook. |
+| **Data Sheet Analysis** | `DataSheetAnalysis` | The calculations a template defines for one imported sheet, as an ordered list of Analysis Layers. Saved with the template under its `analysis` key. It is not part of the Template Structure. Working out results is a later feature; today it is only configured. |
+| **Historical Analysis** | | Calculations across many sessions of one student with one template. Not built yet; the Analysis section says so. |
+| **Analysis Layer** | `AnalysisLayer` | A numbered group of calculations. A calculation in layer *n* may use the results of layers 1 to *n − 1* only. Only the highest layer can be deleted, and a calculation never moves between layers. |
+| **Calculation** | `Calculation` | One named number a template defines for each imported sheet: a menu calculation (Row Aggregate or Arithmetic calculation) or a Formula calculation. Its name is unique in the template, ignoring letter case and surrounding spaces. |
+| **Calculation Description** | `Calculation.description` | Optional free text saying what a calculation measures, shown in view mode and the Formula Legend. It never identifies a student. |
+| **Row Aggregate** | `RowAggregate` | A menu calculation that measures each row of one table section with a Row Measure, and combines the rows by Sum or Average. An Average skips rows with no value. |
+| **Row Measure** | `RowMeasure` | What a Row Aggregate reads from each row: the number in an Integer or Decimal column, the count of one Tally Option (or the tally's total) in a Tally column, or how many of the chosen Choice columns hold one Choice Option. |
+| **Arithmetic calculation** | `Arithmetic` | A menu calculation combining two inputs (lower-layer results, Numeric Sheet Values, or fixed numbers) with add, subtract, multiply, divide, or percentage (left ÷ right × 100). |
+| **Formula calculation** | `Formula` | A calculation the SLP types, e.g. `{Correct} / {Total} * 100` or `SUM([Trials/Attempts/P])`. It is checked as it is typed, and saved exactly as typed. Formulas are never run as code. |
+| **Formula Legend** | `FormulaLegend` | The list beside a formula while it is typed: every operation with its parameters, and every variable name in scope. Clicking an entry inserts it. |
+| **Numeric Sheet Value** | `SectionParts.sheet_values` | A single number on the sheet a calculation can use directly: an Integer or Decimal Simple Form field, or a Running Tally's option count, total, or option percentage. |
+| **Analysis Scope** | `AnalysisScope` | What one calculation may use: Numeric Sheet Values, the tables it can measure, and lower-layer results. The menu, the Formula Legend, and every check read it. |
+| **Section Name** | `section_name` | A section's title, or its type's fallback name (`Table`, `Form`, `Running Tally`) when untitled. Calculations refer to sections by it. Two sections with the same Section Name can't be used by calculations until one gets another title. |
 
 ## Pipeline in one line
 

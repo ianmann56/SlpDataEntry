@@ -1,3 +1,4 @@
+from interpretation.analysis.model import DataSheetAnalysis
 from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase, StudentDataSheetInterpreter
 
 
@@ -9,11 +10,13 @@ class StudentDataSheetTemplate:
     name: str,
     configured_interpreters: list[SessionDataSectionInterpreterBase] | None = None,
     description: str = "",
+    analysis: DataSheetAnalysis | None = None,
   ) -> None:
     self._id: str = id
     self._name: str = name
     self._configured_interpreters: list[SessionDataSectionInterpreterBase] | None = configured_interpreters
     self._description: str = description
+    self._analysis: DataSheetAnalysis = analysis if analysis is not None else DataSheetAnalysis.empty()
 
   @property
   def id(self) -> str:
@@ -35,6 +38,14 @@ class StudentDataSheetTemplate:
     Optional free text describing the sheet layout this template reads. Empty when none was given.
     """
     return self._description
+
+  @property
+  def analysis(self) -> DataSheetAnalysis:
+    """
+    The template's Data Sheet Analysis: the calculations it defines for each imported
+    sheet. Empty for templates that define none (FR-018).
+    """
+    return self._analysis
 
   @property
   def interpreters(self) -> list[SessionDataSectionInterpreterBase]:

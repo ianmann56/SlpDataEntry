@@ -1,3 +1,4 @@
+from interpretation.analysis.parts import SectionParts
 from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
 from interpretation.student_data_sheet import DataSheetScalarDto
 from interpretation.template_manager.option_rules import name_problems, option_problems
@@ -95,6 +96,11 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
     """
     return self._fields
 
+  @property
+  def fallback_section_name(self) -> str:
+    """The name this section goes by when it has no title."""
+    return _FALLBACK_SECTION_NAME
+
   def section_keys(self) -> list[str]:
     """
     The field names, in template order.
@@ -114,9 +120,16 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
         problems.extend(option_problems(field.name, ColumnType.CHOICE, [c.value for c in field.choices], kind="field"))
     return problems
 
+  def analysis_parts(self) -> SectionParts:
+    """The Integer and Decimal fields, in field order, as Numeric Sheet Values."""
+    return SectionParts(
+      [],
+      [field.name for field in self._fields.values() if field.field_type in (ColumnType.INT, ColumnType.DECIMAL)],
+    )
+
   def option_descriptions(self) -> list[OptionDescription]:
     """Every Choice field's choices, in field order then choice order."""
-    section = self.title or _FALLBACK_SECTION_NAME
+    section = self.section_name
     return [
       OptionDescription(section, field.name, "Choice", choice.value, choice.description)
       for field in self._fields.values()
@@ -138,7 +151,7 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
     :return: a DataSheetInterpretationDto representing the interpreted data. Every field
       whose value doesn't fit its type is kept as read and listed in its value_problems.
     """
-    section = self.title or _FALLBACK_SECTION_NAME
+    section = self.section_name
     problems: list[ValueProblem] = []
     scalars: dict[str, DataSheetScalarDto] = {}
     for field_key, field in self._fields.items():

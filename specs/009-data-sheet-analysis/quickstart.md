@@ -13,7 +13,7 @@ and [contracts/analysis-ui.md](contracts/analysis-ui.md).
   them out of the repo (for example, in a temp folder):
 
   ```sh
-  cd therepy_sessions && ../.venv/bin/python /path/to/scratch_check.py
+  cd therepy_sessions && PYTHONPATH=. ../.venv/bin/python /path/to/scratch_check.py
   ```
 
 - For V6–V10, use a scratch Workspace folder with a copy of a `templates.json`, never

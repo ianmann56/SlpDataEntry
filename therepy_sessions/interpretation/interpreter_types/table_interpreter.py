@@ -1,5 +1,6 @@
 from typing import Any
 
+from interpretation.analysis.parts import SectionParts, TableColumnPart
 from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
 from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetTable
 from interpretation.template_manager.option_rules import name_problems, option_problems, tally_key_collisions
@@ -120,6 +121,11 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
     return self._columns
 
   @property
+  def fallback_section_name(self) -> str:
+    """The name this section goes by when it has no title."""
+    return _FALLBACK_SECTION_NAME
+
+  @property
   def consumes_tables(self) -> bool:
     """
     A table section reads the tables on the sheet.
@@ -154,9 +160,24 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
     problems.extend(tally_key_collisions(self._columns))
     return problems
 
+  def analysis_parts(self) -> SectionParts:
+    """Every column, in order, with its type, choices, and tally marks."""
+    return SectionParts(
+      [
+        TableColumnPart(
+          column.column_name,
+          column.column_type,
+          column.column_choices,
+          [option.mark for option in column.tally_options],
+        )
+        for column in self._columns
+      ],
+      [],
+    )
+
   def option_descriptions(self) -> list[OptionDescription]:
     """Every Choice and Tally column's options, in column order then option order."""
-    section = self.title or _FALLBACK_SECTION_NAME
+    section = self.section_name
     descriptions: list[OptionDescription] = []
     for column in self._columns:
       if column.column_type is ColumnType.CHOICE:
@@ -230,7 +251,7 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
       in self._columns
     }
 
-    section = self.title or _FALLBACK_SECTION_NAME
+    section = self.section_name
     data: list[dict[str, DataSheetScalarDto]] = []
 
     for row_number, row_data in enumerate(data_sheet_table[1:], start=1):

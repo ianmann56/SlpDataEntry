@@ -1,3 +1,4 @@
+from interpretation.analysis.parts import SectionParts
 from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
 from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetTable
 from interpretation.template_manager.option_rules import option_problems
@@ -58,6 +59,11 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
     return [option.mark for option in self._tally_options]
 
   @property
+  def fallback_section_name(self) -> str:
+    """The name this section goes by when it has no title."""
+    return _FALLBACK_SECTION_NAME
+
+  @property
   def consumes_tables(self) -> bool:
     """
     A running tally is read from a table on the sheet.
@@ -74,9 +80,14 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
     """No options, or blank, repeated, or too-long marks."""
     return option_problems(self.title, ColumnType.TALLY, self.tally_choice_options, kind="running tally section")
 
+  def analysis_parts(self) -> SectionParts:
+    """As Numeric Sheet Values: each mark's count, then the total, then each mark's percentage."""
+    marks = self.tally_choice_options
+    return SectionParts([], marks + ["Total"] + [f"{mark} %" for mark in marks])
+
   def option_descriptions(self) -> list[OptionDescription]:
     """Every tally option, in order."""
-    section = self.title or _FALLBACK_SECTION_NAME
+    section = self.section_name
     return [
       OptionDescription(section, "", "Tally", option.mark, option.description)
       for option in self._tally_options
@@ -99,7 +110,7 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
     :return: a DataSheetInterpretationDto with one table per tally. Each mark that isn't
       an option is left out of the counts and listed in its value_problems.
     """
-    section = self.title or _FALLBACK_SECTION_NAME
+    section = self.section_name
     problems: list[ValueProblem] = []
     several_tables = len(data_sheet_content.tables) > 1
     tables: list[DataSheetTable] = []

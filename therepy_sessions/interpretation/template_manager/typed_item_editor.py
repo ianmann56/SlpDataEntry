@@ -23,10 +23,16 @@ class TypedItem(NamedTuple):
       name: The column or field name.
       item_type: Its type.
       options: Its choices or tally marks as (value, meaning). Empty unless the type has options.
+      loaded_name: Its name when the editor was filled, or None for an item added since.
+        A different current name means it was renamed in place.
+      loaded_options: Each option's loaded value, matching `options`, with None for an
+        option added since. Empty means every option is as loaded.
     """
     name: str
     item_type: ColumnType
     options: list[tuple[str, str]]
+    loaded_name: str | None = None
+    loaded_options: tuple[str | None, ...] = ()
 
 
 class TypedItemEditor:
@@ -93,11 +99,11 @@ class TypedItemEditor:
 
     def get(self) -> list[TypedItem]:
         """Every item, in order."""
-        return [TypedItem(item.name, item.item_type, list(item.options)) for item in self._items]
+        return [item._replace(options=list(item.options)) for item in self._items]
 
     def set(self, items: Sequence[TypedItem]) -> None:
         """Show these items, with none selected."""
-        self._items = [TypedItem(item.name, item.item_type, list(item.options)) for item in items]
+        self._items = [item._replace(options=list(item.options)) for item in items]
         self._selected = None
         self._render()
         self._show_detail()
@@ -105,6 +111,26 @@ class TypedItemEditor:
     def reset(self) -> None:
         """Remove every item."""
         self.set([])
+
+    def renames(self) -> list[tuple[str, str]]:
+        """Every item renamed in place, as (loaded name, current name)."""
+        return [
+            (item.loaded_name, item.name)
+            for item in self._items
+            if item.loaded_name is not None and item.loaded_name.strip() != item.name.strip()
+        ]
+
+    def option_renames(self) -> list[tuple[str, str, str]]:
+        """Every option changed in place, as (its item's current name, loaded value, current value)."""
+        renames: list[tuple[str, str, str]] = []
+        for item in self._items:
+            loaded_values = item.loaded_options or tuple(code for code, _ in item.options)
+            renames.extend(
+                (item.name.strip(), loaded, code)
+                for (code, _), loaded in zip(item.options, loaded_values)
+                if loaded is not None and loaded.strip() != code.strip()
+            )
+        return renames
 
     def set_allowed_types(self, types: Sequence[ColumnType]) -> None:
         """Limit the type picker to these types, in this order."""
@@ -177,14 +203,18 @@ class TypedItemEditor:
                 self._type_var.set(COLUMN_TYPE_LABELS[item.item_type])
                 return
             options = []
-        self._items[self._selected] = item._replace(item_type=new_type, options=options)
+        loaded_options = item.loaded_options if options else ()
+        self._items[self._selected] = item._replace(item_type=new_type, options=options, loaded_options=loaded_options)
         self._render()
         self._show_detail()
 
     def _on_options_changed(self) -> None:
         if self._filling or self._selected is None:
             return
-        self._items[self._selected] = self._items[self._selected]._replace(options=self._options_editor.get())
+        self._items[self._selected] = self._items[self._selected]._replace(
+            options=self._options_editor.get(),
+            loaded_options=tuple(self._options_editor.loaded_values()),
+        )
 
     # ----- Helpers -----
 
@@ -226,7 +256,7 @@ class TypedItemEditor:
             self._type_var.set(COLUMN_TYPE_LABELS[item.item_type])
             if has_options(item.item_type):
                 self._options_editor.set_mode(item.item_type)
-                self._options_editor.set(item.options)
+                self._options_editor.set(item.options, item.loaded_options or None)
                 self._options_label.grid(row=2, column=0, sticky=(tk.W, tk.N), padx=(0, 5), pady=(5, 0))
                 self._options_editor.frame.grid(row=2, column=1, sticky=(tk.W, tk.E), pady=(5, 0))
             else:

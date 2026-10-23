@@ -1,9 +1,11 @@
 import json
 import os
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
+from interpretation.analysis.model import DataSheetAnalysis
+from interpretation.analysis.serialization import analysis_from_json, analysis_to_json
 from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
 from interpretation.template_manager.storage.serialization import serialize, deserialize
 from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
@@ -22,6 +24,7 @@ class TemplateCreateDto:
     name: str
     configured_interpreters: list[SessionDataSectionInterpreterBase]
     description: str = ""
+    analysis: DataSheetAnalysis = field(default_factory=DataSheetAnalysis.empty)
 
 
 @dataclass
@@ -35,6 +38,7 @@ class TemplateEditDto:
     name: str
     configured_interpreters: list[SessionDataSectionInterpreterBase]
     description: str = ""
+    analysis: DataSheetAnalysis = field(default_factory=DataSheetAnalysis.empty)
 
 
 class UnreadableTemplatesError(Exception):
@@ -55,7 +59,8 @@ class TemplateStore:
 
     File format 2 is an object holding `format_version`, `last_template_id` (the highest
     template id ever given out, so ids are never reused) and `templates`. A bare list of
-    templates is format 1, from before format 2 existed, and is still read.
+    templates is format 1, from before format 2 existed, and is still read. Each template
+    entry may hold an optional `analysis` (its Data Sheet Analysis).
     """
 
     def __init__(self, storage_file_path: str) -> None:
@@ -146,6 +151,7 @@ class TemplateStore:
             create_dto.name,
             create_dto.configured_interpreters,
             create_dto.description,
+            create_dto.analysis,
         )
         templates_data.append(self._convert_template_to_data(new_template))
 
@@ -177,6 +183,7 @@ class TemplateStore:
                     edit_dto.name,
                     edit_dto.configured_interpreters,
                     edit_dto.description,
+                    edit_dto.analysis,
                 )
                 templates_data[i] = self._convert_template_to_data(updated_template)
                 self._save(templates_data, last_template_id)
@@ -234,7 +241,8 @@ class TemplateStore:
             template_data: Dictionary containing template data
 
         Returns:
-            The converted template object. A missing description loads as "".
+            The converted template object. A missing description loads as "", and a
+            missing analysis as an empty one.
         """
         interpreters = [deserialize(interpreter_data) for interpreter_data in template_data['interpreters']]
         return StudentDataSheetTemplate(
@@ -242,16 +250,24 @@ class TemplateStore:
             template_data['name'],
             interpreters,
             template_data.get('description', ''),
+            analysis_from_json(template_data.get('analysis')),
         )
 
     def _convert_template_to_data(self, template: StudentDataSheetTemplate) -> dict[str, Any]:
-        """Convert a template to the dictionary saved in the file."""
-        return {
+        """
+        Convert a template to the dictionary saved in the file. The "analysis" key is
+        written only when the template has an analysis, so templates without one are
+        saved exactly as before Data Sheet Analysis existed.
+        """
+        data: dict[str, Any] = {
             'id': template.id,
             'name': template.name,
             'description': template.description,
             'interpreters': [serialize(interpreter) for interpreter in template.interpreters],
         }
+        if not template.analysis.is_empty:
+            data['analysis'] = analysis_to_json(template.analysis)
+        return data
 
     def _load_entries_or_empty(self) -> list[dict[str, Any]]:
         """Return the saved template entries, or an empty list if the file cannot be read."""

@@ -1,5 +1,30 @@
 <!--
 Sync Impact Report
+- Version change: 1.9.0 → 1.10.0 (MINOR: a new rule and new optional contract methods in a
+  referenced doc, and glossary additions)
+- Modified principles: none
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/conventions/architecture/interpreters.md: an interpreter type overrides
+    fallback_section_name, and may override analysis_parts() to offer table columns or
+    Numeric Sheet Values to Data Sheet Analysis; a config may override renames(). New
+    rule 11: Data Sheet Analysis refers to template parts by name, follows renames
+    reported by the editors, and is never part of the Template Structure. The diagram
+    shows the template's analysis.
+  - Updated docs/domain/glossary.md: adds Data Sheet Analysis, Historical Analysis,
+    Analysis Layer, Calculation, Calculation Description, Row Aggregate, Row Measure,
+    Arithmetic calculation, Formula calculation, Formula Legend, Numeric Sheet Value,
+    Analysis Scope, and Section Name; Data Sheet Template may hold a Data Sheet Analysis.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.9.0 (2026-10-22) rewrote interpreters.md rule 10 for values that don't fit their
+    type, and added Unreadable Value and Rounded Value
+  - 1.8.0 (2026-10-11) added interpreters.md rule 10 and the column type glossary terms
+
+Previous report (1.9.0):
 - Version change: 1.8.0 → 1.9.0 (MINOR: a rule in a referenced doc changes meaning, and
   glossary additions)
 - Modified principles: none. Principle V's "fail loudly" still applies to sheets whose
@@ -362,4 +387,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.9.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-22
+**Version**: 1.10.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-22

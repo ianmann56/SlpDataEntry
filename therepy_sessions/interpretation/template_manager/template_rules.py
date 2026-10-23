@@ -11,6 +11,10 @@ from collections.abc import Callable
 from enum import Enum
 from typing import Any, NamedTuple
 
+from interpretation.analysis.model import DataSheetAnalysis
+from interpretation.analysis.renames import PartRename, apply_renames
+from interpretation.analysis.rules import analysis_problems
+from interpretation.analysis.serialization import analysis_to_json
 from interpretation.template_manager.storage.serialization import serialize
 from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
 from interpretation.template_store import TemplateCreateDto, TemplateEditDto
@@ -124,7 +128,9 @@ class TemplateDraft:
 
     It is either a saved template being edited, or a new template being created
     (`template_id` is None). An interpreter the SLP does not change stays the same object
-    it was loaded as, so it is saved exactly as it was (interpreters rule 7).
+    it was loaded as, so it is saved exactly as it was (interpreters rule 7). Its Data
+    Sheet Analysis is replaced, never changed in place, so the saved template is never
+    touched before Save.
     """
 
     def __init__(
@@ -133,16 +139,18 @@ class TemplateDraft:
         name: str,
         description: str,
         interpreters: list[SessionDataSectionInterpreterBase],
+        analysis: DataSheetAnalysis | None = None,
     ) -> None:
         self.template_id: str | None = template_id
         self.name: str = name
         self.description: str = description
         self.interpreters: list[SessionDataSectionInterpreterBase] = list(interpreters)
+        self.analysis: DataSheetAnalysis = analysis if analysis is not None else DataSheetAnalysis.empty()
 
     @classmethod
     def from_template(cls, template: StudentDataSheetTemplate) -> "TemplateDraft":
         """Start a draft from a saved template."""
-        return cls(template.id, template.name, template.description, list(template.interpreters))
+        return cls(template.id, template.name, template.description, list(template.interpreters), template.analysis)
 
     @classmethod
     def new(cls) -> "TemplateDraft":
@@ -192,9 +200,16 @@ class TemplateDraft:
         self.interpreters[index], self.interpreters[target] = self.interpreters[target], self.interpreters[index]
         return target
 
+    def rename_parts(self, renames: list[PartRename]) -> None:
+        """Make every calculation that uses a renamed part follow its new name (FR-016a)."""
+        self.analysis = apply_renames(self.analysis, renames)
+
     def problems(self) -> list[str]:
-        """Return every problem that stops the draft from being saved, or [] when it can be saved."""
-        return validate_template(self.name, self.interpreters)
+        """
+        Return every problem that stops the draft from being saved, or [] when it can be
+        saved: the template's own problems, then its analysis problems.
+        """
+        return validate_template(self.name, self.interpreters) + analysis_problems(self.interpreters, self.analysis)
 
     def has_changes_from(self, template: StudentDataSheetTemplate | None) -> bool:
         """
@@ -202,20 +217,21 @@ class TemplateDraft:
         (None), whether anything has been entered at all.
         """
         if template is None:
-            return bool(self.name.strip() or self.description.strip() or self.interpreters)
+            return bool(self.name.strip() or self.description.strip() or self.interpreters or not self.analysis.is_empty)
         return (
             self.name.strip() != template.name.strip()
             or self.description != template.description
             or _serialized(self.interpreters) != _serialized(template.interpreters)
+            or analysis_to_json(self.analysis) != analysis_to_json(template.analysis)
         )
 
     def to_edit_dto(self) -> TemplateEditDto:
         """Return the values to save over the saved template."""
-        return TemplateEditDto(self.name.strip(), list(self.interpreters), self.description)
+        return TemplateEditDto(self.name.strip(), list(self.interpreters), self.description, self.analysis)
 
     def to_create_dto(self) -> TemplateCreateDto:
         """Return the values to save as a new template."""
-        return TemplateCreateDto(self.name.strip(), list(self.interpreters), self.description)
+        return TemplateCreateDto(self.name.strip(), list(self.interpreters), self.description, self.analysis)
 
 
 def _serialized(interpreters: list[SessionDataSectionInterpreterBase]) -> list[dict[str, Any]]:

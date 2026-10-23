@@ -1,0 +1,158 @@
+{
+  "format_version": 2,
+  "last_template_id": 3,
+  "templates": [
+    {
+      "id": "1",
+      "name": "Articulation trials",
+      "description": "Synthetic table layout for feature 009 checks",
+      "interpreters": [
+        {
+          "type": "TableInterpreter",
+          "id": "t1",
+          "title": "Trials",
+          "config": {
+            "columns": [
+              {
+                "column_name": "Word",
+                "column_type": "TEXT",
+                "options": []
+              },
+              {
+                "column_name": "Trial 1",
+                "column_type": "CHOICE",
+                "options": [
+                  {
+                    "value": "+",
+                    "description": "correct"
+                  },
+                  {
+                    "value": "-",
+                    "description": "incorrect"
+                  },
+                  {
+                    "value": "P",
+                    "description": "prompted"
+                  }
+                ]
+              },
+              {
+                "column_name": "Trial 2",
+                "column_type": "CHOICE",
+                "options": [
+                  {
+                    "value": "+",
+                    "description": "correct"
+                  },
+                  {
+                    "value": "-",
+                    "description": "incorrect"
+                  },
+                  {
+                    "value": "P",
+                    "description": "prompted"
+                  }
+                ]
+              },
+              {
+                "column_name": "Trial 3",
+                "column_type": "CHOICE",
+                "options": [
+                  {
+                    "value": "+",
+                    "description": "correct"
+                  },
+                  {
+                    "value": "-",
+                    "description": "incorrect"
+                  },
+                  {
+                    "value": "P",
+                    "description": "prompted"
+                  }
+                ]
+              },
+              {
+                "column_name": "Attempts",
+                "column_type": "TALLY",
+                "options": [
+                  {
+                    "value": "Y",
+                    "description": "yes"
+                  },
+                  {
+                    "value": "N",
+                    "description": "no"
+                  },
+                  {
+                    "value": "P",
+                    "description": "prompted"
+                  }
+                ]
+              },
+              {
+                "column_name": "Words correct",
+                "column_type": "INT",
+                "options": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "name": "Session form",
+      "description": "",
+      "interpreters": [
+        {
+          "type": "SimpleFormInterpreter",
+          "id": "f1",
+          "title": "Session Info",
+          "config": {
+            "fields": {
+              "Prompts given": {
+                "name": "Prompts given",
+                "fieldType": "INT",
+                "options": []
+              },
+              "Notes": {
+                "name": "Notes",
+                "fieldType": "TEXT",
+                "options": []
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "name": "Tally grid",
+      "description": "",
+      "interpreters": [
+        {
+          "type": "RunningTallyInterpreter",
+          "id": "r1",
+          "title": "",
+          "config": {
+            "tally_options": [
+              {
+                "mark": "Y",
+                "description": "yes"
+              },
+              {
+                "mark": "N",
+                "description": "no"
+              },
+              {
+                "mark": "P",
+                "description": "prompted"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

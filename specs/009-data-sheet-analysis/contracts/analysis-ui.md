@@ -57,7 +57,7 @@ The Formula Legend appears only while "Build with" is Formula (FR-014).
 | **Select a calculation** | Applies pending changes first. If they can't be applied, the old selection is restored, as with interpreters. Then it loads the calculation into the editor panel. |
 | **Remove** | Removes the selected calculation, after `calculations_using` is empty. Otherwise it shows "*name* is used by: *a*, *b*." and nothing is removed (FR-017). |
 | **Up / Down** | Moves the selected calculation within its layer only (FR-005). |
-| **Apply** | Builds the calculation from the panel. On `calculation_problems` it shows them in a "Fix the Calculation" dialog and changes nothing. Otherwise it puts the calculation in the draft. If the name changed, it calls `draft.rename_parts([PartRename(CALCULATION, "", "", old, new)])`. |
+| **Apply** | Builds the calculation from the panel. On `calculation_problems` it shows them in a "Fix the Calculation" dialog and changes nothing. Otherwise it puts the calculation in the draft. If the name changed, it applies `PartRename(CALCULATION, "", "", old, new)` to its analysis with `apply_renames` before reporting the change, so every user of the old name follows. |
 | **Cancel** (panel) | Reloads the panel from the draft, discarding unapplied changes. |
 
 The Description entry shows the same hint as the Template Description, "Describe the sheet layout. Don't include student names." (FR-021).

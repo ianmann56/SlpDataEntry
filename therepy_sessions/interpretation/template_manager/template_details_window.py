@@ -10,6 +10,7 @@ from interpretation.template_manager.template_rules import TemplateDraft, Templa
 from interpretation.template_store import TemplateStore, UnreadableTemplatesError
 from tk_utils import error_handling
 from tk_utils.scrollable import create_scrollable_frame
+from tk_utils.windows import maximize
 
 
 class DetailsMode(Enum):
@@ -64,7 +65,7 @@ class TemplateDetailsWindow:
         self._set_mode(start_mode)
 
     def _setup_window(self) -> None:
-        """Make the window modal over its parent, and centre it."""
+        """Make the window modal over its parent, centre it, and open it full screen."""
         width, height = 640, 680
         self.window.geometry(f"{width}x{height}")
         self.window.resizable(True, True)
@@ -74,6 +75,8 @@ class TemplateDetailsWindow:
         x = self._parent.winfo_x() + (self._parent.winfo_width() // 2) - (width // 2)
         y = self._parent.winfo_y() + (self._parent.winfo_height() // 2) - (height // 2)
         self.window.geometry(f"{width}x{height}+{x}+{y}")
+        # Open full screen; restoring the window gives back the centred size above
+        maximize(self.window)
         self.window.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _create_widgets(self) -> None:

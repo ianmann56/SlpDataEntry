@@ -65,6 +65,9 @@ and surrounding spaces.
 def escape_name(name: str) -> str
     """Escape `\`, `/`, `]`, and `}` with `\`, for inserting a name into a reference."""
 
+def quote_choice(choice: str) -> str
+    """Write a choice as a formula string, in double quotes, with `\` and `"` escaped."""
+
 def parse_formula(text: str) -> FormulaParse
 
 class FormulaProblem(NamedTuple):
@@ -83,6 +86,8 @@ class FormulaReference(NamedTuple):
     start: int
     end: int                     # span of the whole bracketed reference, brackets included
     choice: str | None = None    # for a COLUMN inside COUNT, its choice string
+    choice_start: int = -1       # span of that choice's quoted string, for rewriting it on a rename
+    choice_end: int = -1
     aggregate_start: int = -1    # start of the enclosing SUM/AVERAGE, to group a measure's columns
 
 class FormulaParse(NamedTuple):

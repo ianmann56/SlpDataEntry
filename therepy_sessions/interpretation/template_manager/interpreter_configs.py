@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from tkinter import ttk
 from typing import Any, TypedDict
 
+from interpretation.analysis.renames import PartKind, PartRename
 from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
 from interpretation.interpreter_types.running_tally_interpreter import RunningTallyInterpreter
 from interpretation.interpreter_types.simple_form_interpreter import SimpleFormInterpreter, FieldConfiguration
@@ -80,6 +81,29 @@ class InterpreterConfig(ABC):
         e.g. ["Columns: Sentence, Pitch"].
         """
         pass
+
+    def renames(self, config_values: dict[str, Any]) -> list[PartRename]:
+        """
+        The columns, fields, and options the SLP renamed in place in the form, so
+        calculations can follow them. A type whose form can rename nothing keeps the
+        default, which reports none.
+        """
+        return []
+
+    def _section_name(self, config_values: dict[str, Any]) -> str:
+        """The Section Name the form's values give: the title, or the type's fallback name."""
+        return self.construct_interpreter("", config_values).section_name
+
+    def _item_renames(self, config_values: dict[str, Any]) -> list[PartRename]:
+        """The renames a TypedItemEditor reported in the values: items first, then their options."""
+        section = self._section_name(config_values)
+        return [
+            PartRename(PartKind.ITEM, section, "", old, new)
+            for old, new in config_values.get('renames', [])
+        ] + [
+            PartRename(PartKind.OPTION, section, item, old, new)
+            for item, old, new in config_values.get('option_renames', [])
+        ]
 
 
 def find_config(
@@ -151,7 +175,8 @@ class TableInterpreterConfig(InterpreterConfig):
             reset()
             title_var.set(interpreter.title or '')
             editor.set([
-                TypedItem(column.column_name, column.column_type, _column_options(column))
+                TypedItem(column.column_name, column.column_type, _column_options(column),
+                          loaded_name=column.column_name)
                 for column in interpreter.columns
             ])
 
@@ -160,6 +185,8 @@ class TableInterpreterConfig(InterpreterConfig):
             'get_config': lambda: {
                 'title': title_var.get().strip(),
                 'columns': editor.get(),
+                'renames': editor.renames(),
+                'option_renames': editor.option_renames(),
             },
             'reset': reset,
             'load': load,
@@ -185,6 +212,10 @@ class TableInterpreterConfig(InterpreterConfig):
             for item in items
         ]
         return TableInterpreter(id, title, column_defs)
+
+    def renames(self, config_values: dict[str, Any]) -> list[PartRename]:
+        """Columns and their choices or tally marks renamed in place."""
+        return self._item_renames(config_values)
 
     def describe(self, interpreter: SessionDataSectionInterpreterBase) -> list[str]:
         lines = [
@@ -229,6 +260,7 @@ class RunningTallyInterpreterConfig(InterpreterConfig):
             'get_config': lambda: {
                 'title': title_var.get().strip(),
                 'tally_options': editor.get(),
+                'renames': editor.renames(),
             },
             'reset': reset,
             'load': load,
@@ -245,6 +277,11 @@ class RunningTallyInterpreterConfig(InterpreterConfig):
         title = config_values.get('title', '')
         tally_options = [TallyOption(mark, meaning) for mark, meaning in config_values.get('tally_options', [])]
         return RunningTallyInterpreter(id, title, tally_options)
+
+    def renames(self, config_values: dict[str, Any]) -> list[PartRename]:
+        """Tally marks renamed in place. They have no column, so `item` is ""."""
+        section = self._section_name(config_values)
+        return [PartRename(PartKind.OPTION, section, "", old, new) for old, new in config_values.get('renames', [])]
 
     def describe(self, interpreter: SessionDataSectionInterpreterBase) -> list[str]:
         options = [(option.mark, option.description) for option in interpreter.tally_options]
@@ -280,7 +317,8 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
             reset()
             title_var.set(interpreter.title or '')
             editor.set([
-                TypedItem(field.name, field.field_type, [(choice.value, choice.description) for choice in field.choices])
+                TypedItem(field.name, field.field_type, [(choice.value, choice.description) for choice in field.choices],
+                          loaded_name=field.name)
                 for field in interpreter.fields.values()
             ])
 
@@ -289,6 +327,8 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
             'get_config': lambda: {
                 'title': title_var.get().strip(),
                 'fields': editor.get(),
+                'renames': editor.renames(),
+                'option_renames': editor.option_renames(),
             },
             'reset': reset,
             'load': load,
@@ -313,6 +353,10 @@ class SimpleFormInterpreterConfig(InterpreterConfig):
             key = name if name not in field_configs else f"{name}#{index}"
             field_configs[key] = FieldConfiguration(name, item.item_type, choices)
         return SimpleFormInterpreter(id, title, field_configs)
+
+    def renames(self, config_values: dict[str, Any]) -> list[PartRename]:
+        """Fields and their choices renamed in place."""
+        return self._item_renames(config_values)
 
     def describe(self, interpreter: SessionDataSectionInterpreterBase) -> list[str]:
         lines = [

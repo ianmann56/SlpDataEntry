@@ -3,6 +3,9 @@ import uuid
 from tkinter import messagebox, ttk
 from typing import Any
 
+from interpretation.analysis.model import DataSheetAnalysis
+from interpretation.analysis.renames import PartKind, PartRename
+from interpretation.template_manager.analysis_editor import AnalysisEditor
 from interpretation.template_manager.interpreter_configs import ConfigForm, InterpreterConfig, find_config
 from interpretation.template_manager.storage.serialization import serialize
 from interpretation.template_manager.template_rules import DESCRIPTION_HINT, TemplateDraft, TitleConflictError
@@ -16,13 +19,14 @@ class TemplateForm:
     """
     The fields of one Data Sheet Template, shared by the Create and Template Details windows.
 
-    It shows a TemplateDraft and lets the SLP change it: the name, the description, and
-    the interpreters (each changed in its type's configuration form). It never saves
+    It shows a TemplateDraft and lets the SLP change it: the name, the description, the
+    interpreters (each changed in its type's configuration form), and the Data Sheet
+    Analysis (in the Analysis section below them). It never saves
     anything, and knows nothing about students. The window that holds it decides when
     and how the draft is saved.
 
     Call `commit()` before reading the draft, so the name, the description, and any
-    unapplied interpreter form changes are in it.
+    unapplied interpreter or calculation panel changes are in it.
     """
 
     def __init__(
@@ -74,6 +78,7 @@ class TemplateForm:
         self._description_text.insert("1.0", draft.description)
         self._description_text.configure(state=state)
         self._render_tree()
+        self._analysis_editor.show(draft.analysis)
 
     def set_read_only(self, read_only: bool) -> None:
         """Switch between only showing the draft and letting the SLP change it."""
@@ -87,12 +92,14 @@ class TemplateForm:
             self._description_hint.grid_remove()
             self._edit_controls.grid_remove()
             self._form_panel.grid_remove()
+            self._analysis_editor.set_read_only(True)
         else:
             self._name_entry.configure(state=tk.NORMAL)
             self._description_text.configure(state=tk.NORMAL)
             self._description_hint.grid()
             self._edit_controls.grid()
             self._form_panel.grid()
+            self._analysis_editor.set_read_only(False)
 
     def focus(self) -> None:
         """Put the keyboard focus on the name field."""
@@ -101,17 +108,27 @@ class TemplateForm:
     def commit(self) -> bool:
         """
         Copy the name and description into the draft, and apply any unapplied interpreter
-        form changes.
+        form and calculation panel changes.
 
         Returns:
-            False if the interpreter form could not be applied, after telling the SLP why
+            False if either could not be applied, after telling the SLP why
         """
         if not self._read_only:
             self._draft.name = self._name_var.get()
             self._draft.description = self._description_text.get("1.0", tk.END).strip()
-        return self._apply_pending_changes()
+        if not self._apply_pending_changes() or not self._analysis_editor.apply_pending():
+            return False
+        self._draft.analysis = self._analysis_editor.analysis
+        return True
 
     def has_unapplied_changes(self) -> bool:
+        """
+        Return whether the interpreter form or the calculation panel differs from what was
+        loaded or emptied into it.
+        """
+        return self._interpreter_form_changed() or self._analysis_editor.has_unapplied_changes()
+
+    def _interpreter_form_changed(self) -> bool:
         """Return whether the interpreter form differs from what was loaded or emptied into it."""
         return self._form is not None and self._form_snapshot() != self._form_baseline
 
@@ -172,6 +189,13 @@ class TemplateForm:
         self._apply_button.pack(side=tk.LEFT, padx=(0, 5))
         self._form_cancel_button = ttk.Button(form_buttons, text="Cancel", command=self._on_form_cancel)
         self._form_cancel_button.pack(side=tk.LEFT)
+
+        self._analysis_editor = AnalysisEditor(content, lambda: self._draft.interpreters, self._on_analysis_changed)
+        self._analysis_editor.frame.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(15, 5))
+
+    def _on_analysis_changed(self, analysis: DataSheetAnalysis) -> None:
+        """Keep the draft's analysis in step with what the SLP applied in the Analysis section."""
+        self._draft.analysis = analysis
 
     # ----- Interpreter list -----
 
@@ -263,6 +287,7 @@ class TemplateForm:
         self._selected_index = None
         self._close_form()
         self._render_tree()
+        self._analysis_editor.refresh()
 
     # ----- Interpreter form -----
 
@@ -325,6 +350,13 @@ class TemplateForm:
         if problems:
             messagebox.showerror("Fix the Section", "\n".join(problems), parent=self.frame.winfo_toplevel())
             return False
+        renames: list[PartRename] = []
+        if index is not None:
+            old_name = self._draft.interpreters[index].section_name
+            if old_name.strip() != interpreter.section_name.strip():
+                renames.append(PartRename(PartKind.SECTION, interpreter.section_name, "", old_name,
+                                          interpreter.section_name))
+            renames.extend(config.renames(values))
         try:
             if index is None:
                 self._draft.add(interpreter)
@@ -335,16 +367,24 @@ class TemplateForm:
             messagebox.showerror("Duplicate Title", str(e), parent=self.frame.winfo_toplevel())
             return False
 
+        # Calculations follow the section's renames, so they never refer to the old names
+        if renames:
+            self._draft.rename_parts(renames)
+            self._analysis_editor.set_analysis(self._draft.analysis)
+        self._analysis_editor.refresh()
+
         self._selected_index = index
         self._form = (config, index)
         self._form_panel.configure(text="Interpreter")
         self._render_tree()
+        # Reload the form from what was applied, so its names count as loaded from here on
+        self._forms[config.name]["load"](interpreter)
         self._form_baseline = self._form_snapshot()
         return True
 
     def _apply_pending_changes(self) -> bool:
         """Apply the open form if it has unapplied changes. Returns False if they could not be applied."""
-        if not self.has_unapplied_changes():
+        if not self._interpreter_form_changed():
             return True
         return self._apply_form()
 

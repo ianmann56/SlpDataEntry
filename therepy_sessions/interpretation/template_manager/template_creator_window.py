@@ -8,6 +8,7 @@ from interpretation.template_manager.template_rules import TemplateDraft
 from interpretation.template_store import TemplateStore
 from tk_utils import error_handling
 from tk_utils.scrollable import create_scrollable_frame
+from tk_utils.windows import maximize
 
 
 class TemplateCreatorWindow:
@@ -45,7 +46,7 @@ class TemplateCreatorWindow:
         self._create_widgets()
 
     def _setup_window(self) -> None:
-        """Make the window modal over its parent, and centre it."""
+        """Make the window modal over its parent, centre it, and open it full screen."""
         width, height = 640, 620
         self.window.title("Create New Template")
         self.window.geometry(f"{width}x{height}")
@@ -56,6 +57,8 @@ class TemplateCreatorWindow:
         x = self.parent.winfo_x() + (self.parent.winfo_width() // 2) - (width // 2)
         y = self.parent.winfo_y() + (self.parent.winfo_height() // 2) - (height // 2)
         self.window.geometry(f"{width}x{height}+{x}+{y}")
+        # Open full screen; restoring the window gives back the centred size above
+        maximize(self.window)
         self.window.protocol("WM_DELETE_WINDOW", self._on_cancel)
 
     def _create_widgets(self) -> None:

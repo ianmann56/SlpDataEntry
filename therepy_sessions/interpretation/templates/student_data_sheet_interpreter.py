@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from typing import TYPE_CHECKING
 
+from interpretation.analysis.parts import SectionParts
 from interpretation.student_data_sheet import StudentDataSheet
 from interpretation.value_types import OptionDescription
 from collection.collection_headers import StudentDataSheetImport
@@ -56,6 +57,19 @@ class SessionDataSectionInterpreterBase(ABC):
     return self._title
 
   @property
+  def fallback_section_name(self) -> str:
+    """The name this section goes by when it has no title. Each interpreter type overrides it."""
+    return "Section"
+
+  @property
+  def section_name(self) -> str:
+    """
+    The Section Name: the title, or the fallback name when untitled. It is the name used
+    in messages, in the Workbook Key, and by Data Sheet Analysis.
+    """
+    return self.title or self.fallback_section_name
+
+  @property
   def section_kind(self) -> str:
     """
     The kind of section this interpreter reads. Part of the Template Structure, so
@@ -95,6 +109,13 @@ class SessionDataSectionInterpreterBase(ABC):
     order. Storage writes them to the Workbook Key without checking interpreter types.
     """
     return []
+
+  def analysis_parts(self) -> SectionParts:
+    """
+    What this section offers to Data Sheet Analysis: table columns, or Numeric Sheet
+    Values. An interpreter type overrides it to opt in. By default it offers nothing.
+    """
+    return SectionParts.none()
 
   @abstractmethod
   def interpret_student_data_sheet_content(self, data_sheet_content: StudentDataSheetImport) -> DataSheetInterpretationDto:
