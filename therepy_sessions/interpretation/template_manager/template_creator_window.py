@@ -50,7 +50,6 @@ class TemplateCreatorWindow:
         self.window.title("Create New Template")
         self.window.geometry(f"{width}x{height}")
         self.window.resizable(True, True)
-        self.window.transient(self.parent)
         self.window.wait_visibility()
         self.window.grab_set()
         self.window.update_idletasks()

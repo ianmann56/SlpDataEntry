@@ -68,7 +68,6 @@ class TemplateDetailsWindow:
         width, height = 640, 680
         self.window.geometry(f"{width}x{height}")
         self.window.resizable(True, True)
-        self.window.transient(self._parent)
         self.window.wait_visibility()
         self.window.grab_set()
         self.window.update_idletasks()
