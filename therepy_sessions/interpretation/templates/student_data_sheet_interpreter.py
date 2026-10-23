@@ -5,7 +5,7 @@ from collections import namedtuple
 from typing import TYPE_CHECKING
 
 from interpretation.student_data_sheet import StudentDataSheet
-from interpretation.value_types import InvalidValuesError, OptionDescription, ValueProblem
+from interpretation.value_types import OptionDescription
 from collection.collection_headers import StudentDataSheetImport
 
 if TYPE_CHECKING:
@@ -21,8 +21,10 @@ Properties:
     name to the row value for each row in the table.
   scalars: Dictionary where the key is the scalar field name and the value is a
     DTO with the value and type (with those names as property names).
+  value_problems: Every Unreadable Value, Rounded Value, and unknown tally mark in the
+    section, as ValueProblems in reading order. Empty by default.
 """
-DataSheetInterpretationDto = namedtuple('DataSheetInterpretationDto', ['tables', 'scalars'])
+DataSheetInterpretationDto = namedtuple('DataSheetInterpretationDto', ['tables', 'scalars', 'value_problems'], defaults=[()])
 
 
 def _normalize_title(title: str) -> str:
@@ -108,7 +110,9 @@ class SessionDataSectionInterpreterBase(ABC):
       tables: List of 2D arrays representing tables from the data sheet
       form_data: A list of key value pairs where the key is the field name and the
                  value is the value name.
-    :return: a DataSheetInterpretationDto representing the interpreted data
+    :return: a DataSheetInterpretationDto representing the interpreted data. A value that
+      doesn't fit its type is kept and listed in `value_problems`, never raised
+      (interpreters rule 10). Only a layout that doesn't match the section raises.
     """
     pass
 
@@ -202,9 +206,8 @@ class StudentDataSheetInterpreter:
                 level represents a row of data. The column headers are expected to be the first row.
 
     :return: The interpreted sheet. It carries the template it was interpreted with, and
-      each of its tables is tagged with the id of the interpreter that produced it.
-    :raises InvalidValuesError: If any value doesn't fit its column or field, holding every
-      such value from every section
+      each of its tables is tagged with the id of the interpreter that produced it. Its
+      value_warnings hold every value that didn't fit, from every section.
     """
     student_key = data_sheet_content.form_data['Student Key']
     date = data_sheet_content.form_data['Date']
@@ -218,28 +221,18 @@ class StudentDataSheetInterpreter:
     # Each table section sees only the tables assigned to it, so no table is read twice
     tables_by_section = self._assign_tables(data_sheet_content)
 
-    # Each interpretation is paired with the interpreter that produced it, so tables can be tagged.
-    # Bad values from every section are collected, so the SLP sees them all at once.
-    data_sheet_interpretations: list[tuple[SessionDataSectionInterpreterBase, DataSheetInterpretationDto]] = []
-    problems: list[ValueProblem] = []
+    # Values that don't fit from every section are gathered in template order, so the SLP sees them all at once
     for interpreter in self.session_data_templates:
-      try:
-        interpretation = interpreter.interpret_student_data_sheet_content(
-          tables_by_section.get(interpreter.id, data_sheet_content)
-        )
-      except InvalidValuesError as e:
-        problems.extend(e.problems)
-        continue
-      data_sheet_interpretations.append((interpreter, interpretation))
-    if problems:
-      raise InvalidValuesError(problems)
-
-    for interpreter, interpretation in data_sheet_interpretations:
+      interpretation = interpreter.interpret_student_data_sheet_content(
+        tables_by_section.get(interpreter.id, data_sheet_content)
+      )
       for table in interpretation.tables:
         data_sheet.register_table(table, interpreter.id)
 
       for scalar_name, scalar_dto in interpretation.scalars.items():
         data_sheet.register_scalar(scalar_name, scalar_dto)
+
+      data_sheet.add_value_warnings(interpretation.value_problems)
 
     return data_sheet
   

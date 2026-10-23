@@ -26,7 +26,6 @@ from collection.collection_headers import StudentDataSheetImport
 from interpretation.data_sheet_store import DataSheetStore, SavedDataSheet
 from interpretation.student_data_sheet import StudentDataSheet
 from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
-from interpretation.value_types import InvalidValuesError
 from students.student import UnreadableStudentRecordsError
 from students.student_store import StudentStore
 
@@ -48,12 +47,12 @@ class FailureReason(Enum):
     STUDENT_RECORDS_UNREADABLE = "student_records_unreadable"
     MISSING_DATE = "missing_date"
     SAVE_FAILED = "save_failed"
-    INVALID_VALUES = "invalid_values"
 
 
 class SheetOutcome(NamedTuple):
     """
-    One file's latest result.
+    One file's latest result. A SUCCEEDED outcome with warnings is "succeeded with
+    warnings": it counts as succeeded for every purpose.
 
     Properties:
       status: Whether the file is not yet imported, succeeded, or failed.
@@ -62,6 +61,8 @@ class SheetOutcome(NamedTuple):
       failure_reason: Why the file failed. Set only when status is FAILED.
       message: Text shown to the SLP. Names students only by Student Key.
       saved: Where the session was saved. Set only when status is SUCCEEDED.
+      warnings: One message per value that didn't fit its type (an Unreadable Value, a
+        Rounded Value, or an unknown tally mark). Set only when status is SUCCEEDED.
     """
     status: SheetStatus
     student_key: str | None = None
@@ -69,6 +70,7 @@ class SheetOutcome(NamedTuple):
     failure_reason: FailureReason | None = None
     message: str = ""
     saved: SavedDataSheet | None = None
+    warnings: tuple[str, ...] = ()
 
 
 class ProcessedSheet(NamedTuple):
@@ -78,10 +80,14 @@ class ProcessedSheet(NamedTuple):
 
 
 class ListTotals(NamedTuple):
-    """How many files in the whole list are in each status."""
+    """
+    How many files in the whole list are in each status. `with_warnings` counts the
+    succeeded files that have warnings, which are also counted in `succeeded`.
+    """
     succeeded: int
     failed: int
     not_imported: int
+    with_warnings: int = 0
 
 
 SUPPORTED_IMAGE_EXTENSIONS: tuple[str, ...] = (".png", ".jpg", ".jpeg", ".tif", ".tiff")
@@ -136,7 +142,6 @@ _FAILURE_MESSAGES: dict[FailureReason, str] = {
     FailureReason.STUDENT_RECORDS_UNREADABLE: "The student records could not be read. Fix them in Setup → Students.",
     FailureReason.MISSING_DATE: "No session Date was found on the sheet. Fill in the Date and retake the photo.",
     FailureReason.SAVE_FAILED: "Could not save to Google Drive: {detail}. Press Import again to retry.",
-    FailureReason.INVALID_VALUES: 'Some values on the sheet don\'t fit template "{template_name}": {detail}. Fix the template, or retake the photo.',
 }
 
 
@@ -303,14 +308,6 @@ class SheetImportBatch:
                 template_name=template.name,
                 detail=_mismatch_detail(e),
             ) from e
-        except InvalidValuesError as e:
-            # Every bad value is listed, so they can all be fixed at once (FR-012)
-            raise _SheetFailed(
-                FailureReason.INVALID_VALUES,
-                student_key=student_key,
-                template_name=template.name,
-                detail=str(e),
-            ) from e
         except Exception as e:
             raise _SheetFailed(
                 FailureReason.TEMPLATE_MISMATCH,
@@ -336,8 +333,18 @@ class SheetImportBatch:
             message = f"Already saved in {saved.location_name}"
         else:
             message = f"Saved to {saved.location_name}"
+        # Every value that didn't fit is listed, so the SLP can find each one (FR-012)
+        warnings = tuple(problem.message() for problem in data_sheet.value_warnings)
+        if warnings:
+            values = "value" if len(warnings) == 1 else "values"
+            message += f". {len(warnings)} {values} didn't fit their type: {'; '.join(warnings)}"
         outcome = SheetOutcome(
-            SheetStatus.SUCCEEDED, student_key=student_key, template_name=template.name, message=message, saved=saved,
+            SheetStatus.SUCCEEDED,
+            student_key=student_key,
+            template_name=template.name,
+            message=message,
+            saved=saved,
+            warnings=warnings,
         )
         return outcome, data_sheet
 
@@ -365,12 +372,16 @@ class SheetImportBatch:
         return sheet_import
 
     def totals(self) -> ListTotals:
-        """Count the files in the whole list by status."""
+        """Count the files in the whole list by status, and the succeeded ones with warnings."""
         statuses = [selected.outcome.status for selected in self._files]
         return ListTotals(
             succeeded=statuses.count(SheetStatus.SUCCEEDED),
             failed=statuses.count(SheetStatus.FAILED),
             not_imported=statuses.count(SheetStatus.NOT_IMPORTED),
+            with_warnings=sum(
+                1 for selected in self._files
+                if selected.outcome.status == SheetStatus.SUCCEEDED and selected.outcome.warnings
+            ),
         )
 
     def _find(self, identity: str) -> SelectedFile:

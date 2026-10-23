@@ -6,16 +6,15 @@ from interpretation.template_manager.option_rules import name_problems, option_p
 from interpretation.value_types import (
   ChoiceOption,
   ColumnType,
-  InvalidValuesError,
   OptionDescription,
   TallyOption,
   ValueProblem,
-  ValueReadError,
   read_tally,
-  read_value,
+  read_value_leniently,
   scalar_type_for,
   tally_keys,
   tally_scalars,
+  unknown_marks_phrase,
 )
 from collection.collection_headers import StudentDataSheetImport
 
@@ -186,9 +185,8 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
       tables: List of 2D arrays representing tables from the data sheet
       form_data: A list of key value pairs where the key is the field name and the
                  value is the value name.
-    :return: a DataSheetInterpretationDto representing the interpreted data
-    :raises InvalidValuesError: If any cell doesn't fit its column's type, after every
-      table is read, holding every such cell
+    :return: a DataSheetInterpretationDto representing the interpreted data. Every cell
+      that doesn't fit its column's type is kept as read and listed in its value_problems.
     """
     problems: list[ValueProblem] = []
     several_tables = len(data_sheet_content.tables) > 1
@@ -197,10 +195,8 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
       for table_number, raw_table
       in enumerate(data_sheet_content.tables, start=1)
     ]
-    if problems:
-      raise InvalidValuesError(problems)
 
-    return DataSheetInterpretationDto(tables, {})
+    return DataSheetInterpretationDto(tables, {}, problems)
 
   def _interpret_single_student_data_sheet_table(
     self,
@@ -244,27 +240,23 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
         # OCR can leave out trailing empty cells, so a cell past the end of a short row is blank
         cell_text = row_data[column_index] if column_index < len(row_data) else ""
         if column_def.column_type is ColumnType.TALLY:
-          try:
-            summary = read_tally(cell_text, column_def.tally_options)
-          except ValueReadError as e:
-            # The whole cell is named, so the SLP can find it; the bad mark is named too
-            marks = ", ".join(option.mark for option in column_def.tally_options)
-            expected = f'made of only the marks {marks} ("{e.found}" is not one)'
+          summary = read_tally(cell_text, column_def.tally_options)
+          if summary.unknown_marks:
+            # The whole cell is named, so the SLP can find it; the unknown marks are named too
+            expected = unknown_marks_phrase(column_def.tally_options, summary.unknown_marks)
             problems.append(ValueProblem(section, column_name, row, cell_text, expected))
-            continue
           row_dto.update(tally_scalars(column_name, summary, column_def.tally_options))
           continue
-        try:
-          typed_value = read_value(column_def.column_type, cell_text, column_def.choices)
-        except ValueReadError as e:
-          problems.append(ValueProblem(section, column_name, row, cell_text, e.expected))
-          continue
+        # A cell that doesn't fit keeps its text, with no typed value, so nothing written is lost
+        reading = read_value_leniently(column_def.column_type, cell_text, column_def.choices)
+        if reading.expected:
+          problems.append(ValueProblem(section, column_name, row, cell_text, reading.expected, saved_as=reading.saved_as))
         row_dto[column_name] = DataSheetScalarDto(
           column_name,
           cell_text,
           scalar_type_for(column_def.column_type),
           column_def.column_choices or None,
-          typed_value,
+          reading.typed_value,
         )
 
       data.append(row_dto)

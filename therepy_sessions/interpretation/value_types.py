@@ -5,7 +5,8 @@ Every interpreter reads values through this module, so a column and a form field
 same type are read the same way. It is pure: no I/O and no UI, so all of it can be
 checked offline with plain strings.
 
-It imports from `interpretation/student_data_sheet.py`, which never imports it back.
+It imports from `interpretation/student_data_sheet.py`, which imports it back only for
+type checking.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 from typing import NamedTuple
 
@@ -82,15 +84,20 @@ class TallySummary(NamedTuple):
   What a tally holds once read.
 
   Properties:
-    marks: The marks in reading order, each as configured, e.g. "YYNP".
+    marks: The recognised marks in reading order, each as configured, e.g. "YYNP".
     counts: How many times each option was marked, in option order, including zeros.
-    total: How many marks there are.
+    total: How many recognised marks there are.
     percentages: Each option's count / total, or None when total is 0.
+    text_as_read: The tally's text exactly as given.
+    unknown_marks: Each non-space character that isn't an option, in reading order, as
+      read. Empty when every mark is known. These are left out of the counts.
   """
   marks: str
   counts: dict[str, int]
   total: int
   percentages: dict[str, float | None]
+  text_as_read: str = ""
+  unknown_marks: str = ""
 
 
 class ValueReadError(ValueError):
@@ -109,7 +116,8 @@ class ValueReadError(ValueError):
 
 class ValueProblem(NamedTuple):
   """
-  One value on a sheet that doesn't fit its column or field.
+  One value on a sheet that doesn't fit its column or field: an Unreadable Value, a
+  Rounded Value, or an unknown tally mark. The SLP sees it as a warning.
 
   Properties:
     section: The section title, or the interpreter's fallback name such as "Table".
@@ -118,6 +126,7 @@ class ValueProblem(NamedTuple):
     value: The value as read.
     expected: What it should be, e.g. "a whole number".
     item_kind: What `item` names in the message: "column" or "field".
+    saved_as: For a Rounded Value, the number saved, e.g. "8". Empty otherwise.
   """
   section: str
   item: str
@@ -125,23 +134,42 @@ class ValueProblem(NamedTuple):
   value: str
   expected: str
   item_kind: str = "column"
+  saved_as: str = ""
 
   def message(self) -> str:
-    """E.g. `"Words", column "Trials", row 3: "l" is not a whole number`."""
+    """
+    E.g. `"Words", column "Trials", row 3: "l" is not a whole number`, or for a Rounded
+    Value `…: "7.5" is not a whole number; saved as 8`.
+    """
     where = [f'"{self.section}"']
     if self.item:
       where.append(f'{self.item_kind} "{self.item}"')
     if self.row:
       where.append(self.row)
-    return f'{", ".join(where)}: "{self.value}" is not {self.expected}'
+    message = f'{", ".join(where)}: "{self.value}" is not {self.expected}'
+    if self.saved_as:
+      message += f"; saved as {self.saved_as}"
+    return message
 
 
-class InvalidValuesError(ValueError):
-  """Values on a sheet don't fit the template. Holds every one, so they can all be fixed at once."""
+class ValueReading(NamedTuple):
+  """
+  The result of reading one non-tally value leniently.
 
-  def __init__(self, problems: list[ValueProblem]) -> None:
-    self.problems: list[ValueProblem] = list(problems)
-    super().__init__("; ".join(problem.message() for problem in self.problems))
+  - Fits: `typed_value` is set, and `expected` and `saved_as` are empty.
+  - Blank: `typed_value` is None, and `expected` and `saved_as` are empty.
+  - Unreadable Value: `typed_value` is None, and `expected` is set.
+  - Rounded Value (Integer only): `typed_value` is the whole number, and `expected` and
+    `saved_as` are set.
+
+  Properties:
+    typed_value: The value in its type, or None for a blank or Unreadable Value.
+    expected: What the value should have been, e.g. "a whole number". Empty when it fit.
+    saved_as: For a Rounded Value, the number saved, e.g. "8". Empty otherwise.
+  """
+  typed_value: TypedValue
+  expected: str = ""
+  saved_as: str = ""
 
 
 class OptionDescription(NamedTuple):
@@ -258,33 +286,77 @@ def read_value(column_type: ColumnType, text: str, choices: Sequence[ChoiceOptio
   raise ValueReadError(_choice_phrase([choice.value for choice in choices]))
 
 
+def read_value_leniently(column_type: ColumnType, text: str, choices: Sequence[ChoiceOption] = ()) -> ValueReading:
+  """
+  Read one value as read_value does, but never fail on what was written.
+
+  - Text that read_value accepts gives its Typed Value.
+  - Integer text that is a non-whole number by the Decimal rule is a Rounded Value: the
+    nearest whole number, with halves rounded away from zero (`7.5` → 8, `-2.5` → -3).
+  - Any other text that read_value rejects is an Unreadable Value, with no Typed Value.
+
+  :raises ValueError: For TALLY, which is read with read_tally
+  """
+  try:
+    return ValueReading(read_value(column_type, text, choices))
+  except ValueReadError as e:
+    trimmed = text.strip()
+    if column_type is ColumnType.INT and _DECIMAL_PATTERN.fullmatch(trimmed) is not None:
+      # Rounded from the decimal text: round() rounds halves to even, and floats bring error
+      rounded = int(Decimal(trimmed).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+      return ValueReading(rounded, e.expected, str(rounded))
+    return ValueReading(None, e.expected)
+
+
 def read_tally(text: str, options: Sequence[TallyOption]) -> TallySummary:
   """
   Read a tally: every non-space character is one mark, matched to an option ignoring
   letter case. Blank text is a tally with no marks.
 
-  :raises ValueReadError: At the first character that isn't an option's mark, with
-    `found` set to that character as read
+  A character that isn't an option's mark is left out of the counts and kept, as read,
+  in `unknown_marks`. This never fails.
   """
   mark_by_folded = {option.mark.casefold(): option.mark for option in options}
   counts = {option.mark: 0 for option in options}
   marks: list[str] = []
+  unknown_marks: list[str] = []
   for character in text:
     if character.isspace():
       continue
     mark = mark_by_folded.get(character.casefold())
     if mark is None:
-      raise ValueReadError(_marks_phrase(options), found=character)
+      unknown_marks.append(character)
+      continue
     marks.append(mark)
     counts[mark] += 1
 
   total = len(marks)
   percentages = {mark: (count / total if total else None) for mark, count in counts.items()}
-  return TallySummary("".join(marks), counts, total, percentages)
+  return TallySummary("".join(marks), counts, total, percentages, text, "".join(unknown_marks))
 
 
 def _marks_phrase(options: Sequence[TallyOption]) -> str:
   return "one of the marks " + ", ".join(option.mark for option in options)
+
+
+def unknown_mark_phrase(options: Sequence[TallyOption]) -> str:
+  """
+  What one unknown mark in a Running Tally should have been, e.g.
+  `one of the marks Y, N, P (left out of the counts)`.
+  """
+  return f"{_marks_phrase(options)} (left out of the counts)"
+
+
+def unknown_marks_phrase(options: Sequence[TallyOption], unknown_marks: str) -> str:
+  """
+  What a Tally cell holding unknown marks should have been, naming each distinct one, e.g.
+  `made of only the marks Y, N, P ("Q" is not one; left out of the counts)`.
+  """
+  marks = ", ".join(option.mark for option in options)
+  named = list(dict.fromkeys(unknown_marks))
+  quoted = ", ".join(f'"{mark}"' for mark in named)
+  verb = "is not one" if len(named) == 1 else "are not among them"
+  return f"made of only the marks {marks} ({quoted} {verb}; left out of the counts)"
 
 
 def tally_keys(base: str, options: Sequence[TallyOption]) -> list[str]:
@@ -304,10 +376,12 @@ def tally_scalars(base: str, summary: TallySummary, options: Sequence[TallyOptio
   """
   A Tally Summary as scalars, keyed and ordered as tally_keys: the marks as TEXT, the
   counts and total as INT, and the percentages as PERCENT fractions (None when there are
-  no marks).
+  no marks). When the tally has unknown marks, the marks scalar holds the text as read,
+  so the workbook shows what was written.
   """
   keys = tally_keys(base, options)
-  scalars = [DataSheetScalarDto(keys[0], summary.marks, DataSheetScalarType.TEXT, None, summary.marks or None)]
+  marks_text = summary.text_as_read if summary.unknown_marks else summary.marks
+  scalars = [DataSheetScalarDto(keys[0], marks_text, DataSheetScalarType.TEXT, None, marks_text or None)]
   for option in options:
     count = summary.counts.get(option.mark, 0)
     scalars.append(DataSheetScalarDto(f"{base} {option.mark}", str(count), DataSheetScalarType.INT, None, count))
