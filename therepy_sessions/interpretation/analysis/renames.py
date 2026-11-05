@@ -24,6 +24,7 @@ from interpretation.analysis.model import (
   Operand,
   ResultOperand,
   RowAggregate,
+  RowResultMeasure,
   SheetValueOperand,
   TallyCountMeasure,
 )
@@ -93,12 +94,16 @@ def _same(a: str, b: str) -> bool:
 # ----- Menu calculations -----
 
 def _renamed_aggregate(aggregate: RowAggregate, rename: PartRename) -> RowAggregate:
+  measure = aggregate.measure
+  if rename.kind is PartKind.CALCULATION:
+    if isinstance(measure, RowResultMeasure) and _same(measure.calculation, rename.old):
+      return replace(aggregate, measure=RowResultMeasure(rename.new))
+    return aggregate
   if rename.kind is PartKind.SECTION:
     return replace(aggregate, section=rename.new) if _same(aggregate.section, rename.old) else aggregate
-  if rename.kind is PartKind.CALCULATION or not _same(aggregate.section, rename.section):
+  if not _same(aggregate.section, rename.section):
     return aggregate
 
-  measure = aggregate.measure
   if rename.kind is PartKind.ITEM:
     if isinstance(measure, (NumberColumnMeasure, TallyCountMeasure)) and _same(measure.column, rename.old):
       measure = replace(measure, column=rename.new)

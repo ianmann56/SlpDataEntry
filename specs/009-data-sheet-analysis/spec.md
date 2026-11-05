@@ -23,6 +23,12 @@
 - Q: Where does the SLP build and edit a calculation? → A: Inline. The Analysis section sits below the interpreters in the template window, with an editor panel under the calculation list, like the interpreter editor, and the Formula Legend beside the formula entry. The Create Template and Template Details windows open full screen by default.
 - Q: Can the SLP move a calculation to a different layer, or only reorder it within its layer? → A: Only reorder within its layer. To change a calculation's layer, the SLP deletes it and builds it again in the other layer.
 
+### Session 2026-11-04
+
+- Q: Can True/False columns be counted? → A: Yes. A choice count treats a True/False column as offering the two choices `True` and `False`, so the SLP can count, per row, how many of several True/False columns are `True`, or count the rows where one column is `True`. A blank cell holds neither.
+- Q: Can a calculation keep one value per row, instead of combining the rows into one number? → A: Yes. A Row Aggregate may be combined by **Each row**, giving a **Row List**: one value per row of its table. A higher layer can Sum or Average a Row List over the same table's rows, from the menu or in a formula. A Row List cannot be used where a single number is expected.
+- Q: How does the SLP count the rows where one column holds a value? → A: With a choice count over that one column, combined by Sum. View mode reads it as "Number of rows of *Table* where *Column* is "*value*"".
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Define a calculation from the menu (Priority: P1)
@@ -141,13 +147,15 @@ Templates saved before this feature load with an empty Analysis section and impo
 - **FR-007**: Every calculation MUST have a name that is not blank and is unique within the template, ignoring letter case and surrounding spaces.
 - **FR-007a**: Every calculation, menu or formula, MAY have an optional free-text **Calculation Description** saying what it measures. It MUST be shown with the calculation in view mode, and beside that calculation's result wherever the result is listed in a Formula Legend.
 - **FR-008**: Every calculation MUST be either a **menu calculation** (a Row Aggregate or an Arithmetic calculation) or a **Formula calculation**, in any layer. The SLP chooses which when adding it.
-- **FR-009**: A **Row Aggregate** MUST name one table section, one **Row Measure**, and one combination, **Sum** or **Average**, taken across the rows of that table.
+- **FR-009**: A **Row Aggregate** MUST name one table section, one **Row Measure**, and one combination: **Sum** or **Average**, taken across the rows of that table, or **Each row**, which keeps each row's measure and gives a **Row List** (one value per row of that table) as the calculation's result.
 - **FR-010**: A Row Measure MUST be one of:
   - **Number column**: the value of one Integer or Decimal column in the row.
   - **Tally count**: the count of one Tally Option, or the tally's total, in one Tally column in the row.
-  - **Choice count**: the number of chosen Choice columns (one or more) whose value in the row is one chosen Choice Option. Only Choice columns offering that option, matched ignoring letter case and surrounding spaces, MUST be offered.
+  - **Choice count**: the number of chosen Choice or True/False columns (one or more) whose value in the row is one chosen Choice Option. A True/False column offers the choices `True` and `False`. Only columns offering that option, matched ignoring letter case and surrounding spaces, MUST be offered.
+  - **Row result**: the row's value in a lower-layer Row List over the same table.
+- **FR-010a**: A Row List MUST only be used as a Row Measure of a Row Aggregate, or inside a formula's Sum or Average, over the rows of the table it was measured from. It MUST NOT be offered or accepted where a single number is expected (an Arithmetic input, or a formula outside Sum or Average). A formula's result is always one number.
 - **FR-011**: An **Arithmetic** calculation MUST combine two inputs with add, subtract, multiply, divide, or percentage (first ÷ second × 100). Each input MUST be a lower-layer calculation result, a **numeric sheet value** (an Integer or Decimal Simple Form field, or a Running Tally section's option count, total, or option percentage), or a fixed number typed by the SLP.
-- **FR-012**: A **Formula** MUST be able to use: fixed numbers; numeric sheet values; lower-layer results; the Sum or Average over a table section's rows of any Row Measure from FR-010; addition, subtraction, multiplication, and division; and parentheses, with the usual order of operations. Every reference in a formula MUST be written in a delimited form, so names holding spaces or symbols are unambiguous.
+- **FR-012**: A **Formula** MUST be able to use: fixed numbers; numeric sheet values; lower-layer single-number results; the Sum or Average over a table section's rows of any Row Measure from FR-010, including a lower-layer Row List; addition, subtraction, multiplication, and division; and parentheses, with the usual order of operations. Every reference in a formula MUST be written in a delimited form, so names holding spaces or symbols are unambiguous.
 - **FR-013**: A formula MUST be checked as the SLP types it. A message under the formula entry MUST show, after each change, either what is wrong and where in the formula (it cannot be understood, or refers to something it may not use), or that the formula is OK. Apply MUST stay available, but MUST refuse a formula with a problem, leaving the message in place.
 - **FR-014**: While the SLP types a formula, a **Formula Legend** MUST be shown beside the formula entry. It MUST list every operation a formula may use, each with its parameters (for example, a table Sum naming its table and Row Measure), and every variable name in scope for that calculation (FR-006), written exactly as the formula expects. It MUST NOT list anything the calculation may not use. Clicking a legend entry MUST insert it into the formula at the cursor: a variable name as written, and an operation with a placeholder for each of its parameters. The legend is not shown for menu calculations.
 - **FR-015**: The menu, and the formula reference list, MUST offer only the sections, columns, fields, choices, and tally options the template's current draft holds, by their configured names.
@@ -167,9 +175,10 @@ Templates saved before this feature load with an empty Analysis section and impo
 - **Data Sheet Analysis**: The calculations a template defines for one imported sheet, as an ordered list of Analysis Layers. Saved with the template.
 - **Historical Analysis**: Calculations across many sessions of one student with one template. Named here only to place Data Sheet Analysis beside it; out of scope.
 - **Analysis Layer**: A numbered group of calculations. A calculation may use results only from lower layers.
-- **Calculation**: One named number the template defines for each imported sheet, with an optional Calculation Description. Either a menu calculation (Row Aggregate or Arithmetic) or a Formula calculation.
-- **Row Aggregate**: A menu calculation that measures each row of one table section with a Row Measure and combines the rows by Sum or Average.
-- **Row Measure**: What a Row Aggregate reads from each row: a number column, a tally count, or a choice count across one or more Choice columns.
+- **Calculation**: One named result the template defines for each imported sheet (a number, or a Row List), with an optional Calculation Description. Either a menu calculation (Row Aggregate or Arithmetic) or a Formula calculation.
+- **Row Aggregate**: A menu calculation that measures each row of one table section with a Row Measure and combines the rows by Sum or Average, or keeps each row's value as a Row List.
+- **Row Measure**: What a Row Aggregate reads from each row: a number column, a tally count, a choice count across one or more Choice or True/False columns, or a lower-layer Row List's value.
+- **Row List**: The result of a Row Aggregate combined by Each row: one value per row of its table. It can only be summed or averaged over that table's rows.
 - **Arithmetic calculation**: A menu calculation that combines two inputs (lower-layer results, numeric sheet values, or fixed numbers) with add, subtract, multiply, divide, or percentage.
 - **Formula calculation**: A calculation the SLP types as a formula, using the same inputs and table aggregations as the menu, plus arithmetic and parentheses.
 - **Formula Legend**: The reference shown beside a formula while it is typed: the operations available with their parameters, and the variable names in scope for that calculation.
@@ -196,7 +205,8 @@ Templates saved before this feature load with an empty Analysis section and impo
   - An Average over no values, and a division or percentage by 0, give an empty result, and a calculation using an empty result is also empty.
   - Results are numbers, worked out from interpreted values (Typed Values, Tally Summaries), never from raw OCR text.
 - Row Aggregates cover the four example calculations: "sum of tallies in a column" and "average tally count" are Tally count measures combined by Sum and Average; "sum of a particular value selected in choice columns" and "average number of a particular value" are Choice count measures combined by Sum and Average.
-- True/False, Date, and Text columns and fields are not row measures or sheet values in this spec.
+- Date and Text columns and fields are not row measures or sheet values in this spec. True/False columns are row measures only through a choice count; True/False fields are not sheet values.
+- When results are worked out, a Row List keeps an empty value for a row whose measure is empty, and a Sum or Average over it follows the rules above.
 - The exact formula syntax (how references, functions, and percentages are written) is decided during planning, within FR-012 to FR-014.
 - A menu calculation is not converted to a formula, or back, automatically; the SLP can replace one with the other.
 - The new domain terms (Data Sheet Analysis, Historical Analysis, Analysis Layer, Calculation, Row Aggregate, Row Measure, Arithmetic calculation, Formula calculation, Calculation Description, Formula Legend, Numeric Sheet Value) will be added to the glossary as part of this feature, per Principle II.

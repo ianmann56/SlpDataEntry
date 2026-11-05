@@ -28,6 +28,7 @@ from interpretation.analysis.model import (
     Operand,
     ResultOperand,
     RowAggregate,
+    RowResultMeasure,
     SheetValueOperand,
     TallyCountMeasure,
 )
@@ -47,10 +48,12 @@ from interpretation.templates.student_data_sheet_interpreter import SessionDataS
 HISTORICAL_NOTE: str = "Historical analysis (across a student's sessions) is not available yet."
 
 _ROW_AGGREGATE = "Row Aggregate"
+_ROW_LIST = "Row List"
 _ARITHMETIC = "Arithmetic"
 _NUMBER_COLUMN = "Number column"
 _TALLY_COUNT = "Tally count"
 _CHOICE_COUNT = "Choice count"
+_ROW_RESULT = "Row result"
 _RESULT = "Result"
 _SHEET_VALUE = "Sheet value"
 _NUMBER = "Number"
@@ -64,10 +67,18 @@ _OPERATION_LABELS: dict[ArithmeticOperation, str] = {
     ArithmeticOperation.DIVIDE: "divide (÷)",
     ArithmeticOperation.PERCENTAGE: "percentage (left ÷ right × 100)",
 }
-_COMBINATION_LABELS: dict[Combination, str] = {Combination.SUM: "Sum", Combination.AVERAGE: "Average"}
+_COMBINATION_LABELS: dict[Combination, str] = {
+    Combination.SUM: "Sum",
+    Combination.AVERAGE: "Average",
+    Combination.EACH_ROW: "Each row (keep a value per row)",
+}
+_NOTHING_TO_MEASURE: str = ("This template has no table with an Integer, Decimal, Tally, Choice, or True/False "
+                            "column, so there is nothing to measure. Text and Date columns can't be measured.")
 
 
 def _kind_label(calculation: Calculation) -> str:
+    if calculation.row_list_section is not None:
+        return _ROW_LIST
     if isinstance(calculation.definition, RowAggregate):
         return _ROW_AGGREGATE
     if isinstance(calculation.definition, Arithmetic):
@@ -512,7 +523,7 @@ class AnalysisEditor:
         self._choice_columns = tk.Listbox(aggregate, selectmode=tk.MULTIPLE, height=4, exportselection=False,
                                           width=30)
         self._combination_picker = ttk.Combobox(aggregate, textvariable=self._combination_var, state="readonly",
-                                                width=10, values=list(_COMBINATION_LABELS.values()))
+                                                width=30, values=list(_COMBINATION_LABELS.values()))
         aggregate_row("Table:", self._table_picker, 0)
         aggregate_row("Measure:", self._measure_picker, 1)
         self._column_row = aggregate_row("Column:", self._column_picker, 2)
@@ -520,6 +531,8 @@ class AnalysisEditor:
         self._choice_row = aggregate_row("Choice:", self._choice_picker, 4)
         self._choice_columns_row = aggregate_row("Columns:", self._choice_columns, 5)
         aggregate_row("Combine:", self._combination_picker, 6)
+        self._nothing_to_measure = ttk.Label(aggregate, text=_NOTHING_TO_MEASURE, wraplength=420, justify=tk.LEFT)
+        self._nothing_to_measure.grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
         for picker in (self._table_picker, self._measure_picker, self._column_picker, self._choice_picker):
             picker.bind("<<ComboboxSelected>>", lambda e: self._fill_pickers())
 
@@ -621,6 +634,9 @@ class AnalysisEditor:
             self._measure_var.set(_TALLY_COUNT)
             self._column_var.set(measure.column)
             self._mark_var.set(TALLY_TOTAL_PART if measure.mark is None else measure.mark)
+        elif isinstance(measure, RowResultMeasure):
+            self._measure_var.set(_ROW_RESULT)
+            self._column_var.set(measure.calculation)
         else:
             self._measure_var.set(_CHOICE_COUNT)
             self._choice_var.set(measure.choice)
@@ -668,6 +684,10 @@ class AnalysisEditor:
             self._left.fill(scope)
             self._right.fill(scope)
             self._table_picker.configure(values=[table.section for table in scope.tables])
+            if scope.tables:
+                self._nothing_to_measure.grid_remove()
+            else:
+                self._nothing_to_measure.grid()
             table = self._table(scope)
             measures: list[str] = []
             if table is not None:
@@ -677,6 +697,8 @@ class AnalysisEditor:
                     measures.append(_TALLY_COUNT)
                 if table.choice_columns:
                     measures.append(_CHOICE_COUNT)
+                if table.row_results:
+                    measures.append(_ROW_RESULT)
             self._measure_picker.configure(values=measures)
             if measures and self._measure_var.get() not in measures and table is not None:
                 self._measure_var.set(measures[0])
@@ -685,9 +707,10 @@ class AnalysisEditor:
             for widget_row in (self._column_row, self._mark_row, self._choice_row, self._choice_columns_row):
                 for widget in widget_row:
                     widget.grid_remove()
-            if measure in (_NUMBER_COLUMN, _TALLY_COUNT):
+            if measure in (_NUMBER_COLUMN, _TALLY_COUNT, _ROW_RESULT):
                 for widget in self._column_row:
                     widget.grid()
+            self._column_row[0].configure(text="Result:" if measure == _ROW_RESULT else "Column:")
             if measure == _NUMBER_COLUMN:
                 columns = [entry.label for entry in table.number_columns] if table is not None else []
                 self._column_picker.configure(values=columns)
@@ -699,6 +722,9 @@ class AnalysisEditor:
                 self._mark_picker.configure(values=[entry.label.split(" › ")[-1] for entry in entries])
                 for widget in self._mark_row:
                     widget.grid()
+            elif measure == _ROW_RESULT:
+                self._column_picker.configure(values=[entry.label for entry in table.row_results]
+                                              if table is not None else [])
             elif measure == _CHOICE_COUNT:
                 self._fill_choice_count(table)
             if measure != _CHOICE_COUNT:
@@ -750,6 +776,8 @@ class AnalysisEditor:
         elif measure_kind == _CHOICE_COUNT:
             columns = tuple(self._choice_columns.get(i) for i in self._choice_columns.curselection())
             measure = ChoiceCountMeasure(self._choice_var.get(), columns)
+        elif measure_kind == _ROW_RESULT:
+            measure = RowResultMeasure(self._column_var.get())
         else:
             measure = NumberColumnMeasure(self._column_var.get())
         return RowAggregate(self._table_var.get(), measure, combination)

@@ -13,9 +13,10 @@ from interpretation.analysis.formula import ReferenceKind, parse_formula
 
 
 class Combination(Enum):
-  """How a Row Aggregate combines its rows."""
+  """How a Row Aggregate combines its rows. EACH_ROW keeps every row's value, giving a Row List."""
   SUM = "Sum"
   AVERAGE = "Average"
+  EACH_ROW = "Each row"
 
 
 class ArithmeticOperation(Enum):
@@ -42,17 +43,26 @@ class TallyCountMeasure:
 
 @dataclass(frozen=True)
 class ChoiceCountMeasure:
-  """A Row Measure: how many of the chosen Choice columns hold the choice."""
+  """A Row Measure: how many of the chosen Choice or True/False columns hold the choice."""
   choice: str
   columns: tuple[str, ...]
 
 
-RowMeasure = NumberColumnMeasure | TallyCountMeasure | ChoiceCountMeasure
+@dataclass(frozen=True)
+class RowResultMeasure:
+  """A Row Measure: the row's value in a lower-layer Row List of the same table."""
+  calculation: str
+
+
+RowMeasure = NumberColumnMeasure | TallyCountMeasure | ChoiceCountMeasure | RowResultMeasure
 
 
 @dataclass(frozen=True)
 class RowAggregate:
-  """A menu calculation: a Row Measure taken from every row of one table section, combined by Sum or Average."""
+  """
+  A menu calculation: a Row Measure taken from every row of one table section, combined
+  by Sum or Average into one number, or kept for each row (a Row List).
+  """
   section: str
   measure: RowMeasure
   combination: Combination
@@ -100,7 +110,8 @@ CalculationDefinition = RowAggregate | Arithmetic | Formula
 @dataclass(frozen=True)
 class Calculation:
   """
-  One named number a template defines for each imported sheet.
+  One named result a template defines for each imported sheet: a number, or a Row List
+  (one value per row of a table) when it is a Row Aggregate combined by Each row.
 
   Properties:
     name: Not blank, and unique in the template ignoring letter case and surrounding spaces.
@@ -116,6 +127,14 @@ class Calculation:
     """Whether it was built from the menu rather than typed as a formula."""
     return not isinstance(self.definition, Formula)
 
+  @property
+  def row_list_section(self) -> str | None:
+    """The table whose rows its Row List follows, or None when its result is one number."""
+    definition = self.definition
+    if isinstance(definition, RowAggregate) and definition.combination is Combination.EACH_ROW:
+      return definition.section
+    return None
+
   def result_references(self) -> list[str]:
     """The names of the calculations whose results this one uses, as written."""
     definition = self.definition
@@ -125,6 +144,8 @@ class Calculation:
     if isinstance(definition, Formula):
       parse = parse_formula(definition.text)
       return [reference.parts[0] for reference in parse.references if reference.kind is ReferenceKind.RESULT]
+    if isinstance(definition.measure, RowResultMeasure):
+      return [definition.measure.calculation]
     return []
 
 

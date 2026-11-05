@@ -48,7 +48,7 @@ Rules:
 | --- | --- | --- |
 | `section` | `str` | A table section's Section Name. |
 | `measure` | `RowMeasure` | What each row gives. |
-| `combination` | `Combination` | `SUM` or `AVERAGE`. |
+| `combination` | `Combination` | `SUM`, `AVERAGE`, or `EACH_ROW`. `EACH_ROW` makes the calculation's result a Row List over `section` (`Calculation.row_list_section`). |
 
 `RowMeasure` is one of:
 
@@ -56,7 +56,8 @@ Rules:
 | --- | --- | --- |
 | `NumberColumnMeasure` | `column: str` | The column is Integer or Decimal. |
 | `TallyCountMeasure` | `column: str`, `mark: str \| None` | The column is Tally. `mark` is one of its tally options, or `None` for the tally's total. |
-| `ChoiceCountMeasure` | `choice: str`, `columns: tuple[str, ...]` (one or more, no repeats) | Every column is Choice and offers `choice`, matched ignoring letter case and surrounding spaces. |
+| `ChoiceCountMeasure` | `choice: str`, `columns: tuple[str, ...]` (one or more, no repeats) | Every column is Choice or True/False and offers `choice`, matched ignoring letter case and surrounding spaces. A True/False column offers `True` and `False` (`scope.BOOLEAN_CHOICES`). |
+| `RowResultMeasure` | `calculation: str` | Names a lower-layer calculation whose result is a Row List over this aggregate's `section`. Saved as `{"kind": "row_result", "calculation": ...}`. |
 
 ## Arithmetic (menu)
 
@@ -69,7 +70,7 @@ Rules:
 
 | Variant | Fields | Valid when |
 | --- | --- | --- |
-| `ResultOperand` | `calculation: str` | Names a calculation in a lower layer (FR-006). |
+| `ResultOperand` | `calculation: str` | Names a calculation in a lower layer (FR-006) whose result is a single number, not a Row List (FR-010a). |
 | `SheetValueOperand` | `section: str`, `value: str` | Names a Numeric Sheet Value of that section. |
 | `NumberOperand` | `number: Decimal` | Always valid. |
 

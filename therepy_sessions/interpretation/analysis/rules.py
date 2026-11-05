@@ -12,12 +12,14 @@ from interpretation.analysis.model import (
   ArithmeticOperation,
   Calculation,
   ChoiceCountMeasure,
+  Combination,
   DataSheetAnalysis,
   Formula,
   NumberColumnMeasure,
   Operand,
   ResultOperand,
   RowAggregate,
+  RowResultMeasure,
   SheetValueOperand,
   TallyCountMeasure,
 )
@@ -25,12 +27,13 @@ from interpretation.analysis.parts import TableColumnPart
 from interpretation.analysis.scope import (
   NUMBER_COLUMN_TYPES,
   TALLY_TOTAL_PART,
+  countable_choices,
   find_column,
   find_section,
   find_sheet_value,
   fold,
   is_ambiguous,
-  lower_layer_names,
+  lower_layer_calculation,
 )
 from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
 from interpretation.value_types import COLUMN_TYPE_LABELS, ColumnType
@@ -82,6 +85,8 @@ def _type_label(column: TableColumnPart) -> str:
 def _number_column(column: TableColumnPart) -> None:
   if column.column_type is ColumnType.TALLY:
     raise _Problem(f'"{column.name}" is a Tally column: measure one of its marks, or its total')
+  if column.column_type is ColumnType.BOOLEAN:
+    raise _Problem(f'"{column.name}" is a True/False column: count "True" or "False" with a choice count')
   if column.column_type not in NUMBER_COLUMN_TYPES:
     raise _Problem(f'"{column.name}" is {_type_label(column)} column, so it can\'t be summed or averaged')
 
@@ -94,9 +99,10 @@ def _tally_part(column: TableColumnPart, mark: str | None) -> None:
 
 
 def _choice_column(column: TableColumnPart, choice: str) -> None:
-  if column.column_type is not ColumnType.CHOICE:
-    raise _Problem(f'"{column.name}" is not a Choice column')
-  if not any(fold(choice) == fold(existing) for existing in column.choices):
+  choices = countable_choices(column)
+  if choices is None:
+    raise _Problem(f'"{column.name}" is not a Choice or True/False column')
+  if not any(fold(choice) == fold(existing) for existing in choices):
     raise _Problem(f'"{column.name}" has no choice "{choice.strip()}"')
 
 
@@ -111,14 +117,27 @@ def _sheet_value(interpreters: list[SessionDataSectionInterpreterBase], section_
   raise _Problem(f'"{section_name.strip()}" has no number "{value.strip()}"')
 
 
-def _result(analysis: DataSheetAnalysis, layer_number: int, name: str) -> None:
+def _result(analysis: DataSheetAnalysis, layer_number: int, name: str, row_list_of: str | None = None) -> None:
+  """
+  Check a lower-layer result is used as what it is: a number, or (when row_list_of names
+  a table) a Row List over that table.
+  """
   if not name.strip():
     raise _Problem("choose a calculation")
-  if any(fold(name) == fold(lower) for lower in lower_layer_names(analysis, layer_number)):
-    return
-  if any(fold(name) == fold(calculation.name) for _, _, calculation in analysis.all_calculations()):
-    raise _Problem(f'"{name.strip()}" is not a calculation in a lower layer')
-  raise _Problem(f'there is no calculation "{name.strip()}"')
+  calculation = lower_layer_calculation(analysis, layer_number, name)
+  if calculation is None:
+    if any(fold(name) == fold(other.name) for _, _, other in analysis.all_calculations()):
+      raise _Problem(f'"{name.strip()}" is not a calculation in a lower layer')
+    raise _Problem(f'there is no calculation "{name.strip()}"')
+  section = calculation.row_list_section
+  if row_list_of is None and section is not None:
+    raise _Problem(f'"{name.strip()}" has a value for each row of "{section.strip()}", '
+                   "so it can only be summed or averaged over those rows")
+  if row_list_of is not None and section is None:
+    raise _Problem(f'"{name.strip()}" is a single number, not a value for each row')
+  if row_list_of is not None and section is not None and fold(section) != fold(row_list_of):
+    raise _Problem(f'"{name.strip()}" has a value for each row of "{section.strip()}", '
+                   f'not of "{row_list_of.strip()}"')
 
 
 def _capitalized(message: str) -> str:
@@ -127,7 +146,12 @@ def _capitalized(message: str) -> str:
 
 # ----- Menu calculations -----
 
-def _aggregate_problems(aggregate: RowAggregate, interpreters: list[SessionDataSectionInterpreterBase]) -> list[str]:
+def _aggregate_problems(
+  aggregate: RowAggregate,
+  interpreters: list[SessionDataSectionInterpreterBase],
+  analysis: DataSheetAnalysis,
+  layer_number: int,
+) -> list[str]:
   try:
     if not aggregate.section.strip():
       raise _Problem("choose a table")
@@ -142,6 +166,8 @@ def _aggregate_problems(aggregate: RowAggregate, interpreters: list[SessionDataS
       _number_column(_column(columns, aggregate.section, measure.column))
     elif isinstance(measure, TallyCountMeasure):
       _tally_part(_column(columns, aggregate.section, measure.column), measure.mark)
+    elif isinstance(measure, RowResultMeasure):
+      _result(analysis, layer_number, measure.calculation, row_list_of=aggregate.section)
     else:
       if not measure.choice.strip():
         raise _Problem("choose the choice to count")
@@ -218,7 +244,13 @@ def _check_reference(
   table_by_aggregate: dict[int, str],
 ) -> None:
   if reference.kind is ReferenceKind.RESULT:
-    _result(analysis, layer_number, reference.parts[0])
+    if reference.aggregate_start < 0:
+      _result(analysis, layer_number, reference.parts[0])
+      return
+    # A Row List measured by SUM or AVERAGE: over the table its own calculation measured
+    calculation = lower_layer_calculation(analysis, layer_number, reference.parts[0])
+    table = calculation.row_list_section if calculation is not None else None
+    _result(analysis, layer_number, reference.parts[0], row_list_of=table or "")
     return
   section = reference.parts[0]
   if reference.kind is ReferenceKind.SHEET_VALUE:
@@ -250,7 +282,7 @@ def _reference_problems(
   """Problems with what a calculation refers to, each starting with its name."""
   definition = calculation.definition
   if isinstance(definition, RowAggregate):
-    problems = _aggregate_problems(definition, interpreters)
+    problems = _aggregate_problems(definition, interpreters, analysis, layer_number)
   elif isinstance(definition, Arithmetic):
     problems = (_operand_problems(definition.left, interpreters, analysis, layer_number)
                 + _operand_problems(definition.right, interpreters, analysis, layer_number))
@@ -345,10 +377,17 @@ def describe_calculation(calculation: Calculation) -> str:
     return f"{left} {_OPERATION_WORDS[definition.operation]} {right}"
 
   measure = definition.measure
+  if (isinstance(measure, ChoiceCountMeasure) and len(measure.columns) == 1
+      and definition.combination is Combination.SUM):
+    return f'Number of rows of {definition.section} where {measure.columns[0]} is "{measure.choice}"'
   if isinstance(measure, NumberColumnMeasure):
     what = measure.column
   elif isinstance(measure, TallyCountMeasure):
     what = f"{measure.column} total" if measure.mark is None else f"{measure.column} {measure.mark} count"
+  elif isinstance(measure, RowResultMeasure):
+    what = measure.calculation
   else:
     what = f'count of "{measure.choice}" in {", ".join(measure.columns)}'
+  if definition.combination is Combination.EACH_ROW:
+    return f"For each row of {definition.section}: {what}"
   return f"{definition.combination.value} over rows of {definition.section}: {what}"

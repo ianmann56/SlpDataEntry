@@ -23,6 +23,7 @@ from interpretation.analysis.model import (
   ResultOperand,
   RowAggregate,
   RowMeasure,
+  RowResultMeasure,
   SheetValueOperand,
   TallyCountMeasure,
 )
@@ -83,6 +84,8 @@ def _measure_to_json(measure: RowMeasure) -> dict[str, Any]:
     return {"kind": "number_column", "column": measure.column}
   if isinstance(measure, TallyCountMeasure):
     return {"kind": "tally_count", "column": measure.column, "mark": measure.mark}
+  if isinstance(measure, RowResultMeasure):
+    return {"kind": "row_result", "calculation": measure.calculation}
   return {"kind": "choice_count", "choice": measure.choice, "columns": list(measure.columns)}
 
 
@@ -127,6 +130,8 @@ def _measure_from_json(data: dict[str, Any]) -> RowMeasure:
     return TallyCountMeasure(str(data.get("column", "")), None if mark is None else str(mark))
   if kind == "choice_count":
     return ChoiceCountMeasure(str(data.get("choice", "")), tuple(str(column) for column in data.get("columns") or []))
+  if kind == "row_result":
+    return RowResultMeasure(str(data.get("calculation", "")))
   raise ValueError(f'Unknown row measure kind "{kind}".')
 
 

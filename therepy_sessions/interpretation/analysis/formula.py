@@ -7,8 +7,9 @@ The formula language of Formula calculations: a tokenizer and recursive-descent 
     unary      := "-" unary | primary
     primary    := NUMBER | result_ref | value_ref | aggregate | "(" expr ")"
     aggregate  := ("SUM" | "AVERAGE") "(" measure ")"
-    measure    := column_ref | "COUNT" "(" STRING ("," column_ref)+ ")"
-    result_ref := "{" name "}"                            a lower-layer calculation's result
+    measure    := column_ref | result_ref | "COUNT" "(" STRING ("," column_ref)+ ")"
+    result_ref := "{" name "}"                            a lower-layer calculation's result: a
+                                                          number, or a Row List inside SUM or AVERAGE
     value_ref  := "[" section "/" item "]"                a Numeric Sheet Value
     column_ref := "[" section "/" column ("/" part)? "]"  a table column, in a Row Measure
 
@@ -28,7 +29,7 @@ from typing import NamedTuple
 
 class ReferenceKind(Enum):
   """What a reference in a formula points at."""
-  RESULT = "result"            # {name}
+  RESULT = "result"            # {name}: a number outside an aggregation, a Row List inside one
   SHEET_VALUE = "sheet_value"  # [section/value], outside an aggregation
   COLUMN = "column"            # [section/column] or [section/column/part], inside SUM or AVERAGE
 
@@ -46,7 +47,8 @@ class FormulaReference(NamedTuple):
     choice_start: Offset of that choice's opening quote, or -1.
     choice_end: Offset just past that choice's closing quote, or -1.
     aggregate_start: Offset of the enclosing SUM or AVERAGE, so the columns of one Row
-      Measure can be grouped. -1 outside an aggregation.
+      Measure can be grouped, and a result used as a Row List told from one used as a
+      number. -1 outside an aggregation.
   """
   kind: ReferenceKind
   parts: tuple[str, ...]
@@ -111,7 +113,8 @@ OPERATIONS: list[LegendOperation] = [
   _operation("AVERAGE(row measure)", "AVERAGE(<row measure>)",
              "Average of a row measure over the rows that have a value"),
   _operation('COUNT("choice", column, …)', 'COUNT("<choice>", <column>)',
-             "Per row, how many of the columns hold the choice. Only inside SUM or AVERAGE"),
+             "Per row, how many of the columns hold the choice (True/False columns: \"True\" or \"False\"). "
+             "Only inside SUM or AVERAGE"),
   _operation("+  add", " + ", "Add two values"),
   _operation("−  subtract", " - ", "Subtract the second value from the first"),
   _operation("×  multiply", " * ", "Multiply two values"),
@@ -371,6 +374,13 @@ class _Parser:
     if token.kind is _Kind.SHEET:
       self._next()
       self._column(token, aggregate)
+    elif token.kind is _Kind.RESULT:
+      self._next()
+      if not token.value.strip():
+        raise _Problem("Write a calculation's name inside { }", token.start, token.end)
+      self.references.append(FormulaReference(
+        ReferenceKind.RESULT, (token.value,), token.start, token.end, aggregate_start=aggregate.start,
+      ))
     elif token.kind is _Kind.WORD and token.value == "COUNT":
       self._next()
       self._count(token, aggregate)
@@ -378,7 +388,8 @@ class _Parser:
       raise _Problem(f"Fill in {token.text}", token.start, token.end)
     else:
       raise _Problem(
-        f'{aggregate.text.upper()} takes one row measure: a column like [Table/Column], or COUNT(...)',
+        f'{aggregate.text.upper()} takes one row measure: a column like [Table/Column], '
+        'a per-row result like {Name}, or COUNT(...)',
         token.start, token.end,
       )
 

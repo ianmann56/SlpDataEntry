@@ -9,7 +9,7 @@ checks interpreter types.
 from typing import NamedTuple
 
 from interpretation.analysis.formula import escape_name
-from interpretation.analysis.model import DataSheetAnalysis
+from interpretation.analysis.model import Calculation, DataSheetAnalysis
 from interpretation.analysis.parts import TableColumnPart
 from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
 from interpretation.value_types import ColumnType
@@ -19,6 +19,9 @@ NUMBER_COLUMN_TYPES: tuple[ColumnType, ...] = (ColumnType.INT, ColumnType.DECIMA
 
 # How a formula names a tally's total, after its section and column
 TALLY_TOTAL_PART: str = "Total"
+
+# The choices a True/False column offers to a choice count
+BOOLEAN_CHOICES: tuple[str, ...] = ("True", "False")
 
 
 def fold(name: str) -> str:
@@ -48,12 +51,14 @@ class ScopeTable(NamedTuple):
     section: The table's Section Name.
     number_columns: Its Integer and Decimal columns.
     tally_columns: Each Tally column with its entries: one per mark, then the total.
-    choice_columns: Each Choice column with its choices and its entry.
+    choice_columns: Each Choice or True/False column with its choices and its entry.
+    row_results: The Row Lists of lower-layer calculations over this table, in order.
   """
   section: str
   number_columns: list[ScopeEntry]
   tally_columns: list[tuple[str, list[ScopeEntry]]]
   choice_columns: list[tuple[str, list[str], ScopeEntry]]
+  row_results: list[ScopeEntry]
 
 
 class AnalysisScope(NamedTuple):
@@ -62,8 +67,9 @@ class AnalysisScope(NamedTuple):
 
   Properties:
     sheet_values: The Numeric Sheet Values of every section that can be told apart.
-    tables: The table sections that have a column a Row Measure can read.
-    results: The results of every calculation in a lower layer, in order.
+    tables: The table sections that have a column or Row List a Row Measure can read.
+    results: The single-number results of every calculation in a lower layer, in order.
+      Row Lists are not here: they are listed with their table.
   """
   sheet_values: list[ScopeEntry]
   tables: list[ScopeTable]
@@ -98,6 +104,15 @@ def find_column(columns: list[TableColumnPart], name: str) -> TableColumnPart | 
   return next((column for column in columns if fold(column.name) == fold(name)), None)
 
 
+def countable_choices(column: TableColumnPart) -> list[str] | None:
+  """The choices a choice count can count in this column, or None when it is not a Choice or True/False column."""
+  if column.column_type is ColumnType.CHOICE:
+    return list(column.choices)
+  if column.column_type is ColumnType.BOOLEAN:
+    return list(BOOLEAN_CHOICES)
+  return None
+
+
 def find_sheet_value(sheet_values: list[str], name: str) -> str | None:
   """The Numeric Sheet Value with this name, as configured, or None."""
   return next((value for value in sheet_values if fold(value) == fold(name)), None)
@@ -112,6 +127,15 @@ def lower_layer_names(analysis: DataSheetAnalysis, layer_number: int) -> list[st
   ]
 
 
+def lower_layer_calculation(analysis: DataSheetAnalysis, layer_number: int, name: str) -> Calculation | None:
+  """The calculation in layers 1 to layer_number - 1 with this name, or None."""
+  return next(
+    (calculation for number, _, calculation in analysis.all_calculations()
+     if number < layer_number and fold(calculation.name) == fold(name)),
+    None,
+  )
+
+
 def result_reference(name: str) -> str:
   """How a formula writes a calculation's result."""
   return f"{{{escape_name(name)}}}"
@@ -122,7 +146,7 @@ def sheet_reference(*parts: str) -> str:
   return "[" + "/".join(escape_name(part) for part in parts) + "]"
 
 
-def _scope_table(section: str, columns: list[TableColumnPart]) -> ScopeTable | None:
+def _scope_table(section: str, columns: list[TableColumnPart], row_results: list[ScopeEntry]) -> ScopeTable | None:
   number_columns: list[ScopeEntry] = []
   tally_columns: list[tuple[str, list[ScopeEntry]]] = []
   choice_columns: list[tuple[str, list[str], ScopeEntry]] = []
@@ -135,12 +159,12 @@ def _scope_table(section: str, columns: list[TableColumnPart]) -> ScopeTable | N
         for part in [*column.tally_marks, TALLY_TOTAL_PART]
       ]
       tally_columns.append((column.name, entries))
-    elif column.column_type is ColumnType.CHOICE:
+    elif (choices := countable_choices(column)) is not None:
       entry = ScopeEntry(column.name, sheet_reference(section, column.name), "")
-      choice_columns.append((column.name, list(column.choices), entry))
-  if not (number_columns or tally_columns or choice_columns):
+      choice_columns.append((column.name, choices, entry))
+  if not (number_columns or tally_columns or choice_columns or row_results):
     return None
-  return ScopeTable(section, number_columns, tally_columns, choice_columns)
+  return ScopeTable(section, number_columns, tally_columns, choice_columns, row_results)
 
 
 def analysis_scope(
@@ -153,6 +177,12 @@ def analysis_scope(
   shares are left out, because a name can't tell them apart.
   """
   counts = section_name_counts(interpreters)
+  lower = [calculation for number, _, calculation in analysis.all_calculations() if number < layer_number]
+  results = [
+    ScopeEntry(calculation.name, result_reference(calculation.name), calculation.description)
+    for calculation in lower
+    if calculation.row_list_section is None
+  ]
   sheet_values: list[ScopeEntry] = []
   tables: list[ScopeTable] = []
   for interpreter in interpreters:
@@ -165,13 +195,12 @@ def analysis_scope(
       for value in parts.sheet_values
     )
     if parts.table_columns:
-      table = _scope_table(section, parts.table_columns)
+      row_results = [
+        ScopeEntry(calculation.name, result_reference(calculation.name), calculation.description)
+        for calculation in lower
+        if calculation.row_list_section is not None and fold(calculation.row_list_section) == fold(section)
+      ]
+      table = _scope_table(section, parts.table_columns, row_results)
       if table is not None:
         tables.append(table)
-
-  results = [
-    ScopeEntry(calculation.name, result_reference(calculation.name), calculation.description)
-    for number, _, calculation in analysis.all_calculations()
-    if number < layer_number
-  ]
   return AnalysisScope(sheet_values, tables, results)

@@ -72,7 +72,10 @@ class FormulaLegend:
                     meaning = "Tally total" if entry.reference.endswith("/Total]") else f'Count of "{part}"'
                     self._leaf(tally, entry.reference, meaning, entry.reference)
             for _, choices, entry in table.choice_columns:
-                self._leaf(node, entry.reference, "Choice column, for COUNT: " + ", ".join(choices), entry.reference)
+                self._leaf(node, entry.reference, "For COUNT: " + ", ".join(choices), entry.reference)
+            for entry in table.row_results:
+                meaning = "A value per row" + (f": {entry.description}" if entry.description else "")
+                self._leaf(node, entry.reference, meaning, entry.reference)
 
         if scope.sheet_values:
             values = self._tree.insert(variables, tk.END, text="Sheet values", open=True,
