@@ -9,7 +9,13 @@ checks interpreter types.
 from typing import NamedTuple
 
 from interpretation.analysis.formula import escape_name
-from interpretation.analysis.model import Calculation, DataSheetAnalysis
+from interpretation.analysis.model import (
+  Calculation,
+  DataSheetAnalysis,
+  NumberColumnMeasure,
+  RowResultMeasure,
+  TallyCountMeasure,
+)
 from interpretation.analysis.parts import TableColumnPart
 from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
 from interpretation.value_types import ColumnType
@@ -204,3 +210,16 @@ def analysis_scope(
       if table is not None:
         tables.append(table)
   return AnalysisScope(sheet_values, tables, results)
+
+
+def row_value_sides(table: ScopeTable) -> list[NumberColumnMeasure | TallyCountMeasure | RowResultMeasure]:
+  """Every value a row of this table has that a comparison can compare: its number columns, tally parts, and Row Lists."""
+  sides: list[NumberColumnMeasure | TallyCountMeasure | RowResultMeasure] = [
+    NumberColumnMeasure(entry.label) for entry in table.number_columns
+  ]
+  for column, entries in table.tally_columns:
+    for entry in entries:
+      part = entry.label.split(" › ")[-1]
+      sides.append(TallyCountMeasure(column, None if fold(part) == fold(TALLY_TOTAL_PART) else part))
+  sides.extend(RowResultMeasure(entry.label) for entry in table.row_results)
+  return sides

@@ -15,6 +15,9 @@ from interpretation.analysis.model import (
   CalculationDefinition,
   ChoiceCountMeasure,
   Combination,
+  ComparisonMeasure,
+  ComparisonOperator,
+  ComparisonSide,
   DataSheetAnalysis,
   Formula,
   NumberColumnMeasure,
@@ -86,7 +89,20 @@ def _measure_to_json(measure: RowMeasure) -> dict[str, Any]:
     return {"kind": "tally_count", "column": measure.column, "mark": measure.mark}
   if isinstance(measure, RowResultMeasure):
     return {"kind": "row_result", "calculation": measure.calculation}
+  if isinstance(measure, ComparisonMeasure):
+    return {
+      "kind": "comparison",
+      "left": _side_to_json(measure.left),
+      "operator": measure.operator.name,
+      "right": _side_to_json(measure.right),
+    }
   return {"kind": "choice_count", "choice": measure.choice, "columns": list(measure.columns)}
+
+
+def _side_to_json(side: ComparisonSide) -> dict[str, Any]:
+  if isinstance(side, (NumberColumnMeasure, TallyCountMeasure, RowResultMeasure)):
+    return _measure_to_json(side)
+  return _operand_to_json(side)
 
 
 def _operand_to_json(operand: Operand) -> dict[str, Any]:
@@ -111,7 +127,7 @@ def _calculation_from_json(data: dict[str, Any]) -> Calculation:
   elif kind == "arithmetic":
     definition = Arithmetic(
       _operand_from_json(data.get("left") or {}),
-      _member(ArithmeticOperation, data.get("operation"), "operation"),
+      _operation_from_json(data.get("operation")),
       _operand_from_json(data.get("right") or {}),
     )
   elif kind == "formula":
@@ -132,7 +148,28 @@ def _measure_from_json(data: dict[str, Any]) -> RowMeasure:
     return ChoiceCountMeasure(str(data.get("choice", "")), tuple(str(column) for column in data.get("columns") or []))
   if kind == "row_result":
     return RowResultMeasure(str(data.get("calculation", "")))
+  if kind == "comparison":
+    return ComparisonMeasure(
+      _side_from_json(data.get("left") or {}),
+      _member(ComparisonOperator, data.get("operator"), "comparison"),
+      _side_from_json(data.get("right") or {}),
+    )
   raise ValueError(f'Unknown row measure kind "{kind}".')
+
+
+def _side_from_json(data: dict[str, Any]) -> ComparisonSide:
+  if data.get("kind") in ("number_column", "tally_count", "row_result"):
+    measure = _measure_from_json(data)
+    assert isinstance(measure, (NumberColumnMeasure, TallyCountMeasure, RowResultMeasure))
+    return measure
+  return _operand_from_json(data)
+
+
+def _operation_from_json(name: Any) -> ArithmeticOperation | ComparisonOperator:
+  """An Arithmetic operation: arithmetic, or a comparison. Their member names don't overlap."""
+  if isinstance(name, str) and name in ComparisonOperator.__members__:
+    return ComparisonOperator[name]
+  return _member(ArithmeticOperation, name, "operation")
 
 
 def _operand_from_json(data: dict[str, Any]) -> Operand:

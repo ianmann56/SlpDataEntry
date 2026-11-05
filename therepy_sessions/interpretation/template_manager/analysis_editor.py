@@ -21,11 +21,13 @@ from interpretation.analysis.model import (
     CalculationDefinition,
     ChoiceCountMeasure,
     Combination,
+    ComparisonMeasure,
+    ComparisonOperator,
+    ComparisonSide,
     DataSheetAnalysis,
     Formula,
     NumberColumnMeasure,
     NumberOperand,
-    Operand,
     ResultOperand,
     RowAggregate,
     RowResultMeasure,
@@ -37,10 +39,17 @@ from interpretation.analysis.rules import (
     calculation_problems,
     calculations_using,
     describe_calculation,
-    describe_operand,
+    describe_side,
     formula_problems,
 )
-from interpretation.analysis.scope import TALLY_TOTAL_PART, AnalysisScope, ScopeTable, analysis_scope, fold
+from interpretation.analysis.scope import (
+    TALLY_TOTAL_PART,
+    AnalysisScope,
+    ScopeTable,
+    analysis_scope,
+    fold,
+    row_value_sides,
+)
 from interpretation.template_manager.formula_legend import FormulaLegend
 from interpretation.template_manager.template_rules import DESCRIPTION_HINT
 from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
@@ -54,6 +63,8 @@ _NUMBER_COLUMN = "Number column"
 _TALLY_COUNT = "Tally count"
 _CHOICE_COUNT = "Choice count"
 _ROW_RESULT = "Row result"
+_COMPARISON = "Comparison"
+_ROW_VALUE = "Row value"
 _RESULT = "Result"
 _SHEET_VALUE = "Sheet value"
 _NUMBER = "Number"
@@ -66,6 +77,19 @@ _OPERATION_LABELS: dict[ArithmeticOperation, str] = {
     ArithmeticOperation.MULTIPLY: "multiply (×)",
     ArithmeticOperation.DIVIDE: "divide (÷)",
     ArithmeticOperation.PERCENTAGE: "percentage (left ÷ right × 100)",
+}
+_COMPARISON_LABELS: dict[ComparisonOperator, str] = {
+    ComparisonOperator.EQUAL: "= equals",
+    ComparisonOperator.NOT_EQUAL: "≠ is not",
+    ComparisonOperator.LESS: "< is less than",
+    ComparisonOperator.AT_MOST: "≤ is at most",
+    ComparisonOperator.GREATER: "> is more than",
+    ComparisonOperator.AT_LEAST: "≥ is at least",
+}
+# The Arithmetic operations: arithmetic, then the comparisons, which give 1 or 0
+_ARITHMETIC_LABELS: dict[ArithmeticOperation | ComparisonOperator, str] = {
+    **_OPERATION_LABELS,
+    **{operator: f"{label} (1 if true, 0 if not)" for operator, label in _COMPARISON_LABELS.items()},
 }
 _COMBINATION_LABELS: dict[Combination, str] = {
     Combination.SUM: "Sum",
@@ -87,17 +111,24 @@ def _kind_label(calculation: Calculation) -> str:
 
 
 class _OperandRow:
-    """One Arithmetic input: its kind (a result, a sheet value, or a number) and its value."""
+    """
+    One Arithmetic input or comparison side: its kind (a value from each row, a result, a
+    sheet value, or a number) and its value. "Row value" is offered only with `row_values`.
+    """
 
-    def __init__(self, parent: tk.Misc, label: str, on_change: Callable[[], None]) -> None:
+    def __init__(self, parent: tk.Misc, label: str, on_change: Callable[[], None], row_values: bool = False,
+                 kind: str = _RESULT) -> None:
         self._on_change = on_change
-        # The operand behind each label in the value picker
-        self._operands: dict[str, Operand] = {}
+        self._row_values = row_values
+        # The input behind each label in the value picker
+        self._operands: dict[str, ComparisonSide] = {}
         self.frame: ttk.Frame = ttk.Frame(parent)
         ttk.Label(self.frame, text=label, width=8).pack(side=tk.LEFT)
-        self.kind_var = tk.StringVar(value=_RESULT)
+        self._default_kind = kind
+        self.kind_var = tk.StringVar(value=kind)
+        kinds = ([_ROW_VALUE] if row_values else []) + [_RESULT, _SHEET_VALUE, _NUMBER]
         self._kind_picker = ttk.Combobox(self.frame, textvariable=self.kind_var, state="readonly", width=12,
-                                         values=[_RESULT, _SHEET_VALUE, _NUMBER])
+                                         values=kinds)
         self._kind_picker.pack(side=tk.LEFT, padx=(0, 5))
         self._kind_picker.bind("<<ComboboxSelected>>", lambda e: self._kind_changed())
         self.value_var = tk.StringVar()
@@ -107,10 +138,12 @@ class _OperandRow:
         self._number_entry = ttk.Entry(self.frame, textvariable=self.number_var, width=12)
         self.number_var.trace_add("write", lambda *a: on_change())
         self._scope: AnalysisScope | None = None
+        self._table: ScopeTable | None = None
 
-    def fill(self, scope: AnalysisScope) -> None:
-        """Offer the results and sheet values in scope, keeping the current choice."""
+    def fill(self, scope: AnalysisScope, table: ScopeTable | None = None) -> None:
+        """Offer the results, sheet values, and (with row values) the table's row values in scope, keeping the current choice."""
         self._scope = scope
+        self._table = table
         current = self.operand()
         self._show_kind(current)
 
@@ -119,18 +152,20 @@ class _OperandRow:
         self._show_kind(None)
         self._on_change()
 
-    def _show_kind(self, keep: Operand | None) -> None:
+    def _show_kind(self, keep: ComparisonSide | None) -> None:
         scope = self._scope
         self._operands = {}
-        if scope is not None and self.kind_var.get() == _RESULT:
+        if self.kind_var.get() == _ROW_VALUE and self._table is not None:
+            self._operands = {describe_side(side): side for side in row_value_sides(self._table)}
+        elif scope is not None and self.kind_var.get() == _RESULT:
             self._operands = {entry.label: ResultOperand(entry.label) for entry in scope.results}
         elif scope is not None and self.kind_var.get() == _SHEET_VALUE:
             for entry in scope.sheet_values:
                 section, value = entry.label.split(" › ", 1)
                 self._operands[entry.label] = SheetValueOperand(section, value)
         # A saved input that is no longer in scope stays listed, so Apply can say why
-        if keep is not None and not isinstance(keep, NumberOperand):
-            label = describe_operand(keep)
+        if keep is not None and not isinstance(keep, NumberOperand) and self._kind_of(keep) == self.kind_var.get():
+            label = describe_side(keep)
             if label.strip() and label.strip() != "›":
                 self._operands.setdefault(label, keep)
         self._value_picker.configure(values=list(self._operands))
@@ -141,19 +176,35 @@ class _OperandRow:
             self._number_entry.pack_forget()
             self._value_picker.pack(side=tk.LEFT)
 
-    def load(self, operand: Operand) -> None:
+    def reset(self) -> None:
+        """Empty the input, back to its first kind."""
+        self.kind_var.set(self._default_kind)
+        self.value_var.set("")
+        self.number_var.set("")
+        self._show_kind(None)
+
+    @staticmethod
+    def _kind_of(side: ComparisonSide) -> str:
+        if isinstance(side, NumberOperand):
+            return _NUMBER
+        if isinstance(side, ResultOperand):
+            return _RESULT
+        if isinstance(side, SheetValueOperand):
+            return _SHEET_VALUE
+        return _ROW_VALUE
+
+    def load(self, operand: ComparisonSide) -> None:
         """Show a saved input."""
+        self.kind_var.set(self._kind_of(operand))
         if isinstance(operand, NumberOperand):
-            self.kind_var.set(_NUMBER)
             self.number_var.set(str(operand.number))
             self.value_var.set("")
         else:
-            self.kind_var.set(_RESULT if isinstance(operand, ResultOperand) else _SHEET_VALUE)
-            self.value_var.set(describe_operand(operand))
+            self.value_var.set(describe_side(operand))
             self.number_var.set("")
         self._show_kind(operand)
 
-    def operand(self) -> Operand:
+    def operand(self) -> ComparisonSide:
         """The input as chosen. An incomplete choice gives an input the rules report."""
         kind = self.kind_var.get()
         if kind == _NUMBER:
@@ -164,6 +215,8 @@ class _OperandRow:
         label = self.value_var.get()
         if label in self._operands:
             return self._operands[label]
+        if kind == _ROW_VALUE:
+            return NumberColumnMeasure("")
         return ResultOperand("") if kind == _RESULT else SheetValueOperand(label, "")
 
 
@@ -530,9 +583,17 @@ class AnalysisEditor:
         self._mark_row = aggregate_row("Mark:", self._mark_picker, 3)
         self._choice_row = aggregate_row("Choice:", self._choice_picker, 4)
         self._choice_columns_row = aggregate_row("Columns:", self._choice_columns, 5)
-        aggregate_row("Combine:", self._combination_picker, 6)
+        self._compare_left = _OperandRow(aggregate, "Compare:", lambda: None, row_values=True, kind=_ROW_VALUE)
+        self._compare_left.frame.grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+        self._comparison_var = tk.StringVar(value=_COMPARISON_LABELS[ComparisonOperator.AT_LEAST])
+        comparison_picker = ttk.Combobox(aggregate, textvariable=self._comparison_var, state="readonly",
+                                         width=16, values=list(_COMPARISON_LABELS.values()))
+        self._comparison_row = aggregate_row("Is:", comparison_picker, 7)
+        self._compare_right = _OperandRow(aggregate, "With:", lambda: None, row_values=True, kind=_NUMBER)
+        self._compare_right.frame.grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+        aggregate_row("Combine:", self._combination_picker, 9)
         self._nothing_to_measure = ttk.Label(aggregate, text=_NOTHING_TO_MEASURE, wraplength=420, justify=tk.LEFT)
-        self._nothing_to_measure.grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+        self._nothing_to_measure.grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
         for picker in (self._table_picker, self._measure_picker, self._column_picker, self._choice_picker):
             picker.bind("<<ComboboxSelected>>", lambda e: self._fill_pickers())
 
@@ -544,9 +605,9 @@ class AnalysisEditor:
         operation_row = ttk.Frame(self._arithmetic_frame)
         operation_row.grid(row=1, column=0, sticky=tk.W, pady=(5, 0))
         ttk.Label(operation_row, text="Operation:", width=10).pack(side=tk.LEFT)
-        self._operation_var = tk.StringVar(value=_OPERATION_LABELS[ArithmeticOperation.PERCENTAGE])
-        ttk.Combobox(operation_row, textvariable=self._operation_var, state="readonly", width=32,
-                     values=list(_OPERATION_LABELS.values())).pack(side=tk.LEFT)
+        self._operation_var = tk.StringVar(value=_ARITHMETIC_LABELS[ArithmeticOperation.PERCENTAGE])
+        ttk.Combobox(operation_row, textvariable=self._operation_var, state="readonly", width=34,
+                     values=list(_ARITHMETIC_LABELS.values())).pack(side=tk.LEFT)
         self._right = _OperandRow(self._arithmetic_frame, "Right:", lambda: None)
         self._right.frame.grid(row=2, column=0, sticky=tk.W, pady=(5, 0))
 
@@ -609,7 +670,7 @@ class AnalysisEditor:
                 self._build_var.set(_MENU)
             if isinstance(definition, Arithmetic):
                 self._kind_var.set(_ARITHMETIC)
-                self._operation_var.set(_OPERATION_LABELS[definition.operation])
+                self._operation_var.set(_ARITHMETIC_LABELS[definition.operation])
                 self._left.load(definition.left)
                 self._right.load(definition.right)
             elif isinstance(definition, RowAggregate):
@@ -627,6 +688,9 @@ class AnalysisEditor:
         self._combination_var.set(_COMBINATION_LABELS[aggregate.combination])
         measure = aggregate.measure
         self._choice_columns.delete(0, tk.END)
+        self._compare_left.reset()
+        self._compare_right.reset()
+        self._comparison_var.set(_COMPARISON_LABELS[ComparisonOperator.AT_LEAST])
         if isinstance(measure, NumberColumnMeasure):
             self._measure_var.set(_NUMBER_COLUMN)
             self._column_var.set(measure.column)
@@ -637,6 +701,11 @@ class AnalysisEditor:
         elif isinstance(measure, RowResultMeasure):
             self._measure_var.set(_ROW_RESULT)
             self._column_var.set(measure.calculation)
+        elif isinstance(measure, ComparisonMeasure):
+            self._measure_var.set(_COMPARISON)
+            self._compare_left.load(measure.left)
+            self._comparison_var.set(_COMPARISON_LABELS[measure.operator])
+            self._compare_right.load(measure.right)
         else:
             self._measure_var.set(_CHOICE_COUNT)
             self._choice_var.set(measure.choice)
@@ -699,14 +768,22 @@ class AnalysisEditor:
                     measures.append(_CHOICE_COUNT)
                 if table.row_results:
                     measures.append(_ROW_RESULT)
+                if row_value_sides(table):
+                    measures.append(_COMPARISON)
             self._measure_picker.configure(values=measures)
             if measures and self._measure_var.get() not in measures and table is not None:
                 self._measure_var.set(measures[0])
             measure = self._measure_var.get()
 
-            for widget_row in (self._column_row, self._mark_row, self._choice_row, self._choice_columns_row):
+            for widget_row in (self._column_row, self._mark_row, self._choice_row, self._choice_columns_row,
+                               self._comparison_row, (self._compare_left.frame, self._compare_right.frame)):
                 for widget in widget_row:
                     widget.grid_remove()
+            if measure == _COMPARISON:
+                self._compare_left.fill(scope, table)
+                self._compare_right.fill(scope, table)
+                for widget in (*self._comparison_row, self._compare_left.frame, self._compare_right.frame):
+                    widget.grid()
             if measure in (_NUMBER_COLUMN, _TALLY_COUNT, _ROW_RESULT):
                 for widget in self._column_row:
                     widget.grid()
@@ -763,7 +840,7 @@ class AnalysisEditor:
 
     def _menu_definition(self) -> CalculationDefinition:
         if self._kind_var.get() == _ARITHMETIC:
-            operation = next((o for o, label in _OPERATION_LABELS.items() if label == self._operation_var.get()),
+            operation = next((o for o, label in _ARITHMETIC_LABELS.items() if label == self._operation_var.get()),
                              ArithmeticOperation.ADD)
             return Arithmetic(self._left.operand(), operation, self._right.operand())
         combination = next((c for c, label in _COMBINATION_LABELS.items() if label == self._combination_var.get()),
@@ -778,6 +855,10 @@ class AnalysisEditor:
             measure = ChoiceCountMeasure(self._choice_var.get(), columns)
         elif measure_kind == _ROW_RESULT:
             measure = RowResultMeasure(self._column_var.get())
+        elif measure_kind == _COMPARISON:
+            operator = next((o for o, label in _COMPARISON_LABELS.items() if label == self._comparison_var.get()),
+                            ComparisonOperator.EQUAL)
+            measure = ComparisonMeasure(self._compare_left.operand(), operator, self._compare_right.operand())
         else:
             measure = NumberColumnMeasure(self._column_var.get())
         return RowAggregate(self._table_var.get(), measure, combination)

@@ -18,12 +18,15 @@ from interpretation.analysis.model import (
   Calculation,
   CalculationDefinition,
   ChoiceCountMeasure,
+  ComparisonMeasure,
+  ComparisonSide,
   DataSheetAnalysis,
   Formula,
   NumberColumnMeasure,
   Operand,
   ResultOperand,
   RowAggregate,
+  NumberOperand,
   RowResultMeasure,
   SheetValueOperand,
   TallyCountMeasure,
@@ -95,14 +98,37 @@ def _same(a: str, b: str) -> bool:
 
 def _renamed_aggregate(aggregate: RowAggregate, rename: PartRename) -> RowAggregate:
   measure = aggregate.measure
+  if isinstance(measure, ComparisonMeasure):
+    # Sheet values on either side may belong to other sections, so each side follows on its own
+    measure = replace(
+      measure,
+      left=_renamed_side(measure.left, aggregate.section, rename),
+      right=_renamed_side(measure.right, aggregate.section, rename),
+    )
+  else:
+    measure = _renamed_measure(measure, aggregate.section, rename)
+  section = aggregate.section
+  if rename.kind is PartKind.SECTION and _same(section, rename.old):
+    section = rename.new
+  return replace(aggregate, section=section, measure=measure)
+
+
+def _renamed_side(side: ComparisonSide, section: str, rename: PartRename) -> ComparisonSide:
+  if isinstance(side, (ResultOperand, SheetValueOperand, NumberOperand)):
+    return _renamed_operand(side, rename)
+  renamed = _renamed_measure(side, section, rename)
+  assert not isinstance(renamed, (ChoiceCountMeasure, ComparisonMeasure))
+  return renamed
+
+
+def _renamed_measure(measure, section: str, rename: PartRename):
+  """A row measure of the table `section` (its name before this rename) after the rename."""
   if rename.kind is PartKind.CALCULATION:
     if isinstance(measure, RowResultMeasure) and _same(measure.calculation, rename.old):
-      return replace(aggregate, measure=RowResultMeasure(rename.new))
-    return aggregate
-  if rename.kind is PartKind.SECTION:
-    return replace(aggregate, section=rename.new) if _same(aggregate.section, rename.old) else aggregate
-  if not _same(aggregate.section, rename.section):
-    return aggregate
+      return RowResultMeasure(rename.new)
+    return measure
+  if rename.kind is PartKind.SECTION or not _same(section, rename.section):
+    return measure
 
   if rename.kind is PartKind.ITEM:
     if isinstance(measure, (NumberColumnMeasure, TallyCountMeasure)) and _same(measure.column, rename.old):
@@ -118,7 +144,7 @@ def _renamed_aggregate(aggregate: RowAggregate, rename: PartRename) -> RowAggreg
     elif (isinstance(measure, ChoiceCountMeasure) and _same(measure.choice, rename.old)
           and any(_same(column, rename.item) for column in measure.columns)):
       measure = replace(measure, choice=rename.new)
-  return replace(aggregate, measure=measure)
+  return measure
 
 
 def _renamed_operand(operand: Operand, rename: PartRename) -> Operand:
@@ -169,6 +195,12 @@ def _renamed_parts(reference: FormulaReference, rename: PartRename) -> tuple[str
   if rename.kind is PartKind.ITEM and _same(parts[1], rename.old):
     parts[1] = rename.new
     return tuple(parts)
+  # Inside SUM or AVERAGE, [Section/Value] of a section that isn't a table is a sheet value
+  if len(parts) == 2 and reference.choice is None:
+    value = _renamed_value(parts[1], rename)
+    if value is not None:
+      parts[1] = value
+      return tuple(parts)
   if (rename.kind is PartKind.OPTION and rename.item and len(parts) == 3
       and _same(parts[1], rename.item) and _same(parts[2], rename.old)):
     parts[2] = rename.new

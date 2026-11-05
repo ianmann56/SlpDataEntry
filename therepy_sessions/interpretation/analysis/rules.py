@@ -13,10 +13,14 @@ from interpretation.analysis.model import (
   Calculation,
   ChoiceCountMeasure,
   Combination,
+  ComparisonMeasure,
+  ComparisonOperator,
+  ComparisonSide,
   DataSheetAnalysis,
   Formula,
   NumberColumnMeasure,
   Operand,
+  ROW_SIDES,
   ResultOperand,
   RowAggregate,
   RowResultMeasure,
@@ -88,7 +92,7 @@ def _number_column(column: TableColumnPart) -> None:
   if column.column_type is ColumnType.BOOLEAN:
     raise _Problem(f'"{column.name}" is a True/False column: count "True" or "False" with a choice count')
   if column.column_type not in NUMBER_COLUMN_TYPES:
-    raise _Problem(f'"{column.name}" is {_type_label(column)} column, so it can\'t be summed or averaged')
+    raise _Problem(f'"{column.name}" is {_type_label(column)} column, so it can\'t be measured or compared')
 
 
 def _tally_part(column: TableColumnPart, mark: str | None) -> None:
@@ -132,7 +136,7 @@ def _result(analysis: DataSheetAnalysis, layer_number: int, name: str, row_list_
   section = calculation.row_list_section
   if row_list_of is None and section is not None:
     raise _Problem(f'"{name.strip()}" has a value for each row of "{section.strip()}", '
-                   "so it can only be summed or averaged over those rows")
+                   "so it can only be used per row: inside SUM or AVERAGE, or as a row value of that table")
   if row_list_of is not None and section is None:
     raise _Problem(f'"{name.strip()}" is a single number, not a value for each row')
   if row_list_of is not None and section is not None and fold(section) != fold(row_list_of):
@@ -168,6 +172,8 @@ def _aggregate_problems(
       _tally_part(_column(columns, aggregate.section, measure.column), measure.mark)
     elif isinstance(measure, RowResultMeasure):
       _result(analysis, layer_number, measure.calculation, row_list_of=aggregate.section)
+    elif isinstance(measure, ComparisonMeasure):
+      return _comparison_problems(measure, aggregate.section, columns, interpreters, analysis, layer_number)
     else:
       if not measure.choice.strip():
         raise _Problem("choose the choice to count")
@@ -187,6 +193,33 @@ def _aggregate_problems(
         _choice_column(_column(columns, aggregate.section, name), measure.choice)
       except _Problem as e:
         problems.append(str(e))
+  return problems
+
+
+def _comparison_problems(
+  measure: ComparisonMeasure,
+  section: str,
+  columns: list[TableColumnPart],
+  interpreters: list[SessionDataSectionInterpreterBase],
+  analysis: DataSheetAnalysis,
+  layer_number: int,
+) -> list[str]:
+  problems: list[str] = []
+  for which, side in (("left", measure.left), ("right", measure.right)):
+    try:
+      if isinstance(side, NumberColumnMeasure):
+        _number_column(_column(columns, section, side.column))
+      elif isinstance(side, TallyCountMeasure):
+        _tally_part(_column(columns, section, side.column), side.mark)
+      elif isinstance(side, RowResultMeasure):
+        _result(analysis, layer_number, side.calculation, row_list_of=section)
+      else:
+        problems.extend(f"the {which} side: {problem}"
+                        for problem in _operand_problems(side, interpreters, analysis, layer_number))
+    except _Problem as e:
+      problems.append(f"the {which} side: {e}")
+  if not problems and not any(isinstance(side, ROW_SIDES) for side in (measure.left, measure.right)):
+    problems.append(f'compare at least one value from each row of "{section.strip()}"')
   return problems
 
 
@@ -219,8 +252,9 @@ def formula_problems(
   """
   Every problem with a formula for a calculation in this layer: its syntax problem, if
   any, or else every reference problem in text order (an unknown, ambiguous, or
-  out-of-layer name, the wrong type, columns from two tables in one aggregation, or a
-  choice a column doesn't offer). [] when the formula can be used.
+  out-of-layer name, the wrong type, per-row values from two tables in one aggregation,
+  an aggregation with nothing per row, or a choice a column doesn't offer). [] when the
+  formula can be used.
   """
   parse = parse_formula(text)
   if parse.problem is not None:
@@ -228,12 +262,30 @@ def formula_problems(
 
   problems: list[FormulaProblem] = []
   table_by_aggregate: dict[int, str] = {}
+  failed_aggregates: set[int] = set()
   for reference in parse.references:
     try:
-      _check_reference(reference, interpreters, analysis, layer_number, table_by_aggregate)
+      table = _check_reference(reference, interpreters, analysis, layer_number)
     except _Problem as e:
       problems.append(FormulaProblem(_capitalized(str(e)), reference.start, reference.end))
-  return problems
+      failed_aggregates.add(reference.aggregate_start)
+      continue
+    if table is not None:
+      first_table = table_by_aggregate.setdefault(reference.aggregate_start, fold(table))
+      if first_table != fold(table):
+        problems.append(FormulaProblem(
+          "Everything measured per row in one SUM or AVERAGE must come from the same table",
+          reference.start, reference.end,
+        ))
+  for start, end in parse.aggregates:
+    if start not in table_by_aggregate and start not in failed_aggregates:
+      word = text[start:text.index("(", start)].strip().upper()
+      problems.append(FormulaProblem(
+        f"{word} needs a value from each row of a table: a column like [Table/Column], "
+        "a per-row result, or COUNT over columns",
+        start, end,
+      ))
+  return sorted(problems, key=lambda problem: problem.start)
 
 
 def _check_reference(
@@ -241,34 +293,46 @@ def _check_reference(
   interpreters: list[SessionDataSectionInterpreterBase],
   analysis: DataSheetAnalysis,
   layer_number: int,
-  table_by_aggregate: dict[int, str],
-) -> None:
+) -> str | None:
+  """
+  Check one reference. Returns the table it has a value per row of, or None when it is
+  one value for the whole sheet.
+  """
   if reference.kind is ReferenceKind.RESULT:
     if reference.aggregate_start < 0:
       _result(analysis, layer_number, reference.parts[0])
-      return
-    # A Row List measured by SUM or AVERAGE: over the table its own calculation measured
+      return None
+    # Inside SUM or AVERAGE a result may be a Row List, or a number that is the same for every row
     calculation = lower_layer_calculation(analysis, layer_number, reference.parts[0])
-    table = calculation.row_list_section if calculation is not None else None
-    _result(analysis, layer_number, reference.parts[0], row_list_of=table or "")
-    return
-  section = reference.parts[0]
+    if calculation is None:
+      _result(analysis, layer_number, reference.parts[0])
+    return calculation.row_list_section if calculation is not None else None
+  section_name = reference.parts[0]
   if reference.kind is ReferenceKind.SHEET_VALUE:
-    _sheet_value(interpreters, section, reference.parts[1])
-    return
+    _sheet_value(interpreters, section_name, reference.parts[1])
+    return None
 
-  columns = _table_columns(interpreters, section)
-  first_table = table_by_aggregate.setdefault(reference.aggregate_start, fold(section))
-  if first_table != fold(section):
-    raise _Problem("every column in one SUM or AVERAGE must come from the same table")
-  column = _column(columns, section, reference.parts[1])
+  # Inside SUM or AVERAGE: a table's column, or a sheet value of a section that isn't a table
+  section = _section(interpreters, section_name)
+  columns = section.analysis_parts().table_columns
+  if not columns:
+    if len(reference.parts) == 2 and reference.choice is None:
+      _sheet_value(interpreters, section_name, reference.parts[1])
+      return None
+    raise _Problem(f'"{section_name.strip()}" is not a table')
+  column = _column(columns, section_name, reference.parts[1])
   if reference.choice is not None:
     _choice_column(column, reference.choice)
   elif len(reference.parts) == 3:
     part = reference.parts[2]
     _tally_part(column, None if fold(part) == fold(TALLY_TOTAL_PART) else part)
+  elif (choices := countable_choices(column)) is not None:
+    example = choices[0] if choices else "choice"
+    raise _Problem(f'"{column.name}" is {_type_label(column)} column: compare it with a choice, '
+                   f'like [{section_name.strip()}/{column.name}] = "{example}"')
   else:
     _number_column(column)
+  return section_name
 
 
 # ----- Calculations and the whole analysis -----
@@ -356,6 +420,27 @@ _OPERATION_WORDS: dict[ArithmeticOperation, str] = {
 }
 
 
+_COMPARISON_WORDS: dict[ComparisonOperator, str] = {
+  ComparisonOperator.EQUAL: "=",
+  ComparisonOperator.NOT_EQUAL: "≠",
+  ComparisonOperator.LESS: "<",
+  ComparisonOperator.AT_MOST: "≤",
+  ComparisonOperator.GREATER: ">",
+  ComparisonOperator.AT_LEAST: "≥",
+}
+
+
+def describe_side(side: ComparisonSide) -> str:
+  """One side of a comparison in plain language: a value from each row, or an Arithmetic input."""
+  if isinstance(side, NumberColumnMeasure):
+    return side.column
+  if isinstance(side, TallyCountMeasure):
+    return f"{side.column} › {TALLY_TOTAL_PART if side.mark is None else side.mark}"
+  if isinstance(side, RowResultMeasure):
+    return f"{side.calculation} (per row)"
+  return describe_operand(side)
+
+
 def describe_operand(operand: Operand) -> str:
   """An Arithmetic input in plain language."""
   if isinstance(operand, ResultOperand):
@@ -372,11 +457,20 @@ def describe_calculation(calculation: Calculation) -> str:
     return definition.text
   if isinstance(definition, Arithmetic):
     left, right = describe_operand(definition.left), describe_operand(definition.right)
+    if isinstance(definition.operation, ComparisonOperator):
+      return f"1 if {left} {_COMPARISON_WORDS[definition.operation]} {right}, else 0"
     if definition.operation is ArithmeticOperation.PERCENTAGE:
       return f"{left} as a percentage of {right}"
     return f"{left} {_OPERATION_WORDS[definition.operation]} {right}"
 
   measure = definition.measure
+  if isinstance(measure, ComparisonMeasure):
+    condition = f"{describe_side(measure.left)} {_COMPARISON_WORDS[measure.operator]} {describe_side(measure.right)}"
+    if definition.combination is Combination.SUM:
+      return f"Number of rows of {definition.section} where {condition}"
+    if definition.combination is Combination.AVERAGE:
+      return f"Share of rows of {definition.section} where {condition} (0 to 1)"
+    return f"For each row of {definition.section}: 1 if {condition}, else 0"
   if (isinstance(measure, ChoiceCountMeasure) and len(measure.columns) == 1
       and definition.combination is Combination.SUM):
     return f'Number of rows of {definition.section} where {measure.columns[0]} is "{measure.choice}"'

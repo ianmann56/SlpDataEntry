@@ -57,6 +57,7 @@ Rules:
 | `NumberColumnMeasure` | `column: str` | The column is Integer or Decimal. |
 | `TallyCountMeasure` | `column: str`, `mark: str \| None` | The column is Tally. `mark` is one of its tally options, or `None` for the tally's total. |
 | `ChoiceCountMeasure` | `choice: str`, `columns: tuple[str, ...]` (one or more, no repeats) | Every column is Choice or True/False and offers `choice`, matched ignoring letter case and surrounding spaces. A True/False column offers `True` and `False` (`scope.BOOLEAN_CHOICES`). |
+| `ComparisonMeasure` | `left: ComparisonSide`, `operator: ComparisonOperator`, `right: ComparisonSide` | Each side is a `NumberColumnMeasure`, `TallyCountMeasure`, or `RowResultMeasure` of this table (a value from each row), or an `Operand` (one value for the sheet; a `ResultOperand` must be a single number). At least one side is from the row. Saved as `{"kind": "comparison", "left": ..., "operator": "AT_LEAST", "right": ...}`, each side saved as its measure or operand. |
 | `RowResultMeasure` | `calculation: str` | Names a lower-layer calculation whose result is a Row List over this aggregate's `section`. Saved as `{"kind": "row_result", "calculation": ...}`. |
 
 ## Arithmetic (menu)
@@ -64,7 +65,7 @@ Rules:
 | Field | Type | Notes |
 | --- | --- | --- |
 | `left`, `right` | `Operand` | Two inputs. |
-| `operation` | `ArithmeticOperation` | `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, or `PERCENTAGE` (left ÷ right × 100). |
+| `operation` | `ArithmeticOperation \| ComparisonOperator` | `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, or `PERCENTAGE` (left ÷ right × 100); or a comparison `EQUAL`, `NOT_EQUAL`, `LESS`, `AT_MOST`, `GREATER`, `AT_LEAST`, giving 1 or 0. Saved by member name; the two enums' names don't overlap. |
 
 `Operand` is one of:
 

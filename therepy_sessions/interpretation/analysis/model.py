@@ -28,6 +28,38 @@ class ArithmeticOperation(Enum):
   PERCENTAGE = "percentage"  # left ÷ right × 100
 
 
+class ComparisonOperator(Enum):
+  """How a comparison compares two values. A comparison gives 1 when it holds, and 0 when it doesn't."""
+  EQUAL = "="
+  NOT_EQUAL = "≠"
+  LESS = "<"
+  AT_MOST = "≤"
+  GREATER = ">"
+  AT_LEAST = "≥"
+
+
+@dataclass(frozen=True)
+class ResultOperand:
+  """An Arithmetic or comparison input: the single-number result of a calculation in a lower layer."""
+  calculation: str
+
+
+@dataclass(frozen=True)
+class SheetValueOperand:
+  """An Arithmetic or comparison input: a Numeric Sheet Value of one section."""
+  section: str
+  value: str
+
+
+@dataclass(frozen=True)
+class NumberOperand:
+  """An Arithmetic or comparison input: a fixed number the SLP typed."""
+  number: Decimal
+
+
+Operand = ResultOperand | SheetValueOperand | NumberOperand
+
+
 @dataclass(frozen=True)
 class NumberColumnMeasure:
   """A Row Measure: the number in one Integer or Decimal column."""
@@ -54,7 +86,25 @@ class RowResultMeasure:
   calculation: str
 
 
-RowMeasure = NumberColumnMeasure | TallyCountMeasure | ChoiceCountMeasure | RowResultMeasure
+# One side of a Comparison Measure: a value from each row (the first three), or one value for the whole sheet
+ComparisonSide = NumberColumnMeasure | TallyCountMeasure | RowResultMeasure | ResultOperand | SheetValueOperand | NumberOperand
+
+# The sides that have a value for each row
+ROW_SIDES: tuple[type, ...] = (NumberColumnMeasure, TallyCountMeasure, RowResultMeasure)
+
+
+@dataclass(frozen=True)
+class ComparisonMeasure:
+  """
+  A Row Measure: 1 for a row where the comparison holds, 0 where it doesn't. At least one
+  side has a value for each row; the other may be one value for the whole sheet.
+  """
+  left: ComparisonSide
+  operator: ComparisonOperator
+  right: ComparisonSide
+
+
+RowMeasure = NumberColumnMeasure | TallyCountMeasure | ChoiceCountMeasure | RowResultMeasure | ComparisonMeasure
 
 
 @dataclass(frozen=True)
@@ -69,32 +119,10 @@ class RowAggregate:
 
 
 @dataclass(frozen=True)
-class ResultOperand:
-  """An Arithmetic input: the result of a calculation in a lower layer."""
-  calculation: str
-
-
-@dataclass(frozen=True)
-class SheetValueOperand:
-  """An Arithmetic input: a Numeric Sheet Value of one section."""
-  section: str
-  value: str
-
-
-@dataclass(frozen=True)
-class NumberOperand:
-  """An Arithmetic input: a fixed number the SLP typed."""
-  number: Decimal
-
-
-Operand = ResultOperand | SheetValueOperand | NumberOperand
-
-
-@dataclass(frozen=True)
 class Arithmetic:
-  """A menu calculation combining two inputs."""
+  """A menu calculation combining two inputs: by arithmetic, or by a comparison giving 1 or 0."""
   left: Operand
-  operation: ArithmeticOperation
+  operation: ArithmeticOperation | ComparisonOperator
   right: Operand
 
 
@@ -144,8 +172,12 @@ class Calculation:
     if isinstance(definition, Formula):
       parse = parse_formula(definition.text)
       return [reference.parts[0] for reference in parse.references if reference.kind is ReferenceKind.RESULT]
-    if isinstance(definition.measure, RowResultMeasure):
-      return [definition.measure.calculation]
+    measure = definition.measure
+    if isinstance(measure, RowResultMeasure):
+      return [measure.calculation]
+    if isinstance(measure, ComparisonMeasure):
+      return [side.calculation for side in (measure.left, measure.right)
+              if isinstance(side, (ResultOperand, RowResultMeasure))]
     return []
 
 

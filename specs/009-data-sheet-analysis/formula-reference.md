@@ -19,6 +19,26 @@ The rule underneath: anything with one value per **row** goes inside `SUM` or
 | Simple Form Integer or Decimal field | `[Session Info/Prompts given]` | Anywhere a value can go, but not inside `SUM` or `AVERAGE` |
 | Lower-layer single-number result | `{Correct trials}` | Anywhere a value can go, but not inside `SUM` or `AVERAGE` |
 
+## Comparisons and COUNT
+
+A comparison `=`, `<>` (or `!=`), `<`, `<=`, `>`, `>=` gives 1 when it holds and 0 when it
+doesn't. Either side can be any value, or arithmetic on values. Compare two values at a time.
+
+| Meaning | Written as |
+|---|---|
+| Did a result meet its target? | `{Accuracy} >= 70` |
+| Rows where a column passes a sheet value | `SUM([Trials/Words correct] >= [Session Info/Prompts given])` |
+| Rows where a Row List is at least 2 | `SUM({Plus per row} >= 2)` |
+| Share of rows (0 to 1) | `AVERAGE([Trials/Attempts/P] > 0)` |
+| A choice or True/False column holds a choice | `[Trials/Trial 1] = "+"`, `[Tone/Pitch] <> "True"` (only `=` or `<>`, only inside `SUM`, `AVERAGE`, or `COUNT`) |
+| How many conditions hold, per row | `SUM(COUNT([Tone/Pitch] = "True", [Tone/Speed] = "True", [Tone/Body] = "True") >= 2)` |
+| How many conditions hold, for the sheet | `COUNT({Accuracy} >= 70, {Prompted rate} < 20)` |
+
+Inside `SUM` or `AVERAGE`, the row measure can be any expression (e.g.
+`SUM([T/A] + [T/B])`) that uses at least one value from the rows of one table. Single
+values there (numbers, sheet values, single-number results) are the same for every row.
+`SUM` and `AVERAGE` can't be nested.
+
 See also: the grammar in [research.md](research.md) R3 and
 [contracts/analysis-model-and-formulas.md](contracts/analysis-model-and-formulas.md),
 which T044 updates to match this table.
