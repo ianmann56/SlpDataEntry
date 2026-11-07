@@ -68,6 +68,13 @@ _ROW_VALUE = "Row value"
 _RESULT = "Result"
 _SHEET_VALUE = "Sheet value"
 _NUMBER = "Number"
+
+# Shown in place of an input's empty value picker, saying why it has nothing to offer
+NO_RESULTS_NOTE: str = "No single-number results in lower layers."
+ROW_LISTS_NOTE: str = " Row Lists can only be summed or averaged, in a Row Aggregate or a formula."
+NO_SHEET_VALUES_NOTE: str = ("This template has no Numeric Sheet Values "
+                             "(Integer or Decimal form fields, or Running Tallies).")
+NO_ROW_VALUES_NOTE: str = "This table has no number or tally columns or Row Lists."
 _MENU = "menu"
 _FORMULA = "formula"
 
@@ -137,6 +144,7 @@ class _OperandRow:
         self.number_var = tk.StringVar()
         self._number_entry = ttk.Entry(self.frame, textvariable=self.number_var, width=12)
         self.number_var.trace_add("write", lambda *a: on_change())
+        self._empty_note = ttk.Label(self.frame, foreground="#8a8a8a", wraplength=420, justify=tk.LEFT)
         self._scope: AnalysisScope | None = None
         self._table: ScopeTable | None = None
 
@@ -169,12 +177,26 @@ class _OperandRow:
             if label.strip() and label.strip() != "›":
                 self._operands.setdefault(label, keep)
         self._value_picker.configure(values=list(self._operands))
+        self._value_picker.pack_forget()
+        self._number_entry.pack_forget()
+        self._empty_note.pack_forget()
         if self.kind_var.get() == _NUMBER:
-            self._value_picker.pack_forget()
             self._number_entry.pack(side=tk.LEFT)
-        else:
-            self._number_entry.pack_forget()
+        elif self._operands:
             self._value_picker.pack(side=tk.LEFT)
+        else:
+            self._empty_note.configure(text=self.empty_note())
+            self._empty_note.pack(side=tk.LEFT)
+
+    def empty_note(self) -> str:
+        """Why the current kind has nothing to offer: shown in place of its empty value picker."""
+        kind = self.kind_var.get()
+        if kind == _ROW_VALUE:
+            return NO_ROW_VALUES_NOTE
+        if kind == _SHEET_VALUE:
+            return NO_SHEET_VALUES_NOTE
+        has_row_lists = self._scope is not None and any(table.row_results for table in self._scope.tables)
+        return NO_RESULTS_NOTE + (ROW_LISTS_NOTE if has_row_lists else "")
 
     def reset(self) -> None:
         """Empty the input, back to its first kind."""
