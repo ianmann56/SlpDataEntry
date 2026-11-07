@@ -272,6 +272,8 @@ class AnalysisEditor:
         tree_scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S))
         self._tree.configure(yscrollcommand=tree_scrollbar.set)
         self._tree.bind("<<TreeviewSelect>>", self._on_tree_select)
+        # A Hidden Calculation's result won't appear with imported sheets; a mid gray reads in both themes
+        self._tree.tag_configure("hidden", foreground="#8a8a8a")
 
         self._buttons = ttk.Frame(area)
         self._buttons.grid(row=2, column=0, sticky=tk.W, pady=(5, 0))
@@ -365,9 +367,11 @@ class AnalysisEditor:
             layer_row = self._tree.insert("", tk.END, iid=f"L{layer_number}", text=f"Layer {layer_number}",
                                           open=True, values=("", "" if layer.calculations else "(no calculations)"))
             for index, calculation in enumerate(layer.calculations):
+                hidden = not calculation.show_in_imported_sheets
                 row = self._tree.insert(layer_row, tk.END, iid=f"C{layer_number}.{index}", open=True,
-                                        text=calculation.name,
-                                        values=(_kind_label(calculation), describe_calculation(calculation)))
+                                        text=f"{calculation.name} (hidden)" if hidden else calculation.name,
+                                        values=(_kind_label(calculation), describe_calculation(calculation)),
+                                        tags=("hidden",) if hidden else ())
                 if calculation.description.strip():
                     self._tree.insert(row, tk.END, iid=f"D{layer_number}.{index}", text="",
                                       values=("", calculation.description))
@@ -509,9 +513,12 @@ class AnalysisEditor:
         ttk.Label(panel, text="Description:").grid(row=1, column=0, sticky=tk.W, pady=(5, 0))
         ttk.Entry(panel, textvariable=self._description_var).grid(row=1, column=1, sticky=(tk.W, tk.E), pady=(5, 0))
         ttk.Label(panel, text=DESCRIPTION_HINT).grid(row=2, column=1, sticky=tk.W)
+        self._show_var = tk.BooleanVar(value=True)
+        self._show_check = ttk.Checkbutton(panel, text="Show in imported sheets", variable=self._show_var)
+        self._show_check.grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
 
         build = ttk.Frame(panel)
-        build.grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+        build.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
         ttk.Label(build, text="Build with:").pack(side=tk.LEFT, padx=(0, 5))
         for label, value in (("Menu", _MENU), ("Formula", _FORMULA)):
             ttk.Radiobutton(build, text=label, value=value, variable=self._build_var,
@@ -532,7 +539,7 @@ class AnalysisEditor:
 
         self._panel_message = ttk.Label(panel, text="Select a calculation, or press Add Calculation.")
         buttons = ttk.Frame(panel)
-        buttons.grid(row=6, column=0, columnspan=2, sticky=tk.E, pady=(5, 0))
+        buttons.grid(row=7, column=0, columnspan=2, sticky=tk.E, pady=(5, 0))
         self._apply_button = ttk.Button(buttons, text="Apply", command=self._apply)
         self._apply_button.pack(side=tk.LEFT, padx=(0, 5))
         self._cancel_button = ttk.Button(buttons, text="Cancel", command=self._on_panel_cancel)
@@ -621,13 +628,15 @@ class AnalysisEditor:
     def _set_panel_enabled(self, enabled: bool) -> None:
         if enabled:
             self._panel_message.grid_remove()
+            self._show_check.state(["!disabled"])
             self._apply_button.state(["!disabled"])
             self._cancel_button.state(["!disabled"])
         else:
             self._menu_frame.grid_remove()
             self._formula_frame.grid_remove()
             self._legend.frame.grid_remove()
-            self._panel_message.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+            self._panel_message.grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+            self._show_check.state(["disabled"])
             self._apply_button.state(["disabled"])
             self._cancel_button.state(["disabled"])
 
@@ -661,6 +670,7 @@ class AnalysisEditor:
         try:
             self._name_var.set(calculation.name)
             self._description_var.set(calculation.description)
+            self._show_var.set(calculation.show_in_imported_sheets)
             definition = calculation.definition
             self._formula_text.delete("1.0", tk.END)
             if isinstance(definition, Formula):
@@ -717,12 +727,12 @@ class AnalysisEditor:
             return
         if self._build_var.get() == _FORMULA:
             self._menu_frame.grid_remove()
-            self._formula_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0))
+            self._formula_frame.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0))
             self._legend.frame.grid(row=0, column=1, sticky=(tk.N, tk.S, tk.W, tk.E), padx=(10, 0))
         else:
             self._formula_frame.grid_remove()
             self._legend.frame.grid_remove()
-            self._menu_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0))
+            self._menu_frame.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0))
             if self._kind_var.get() == _ARITHMETIC:
                 self._aggregate_frame.grid_remove()
                 self._arithmetic_frame.grid()
@@ -872,7 +882,8 @@ class AnalysisEditor:
             definition: CalculationDefinition = Formula(self._formula_text_value())
         else:
             definition = self._menu_definition()
-        return Calculation(self._name_var.get().strip(), self._description_var.get().strip(), definition)
+        return Calculation(self._name_var.get().strip(), self._description_var.get().strip(), definition,
+                           show_in_imported_sheets=self._show_var.get())
 
     def _apply(self) -> bool:
         """

@@ -16,6 +16,7 @@ The 009 spec already fixes what each calculation means, for this feature to foll
 - A Sum over no values is 0; empty values add nothing.
 - An Average over no values, and a division or percentage by 0, give an empty result, and a calculation using an empty result is also empty.
 - Results are worked out from interpreted values (Typed Values, Tally Summaries), never from raw OCR text.
+- Every calculation that a shown calculation depends on is worked out, but only the results of calculations with **Show in imported sheets** on are shown. A Hidden Calculation only feeds higher layers (see [010 Hide Analysis Results](specs/010-hide-analysis-results/spec.md), FR-009).
 
 Still to decide: where results are saved and how they are shown (for example, whether a formula's result is shown as a percentage).
 

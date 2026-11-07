@@ -145,10 +145,16 @@ class Calculation:
     name: Not blank, and unique in the template ignoring letter case and surrounding spaces.
     description: The optional Calculation Description, "" when none.
     definition: A menu calculation (RowAggregate or Arithmetic) or a Formula.
+    show_in_imported_sheets: Whether its result appears with each sheet imported with the
+      template. False makes it a Hidden Calculation. Hiding never changes what may use its
+      result or how any result is worked out. When results are worked out, every
+      calculation a shown one depends on is still worked out, but only shown results are
+      shown.
   """
   name: str
   description: str
   definition: CalculationDefinition
+  show_in_imported_sheets: bool = True
 
   @property
   def is_menu(self) -> bool:

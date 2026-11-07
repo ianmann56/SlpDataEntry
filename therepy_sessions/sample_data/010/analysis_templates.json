@@ -1,0 +1,119 @@
+{
+  "format_version": 2,
+  "last_template_id": 1,
+  "templates": [
+    {
+      "id": "1",
+      "name": "Accuracy trials",
+      "description": "Synthetic table layout for feature 010 checks",
+      "interpreters": [
+        {
+          "type": "TableInterpreter",
+          "id": "t1",
+          "title": "Trials",
+          "config": {
+            "columns": [
+              {
+                "column_name": "Word",
+                "column_type": "TEXT",
+                "options": []
+              },
+              {
+                "column_name": "Trial 1",
+                "column_type": "CHOICE",
+                "options": [
+                  {
+                    "value": "+",
+                    "description": "correct"
+                  },
+                  {
+                    "value": "-",
+                    "description": "incorrect"
+                  }
+                ]
+              },
+              {
+                "column_name": "Trial 2",
+                "column_type": "CHOICE",
+                "options": [
+                  {
+                    "value": "+",
+                    "description": "correct"
+                  },
+                  {
+                    "value": "-",
+                    "description": "incorrect"
+                  }
+                ]
+              },
+              {
+                "column_name": "Trial 3",
+                "column_type": "CHOICE",
+                "options": [
+                  {
+                    "value": "+",
+                    "description": "correct"
+                  },
+                  {
+                    "value": "-",
+                    "description": "incorrect"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "analysis": {
+        "layers": [
+          {
+            "calculations": [
+              {
+                "name": "Correct trials",
+                "description": "Trials marked +",
+                "kind": "row_aggregate",
+                "section": "Trials",
+                "combination": "SUM",
+                "measure": {
+                  "kind": "choice_count",
+                  "choice": "+",
+                  "columns": [
+                    "Trial 1",
+                    "Trial 2",
+                    "Trial 3"
+                  ]
+                }
+              },
+              {
+                "name": "Incorrect trials",
+                "description": "Trials marked -",
+                "kind": "row_aggregate",
+                "section": "Trials",
+                "combination": "SUM",
+                "measure": {
+                  "kind": "choice_count",
+                  "choice": "-",
+                  "columns": [
+                    "Trial 1",
+                    "Trial 2",
+                    "Trial 3"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "calculations": [
+              {
+                "name": "Accuracy",
+                "description": "Percent of trials correct",
+                "kind": "formula",
+                "formula": "{Correct trials} / ({Correct trials} + {Incorrect trials}) * 100"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
