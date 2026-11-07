@@ -1,7 +1,9 @@
 """
 The saved form of a Data Sheet Analysis, as kept under a template's "analysis" key in
 templates.json. Enums are saved by member name, fixed numbers as strings (so 0.1 stays
-exactly 0.1), and formulas exactly as typed.
+exactly 0.1), and formulas exactly as typed. A hidden calculation is saved with
+"show_in_imported_sheets": false; a shown one is saved without the key, so analyses with
+no hidden calculation are saved exactly as before hiding existed.
 """
 
 from decimal import Decimal, InvalidOperation
@@ -79,6 +81,8 @@ def _calculation_to_json(calculation: Calculation) -> dict[str, Any]:
     })
   else:
     data.update({"kind": "formula", "formula": definition.text})
+  if not calculation.show_in_imported_sheets:
+    data["show_in_imported_sheets"] = False
   return data
 
 
@@ -134,7 +138,13 @@ def _calculation_from_json(data: dict[str, Any]) -> Calculation:
     definition = Formula(str(data.get("formula", "")))
   else:
     raise ValueError(f'Unknown calculation kind "{kind}".')
-  return Calculation(str(data.get("name", "")), str(data.get("description", "")), definition)
+  return Calculation(
+    str(data.get("name", "")),
+    str(data.get("description", "")),
+    definition,
+    # Only an explicit false hides a result, so a damaged value never hides one by accident
+    show_in_imported_sheets=data.get("show_in_imported_sheets") is not False,
+  )
 
 
 def _measure_from_json(data: dict[str, Any]) -> RowMeasure:

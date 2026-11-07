@@ -1,5 +1,22 @@
 <!--
 Sync Impact Report
+- Version change: 1.10.0 → 1.11.0 (MINOR: glossary additions)
+- Modified principles: none
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/domain/glossary.md: adds Show in imported sheets and Hidden Calculation;
+    a Calculation may be hidden. No rule changes meaning.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.10.0 (2026-10-22) added interpreters.md rule 11 and the Data Sheet Analysis
+    glossary terms
+  - 1.9.0 (2026-10-22) rewrote interpreters.md rule 10 for values that don't fit their
+    type, and added Unreadable Value and Rounded Value
+
+Previous report (1.10.0):
 - Version change: 1.9.0 → 1.10.0 (MINOR: a new rule and new optional contract methods in a
   referenced doc, and glossary additions)
 - Modified principles: none
@@ -387,4 +404,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.10.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-22
+**Version**: 1.11.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-11-06
