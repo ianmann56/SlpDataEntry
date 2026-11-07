@@ -4,11 +4,17 @@ templates.json. Enums are saved by member name, fixed numbers as strings (so 0.1
 exactly 0.1), and formulas exactly as typed. A hidden calculation is saved with
 "show_in_imported_sheets": false; a shown one is saved without the key, so analyses with
 no hidden calculation are saved exactly as before hiding existed.
+
+A menu calculation is saved with its menu choices, which are what is loaded and edited,
+and also with the equivalent "formula" text (see menu_formula.py), so every calculation
+can be read as a formula. That text is derived on every save and ignored when loading.
+A Row Aggregate combined by Each row has no formula: its result is a Row List.
 """
 
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from interpretation.analysis.menu_formula import menu_formula
 from interpretation.analysis.model import (
   AnalysisLayer,
   Arithmetic,
@@ -81,6 +87,8 @@ def _calculation_to_json(calculation: Calculation) -> dict[str, Any]:
     })
   else:
     data.update({"kind": "formula", "formula": definition.text})
+  if isinstance(definition, (RowAggregate, Arithmetic)) and (formula := menu_formula(definition)) is not None:
+    data["formula"] = formula
   if not calculation.show_in_imported_sheets:
     data["show_in_imported_sheets"] = False
   return data

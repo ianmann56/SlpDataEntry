@@ -159,7 +159,8 @@ The `"analysis"` key is added to a template entry only when there is at least on
             "kind": "row_aggregate",
             "section": "Trials",
             "combination": "SUM",
-            "measure": {"kind": "choice_count", "choice": "+", "columns": ["Trial 1", "Trial 2", "Trial 3"]}
+            "measure": {"kind": "choice_count", "choice": "+", "columns": ["Trial 1", "Trial 2", "Trial 3"]},
+            "formula": "SUM(COUNT(\"+\", [Trials/Trial 1], [Trials/Trial 2], [Trials/Trial 3]))"
           },
           {
             "name": "Total trials",
@@ -167,7 +168,8 @@ The `"analysis"` key is added to a template entry only when there is at least on
             "kind": "row_aggregate",
             "section": "Trials",
             "combination": "SUM",
-            "measure": {"kind": "tally_count", "column": "Attempts", "mark": null}
+            "measure": {"kind": "tally_count", "column": "Attempts", "mark": null},
+            "formula": "SUM([Trials/Attempts/Total])"
           }
         ]
       },
@@ -179,7 +181,8 @@ The `"analysis"` key is added to a template entry only when there is at least on
             "kind": "arithmetic",
             "left": {"kind": "result", "calculation": "Correct trials"},
             "operation": "PERCENTAGE",
-            "right": {"kind": "result", "calculation": "Total trials"}
+            "right": {"kind": "result", "calculation": "Total trials"},
+            "formula": "{Correct trials} / {Total trials} * 100"
           },
           {
             "name": "Accuracy with partial",
@@ -199,6 +202,12 @@ Other saved shapes:
 - A `number_column` measure saves `{"kind": "number_column", "column": ...}`.
 - A sheet value operand saves `{"kind": "sheet_value", "section": ..., "value": ...}`.
 - A number operand saves `{"kind": "number", "number": "2.5"}`, as a string.
+
+A menu calculation (`row_aggregate` or `arithmetic`) is also saved with a `"formula"`: the
+equivalent formula, written by `menu_formula()` on every save. The menu choices stay the
+source: they are what is loaded, edited, and shown, and the `"formula"` of a menu
+calculation is ignored when loading. A Row Aggregate combined by `EACH_ROW` has no
+`"formula"`, because its result is a Row List and a formula's result is always one number.
 
 Enum members are saved by name. A missing `"description"` loads as `""`.
 
