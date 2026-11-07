@@ -73,6 +73,8 @@ def _quote(value: str) -> str:
 _NUMBER_FORMATS: dict[CellNumberFormat, dict[str, str]] = {
     CellNumberFormat.DATE: {"type": "DATE", "pattern": "m/d/yyyy"},
     CellNumberFormat.PERCENT: {"type": "PERCENT", "pattern": "0%"},
+    CellNumberFormat.DECIMAL: {"type": "NUMBER", "pattern": "0.0#"},
+    CellNumberFormat.PERCENT_DECIMAL: {"type": "PERCENT", "pattern": "0.0#%"},
 }
 
 

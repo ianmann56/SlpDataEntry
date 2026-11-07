@@ -344,6 +344,23 @@ def _reference_problems(
   layer_number: int,
 ) -> list[str]:
   """Problems with what a calculation refers to, each starting with its name."""
+  return [
+    f'Calculation "{calculation.name.strip()}": {problem}'
+    for problem in reference_problems(calculation, interpreters, analysis, layer_number)
+  ]
+
+
+def reference_problems(
+  calculation: Calculation,
+  interpreters: list[SessionDataSectionInterpreterBase],
+  analysis: DataSheetAnalysis,
+  layer_number: int,
+) -> list[str]:
+  """
+  Problems with what a calculation in this layer refers to: a section, column, field,
+  choice, tally option, or calculation that is missing or has the wrong type, or a
+  formula that can't be read. Its name is not checked. [] when it can be worked out.
+  """
   definition = calculation.definition
   if isinstance(definition, RowAggregate):
     problems = _aggregate_problems(definition, interpreters, analysis, layer_number)
@@ -355,7 +372,7 @@ def _reference_problems(
       f"{problem.message} (at character {problem.start + 1})"
       for problem in formula_problems(definition.text, interpreters, analysis, layer_number)
     ]
-  return [f'Calculation "{calculation.name.strip()}": {problem}' for problem in problems]
+  return problems
 
 
 def calculation_problems(

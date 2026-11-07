@@ -66,7 +66,15 @@ def menu_formula(definition: RowAggregate | Arithmetic) -> str | None:
   function = _AGGREGATE_FUNCTIONS.get(definition.combination)
   if function is None:
     return None
-  return f"{function}({_measure(definition.measure, definition.section)})"
+  return f"{function}({menu_row_measure(definition)})"
+
+
+def menu_row_measure(aggregate: RowAggregate) -> str:
+  """
+  The per-row expression a Row Aggregate measures, as menu_formula writes it inside SUM or
+  AVERAGE. Results work out an Each row aggregate from it, once per row.
+  """
+  return _measure(aggregate.measure, aggregate.section)
 
 
 def _measure(measure: RowMeasure, section: str) -> str:

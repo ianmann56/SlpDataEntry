@@ -8,15 +8,19 @@ It decides:
 - tab and workbook names
 - the Workbook Layout Order, and the rows a session tab holds
 - the rows of the Workbook Key tab
+- the Analysis Results block at the bottom of a session tab
 """
 
 import json
 import unicodedata
 from collections.abc import Collection, Sequence
 from datetime import date, datetime, time
+from decimal import Decimal
 from enum import Enum
 from typing import NamedTuple
 
+from interpretation.analysis.model import ShowAs
+from interpretation.analysis.results import AnalysisResults
 from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetScalarType, StudentDataSheet
 from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
 from storage.template_structure import SectionShape, TemplateShape, shape_of
@@ -32,6 +36,10 @@ _FALLBACK_TAB_NAME: str = "Session"
 
 # Header fields, in the order they are written at the top of every tab (FR-021)
 HEADER_LABELS: tuple[str, ...] = ("Student Key", "Date", "Time IN", "Time OUT", "Goal", "Measure")
+
+# The title row of the Analysis Results block, and the header of each Row List in it
+ANALYSIS_RESULTS_TITLE: str = "Analysis Results"
+ROW_LIST_HEADERS: tuple[str, ...] = ("Row", "Value")
 
 # The name of the tab listing every choice and tally code with its meaning
 WORKBOOK_KEY_TAB_NAME: str = "Workbook Key"
@@ -77,7 +85,9 @@ _TIME_FORMATS: tuple[str, ...] = ("%I:%M %p", "%I:%M%p", "%I %p", "%H:%M")
 class CellNumberFormat(Enum):
     """How a number cell is displayed."""
     DATE = "date"
-    PERCENT = "percent"
+    PERCENT = "percent"                  # a whole percentage, e.g. 72%
+    DECIMAL = "decimal"                  # up to 2 decimal places, e.g. 2.33
+    PERCENT_DECIMAL = "percent_decimal"  # a percentage with up to 2 decimal places, e.g. 66.67%
 
 
 class CellValue(NamedTuple):
@@ -373,6 +383,7 @@ def session_rows(sheet: StudentDataSheet, layout: WorkbookLayout) -> list[list[C
     4. for each table section in layout order, and each table it produced on this sheet:
        a title row (when the section has a title), a column-header row in layout order,
        and one row per data row in sheet order, then a blank row
+    5. the Analysis Results block (analysis_rows), only when a calculation is shown
 
     Values are placed by key, so a template that lists the same keys in another order
     still writes them in the workbook's order (FR-025, FR-025a). A missing value is an
@@ -416,7 +427,59 @@ def session_rows(sheet: StudentDataSheet, layout: WorkbookLayout) -> list[list[C
             rows.append([cell_for(data_row.get(key)) for key in keys])
         rows.append([])
 
+    rows.extend(analysis_rows(sheet.analysis_results))
     return rows
+
+
+def analysis_rows(results: AnalysisResults) -> list[list[CellValue]]:
+    """
+    The Analysis Results block, written below everything else in a session tab (research
+    R10). The rows before it already end with a blank row, which separates it (FR-007).
+
+    1. a title row, "Analysis Results"
+    2. one row per shown single-number result, in layer and template order: its name in
+       column A and its result in column B (FR-008, FR-009)
+    3. for each shown Row List, in order: a blank row, its name, a "Row" / "Value" header,
+       and one row per row of its table, numbered from 1 (FR-015)
+
+    Hidden calculations are never written. With no shown calculation there is no block at
+    all, so the tab is exactly what it was before results existed (FR-011). Names are text
+    cells, so they are never read as numbers or formulas (FR-013).
+    """
+    if not results.has_shown:
+        return []
+    rows: list[list[CellValue]] = [[CellValue(ANALYSIS_RESULTS_TITLE, None)]]
+    for result in results.shown_values:
+        rows.append([CellValue(result.name, None), result_cell(result.value, result.show_as)])
+    for result in results.shown_row_lists:
+        rows.append([])
+        rows.append([CellValue(result.name, None)])
+        rows.append([CellValue(header, None) for header in ROW_LIST_HEADERS])
+        for number, value in enumerate(result.rows or (), start=1):
+            rows.append([CellValue(None, number), result_cell(value, result.show_as)])
+    return rows
+
+
+def result_cell(value: Decimal | None, show_as: ShowAs) -> CellValue:
+    """
+    The cell for one Calculation Result (FR-014). Empty for an empty result.
+
+    - Number: a whole number as is; anything else as a decimal shown with up to 2 places.
+    - Percent: the result as a fraction of 100 (72 is written 0.72), shown as 72%, or with
+      up to 2 decimal places when it isn't whole (66.67%), as every percentage in the
+      workbook is.
+
+    The cell always keeps the full value; only its display is rounded.
+    """
+    if value is None:
+        return EMPTY_CELL
+    whole = value == value.to_integral_value()
+    if show_as is ShowAs.PERCENT:
+        return CellValue(None, float(value / 100), None,
+                         CellNumberFormat.PERCENT if whole else CellNumberFormat.PERCENT_DECIMAL)
+    if whole:
+        return CellValue(None, int(value))
+    return CellValue(None, float(value), None, CellNumberFormat.DECIMAL)
 
 
 def workbook_key_rows(template: StudentDataSheetTemplate) -> list[list[CellValue]]:

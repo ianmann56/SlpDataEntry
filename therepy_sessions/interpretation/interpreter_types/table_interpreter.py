@@ -1,8 +1,8 @@
 from typing import Any
 
-from interpretation.analysis.parts import SectionParts, TableColumnPart
+from interpretation.analysis.parts import SectionParts, TableColumnPart, fold
 from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
-from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetTable
+from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetTable, TypedValue
 from interpretation.template_manager.option_rules import name_problems, option_problems, tally_key_collisions
 from interpretation.value_types import (
   ChoiceOption,
@@ -174,6 +174,39 @@ class TableInterpreter(SessionDataSectionInterpreterBase):
       ],
       [],
     )
+
+  def analysis_row_value(
+    self,
+    row: dict[str, DataSheetScalarDto],
+    column: str,
+    part: str | None,
+  ) -> TypedValue:
+    """
+    The Typed Value of one cell: a number, choice, or True/False column's value, or a
+    Tally column's count of one mark (part = the mark) or total (part = "Total").
+    """
+    definition = next((c for c in self._columns if fold(c.column_name) == fold(column)), None)
+    if definition is None:
+      return None
+    name = definition.column_name
+    if definition.column_type is ColumnType.TALLY:
+      if part is None:
+        return None
+      if fold(part) == fold("Total"):
+        key = f"{name} Total"
+      else:
+        # An exact mark first, so marks that differ only in letter case stay apart
+        marks = [o.mark for o in definition.tally_options]
+        mark = part if part in marks else next((m for m in marks if fold(m) == fold(part)), None)
+        if mark is None:
+          return None
+        key = f"{name} {mark}"
+    elif part is not None:
+      return None
+    else:
+      key = name
+    scalar = row.get(key)
+    return scalar.typed_value if scalar is not None else None
 
   def option_descriptions(self) -> list[OptionDescription]:
     """Every Choice and Tally column's options, in column order then option order."""

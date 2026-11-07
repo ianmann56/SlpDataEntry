@@ -135,6 +135,22 @@ class Formula:
 CalculationDefinition = RowAggregate | Arithmetic | Formula
 
 
+class ShowAs(Enum):
+  """How a calculation's result is displayed with imported sheets. Display only: it never changes a result."""
+  NUMBER = "Number"
+  PERCENT = "Percent"
+
+
+def default_show_as(definition: CalculationDefinition) -> ShowAs:
+  """
+  The Show as a calculation gets when it is new, or saved before Show as existed: Percent
+  for an Arithmetic percentage, and Number for everything else.
+  """
+  if isinstance(definition, Arithmetic) and definition.operation is ArithmeticOperation.PERCENTAGE:
+    return ShowAs.PERCENT
+  return ShowAs.NUMBER
+
+
 @dataclass(frozen=True)
 class Calculation:
   """
@@ -150,11 +166,15 @@ class Calculation:
       result or how any result is worked out. When results are worked out, every
       calculation a shown one depends on is still worked out, but only shown results are
       shown.
+    show_as: How its result is displayed with imported sheets: as a number, or as a
+      percentage (a result of 72 shows as 72%). Display only: it never changes a result's
+      value, how any calculation uses it, or the Template Structure.
   """
   name: str
   description: str
   definition: CalculationDefinition
   show_in_imported_sheets: bool = True
+  show_as: ShowAs = ShowAs.NUMBER
 
   @property
   def is_menu(self) -> bool:

@@ -1,6 +1,6 @@
-from interpretation.analysis.parts import SectionParts
+from interpretation.analysis.parts import SectionParts, fold
 from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
-from interpretation.student_data_sheet import DataSheetScalarDto
+from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetTable, TypedValue
 from interpretation.template_manager.option_rules import name_problems, option_problems
 from interpretation.value_types import (
   COLUMN_TYPE_LABELS,
@@ -126,6 +126,19 @@ class SimpleFormInterpreter(SessionDataSectionInterpreterBase):
       [],
       [field.name for field in self._fields.values() if field.field_type in (ColumnType.INT, ColumnType.DECIMAL)],
     )
+
+  def analysis_sheet_value(
+    self,
+    value: str,
+    tables: list[DataSheetTable],
+    scalars: dict[str, DataSheetScalarDto],
+  ) -> TypedValue:
+    """The Typed Value of the Integer or Decimal field with this name, or None."""
+    for field_key, field in self._fields.items():
+      if field.field_type in (ColumnType.INT, ColumnType.DECIMAL) and fold(field.name) == fold(value):
+        scalar = scalars.get(field_key)
+        return scalar.typed_value if scalar is not None else None
+    return None
 
   def option_descriptions(self) -> list[OptionDescription]:
     """Every Choice field's choices, in field order then choice order."""

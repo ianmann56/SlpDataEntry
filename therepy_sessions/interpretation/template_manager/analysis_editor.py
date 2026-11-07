@@ -32,7 +32,9 @@ from interpretation.analysis.model import (
     RowAggregate,
     RowResultMeasure,
     SheetValueOperand,
+    ShowAs,
     TallyCountMeasure,
+    default_show_as,
 )
 from interpretation.analysis.renames import PartKind, PartRename, apply_renames
 from interpretation.analysis.rules import (
@@ -105,6 +107,12 @@ _COMBINATION_LABELS: dict[Combination, str] = {
 }
 _NOTHING_TO_MEASURE: str = ("This template has no table with an Integer, Decimal, Tally, Choice, or True/False "
                             "column, so there is nothing to measure. Text and Date columns can't be measured.")
+
+
+def _list_kind_label(calculation: Calculation) -> str:
+    """The Kind column of the calculation list: its kind, marked " · %" when it shows as a percentage."""
+    label = _kind_label(calculation)
+    return f"{label} · %" if calculation.show_as is ShowAs.PERCENT else label
 
 
 def _kind_label(calculation: Calculation) -> str:
@@ -392,7 +400,7 @@ class AnalysisEditor:
                 hidden = not calculation.show_in_imported_sheets
                 row = self._tree.insert(layer_row, tk.END, iid=f"C{layer_number}.{index}", open=True,
                                         text=f"{calculation.name} (hidden)" if hidden else calculation.name,
-                                        values=(_kind_label(calculation), describe_calculation(calculation)),
+                                        values=(_list_kind_label(calculation), describe_calculation(calculation)),
                                         tags=("hidden",) if hidden else ())
                 if calculation.description.strip():
                     self._tree.insert(row, tk.END, iid=f"D{layer_number}.{index}", text="",
@@ -536,8 +544,18 @@ class AnalysisEditor:
         ttk.Entry(panel, textvariable=self._description_var).grid(row=1, column=1, sticky=(tk.W, tk.E), pady=(5, 0))
         ttk.Label(panel, text=DESCRIPTION_HINT).grid(row=2, column=1, sticky=tk.W)
         self._show_var = tk.BooleanVar(value=True)
-        self._show_check = ttk.Checkbutton(panel, text="Show in imported sheets", variable=self._show_var)
-        self._show_check.grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+        settings = ttk.Frame(panel)
+        settings.grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+        self._show_check = ttk.Checkbutton(settings, text="Show in imported sheets", variable=self._show_var)
+        self._show_check.pack(side=tk.LEFT)
+        ttk.Label(settings, text="Show as:").pack(side=tk.LEFT, padx=(15, 5))
+        self._show_as_var = tk.StringVar(value=ShowAs.NUMBER.value)
+        self._show_as_picker = ttk.Combobox(settings, textvariable=self._show_as_var, state="readonly", width=10,
+                                            values=[show_as.value for show_as in ShowAs])
+        self._show_as_picker.pack(side=tk.LEFT)
+        self._show_as_picker.bind("<<ComboboxSelected>>", lambda e: self._on_show_as_chosen())
+        # A new calculation's Show as follows its kind's default until the SLP chooses one (FR-014b)
+        self._show_as_follows_default = False
 
         build = ttk.Frame(panel)
         build.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
@@ -635,8 +653,10 @@ class AnalysisEditor:
         operation_row.grid(row=1, column=0, sticky=tk.W, pady=(5, 0))
         ttk.Label(operation_row, text="Operation:", width=10).pack(side=tk.LEFT)
         self._operation_var = tk.StringVar(value=_ARITHMETIC_LABELS[ArithmeticOperation.PERCENTAGE])
-        ttk.Combobox(operation_row, textvariable=self._operation_var, state="readonly", width=34,
-                     values=list(_ARITHMETIC_LABELS.values())).pack(side=tk.LEFT)
+        operation_picker = ttk.Combobox(operation_row, textvariable=self._operation_var, state="readonly", width=34,
+                                        values=list(_ARITHMETIC_LABELS.values()))
+        operation_picker.pack(side=tk.LEFT)
+        operation_picker.bind("<<ComboboxSelected>>", lambda e: self._follow_default_show_as())
         self._right = _OperandRow(self._arithmetic_frame, "Right:", lambda: None)
         self._right.frame.grid(row=2, column=0, sticky=tk.W, pady=(5, 0))
 
@@ -651,6 +671,7 @@ class AnalysisEditor:
         if enabled:
             self._panel_message.grid_remove()
             self._show_check.state(["!disabled"])
+            self._show_as_picker.state(["!disabled", "readonly"])
             self._apply_button.state(["!disabled"])
             self._cancel_button.state(["!disabled"])
         else:
@@ -659,6 +680,7 @@ class AnalysisEditor:
             self._legend.frame.grid_remove()
             self._panel_message.grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
             self._show_check.state(["disabled"])
+            self._show_as_picker.state(["disabled"])
             self._apply_button.state(["disabled"])
             self._cancel_button.state(["disabled"])
 
@@ -675,6 +697,7 @@ class AnalysisEditor:
         scope = self._scope()
         section = scope.tables[0].section if scope is not None and scope.tables else ""
         self._fill_from(Calculation("", "", RowAggregate(section, NumberColumnMeasure(""), Combination.SUM)))
+        self._show_as_follows_default = True
         self._set_panel_enabled(True)
         self._baseline = self._panel_calculation()
         self._name_entry.focus_set()
@@ -683,6 +706,8 @@ class AnalysisEditor:
         self._open = (layer, index)
         self._panel.configure(text=f"Calculation in Layer {layer}")
         self._fill_from(self._analysis.layer(layer).calculations[index])
+        # A saved calculation keeps its Show as when its operation changes (FR-014b)
+        self._show_as_follows_default = False
         self._set_panel_enabled(True)
         self._baseline = self._panel_calculation()
 
@@ -693,6 +718,7 @@ class AnalysisEditor:
             self._name_var.set(calculation.name)
             self._description_var.set(calculation.description)
             self._show_var.set(calculation.show_in_imported_sheets)
+            self._show_as_var.set(calculation.show_as.value)
             definition = calculation.definition
             self._formula_text.delete("1.0", tk.END)
             if isinstance(definition, Formula):
@@ -765,10 +791,21 @@ class AnalysisEditor:
 
     def _on_build_changed(self) -> None:
         self._show_build()
+        self._follow_default_show_as()
 
     def _on_menu_kind_changed(self) -> None:
         self._fill_pickers()
         self._show_build()
+        self._follow_default_show_as()
+
+    def _on_show_as_chosen(self) -> None:
+        self._show_as_follows_default = False
+
+    def _follow_default_show_as(self) -> None:
+        """Give a new calculation its kind's default Show as, until the SLP chooses one."""
+        if self._open is None or self._filling or not self._show_as_follows_default:
+            return
+        self._show_as_var.set(default_show_as(self._panel_calculation().definition).value)
 
     # ----- Menu pickers -----
 
@@ -905,7 +942,7 @@ class AnalysisEditor:
         else:
             definition = self._menu_definition()
         return Calculation(self._name_var.get().strip(), self._description_var.get().strip(), definition,
-                           show_in_imported_sheets=self._show_var.get())
+                           show_in_imported_sheets=self._show_var.get(), show_as=ShowAs(self._show_as_var.get()))
 
     def _apply(self) -> bool:
         """

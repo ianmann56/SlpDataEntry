@@ -11,6 +11,8 @@ if TYPE_CHECKING:
   from interpretation.template_manager.student_data_sheet_template import StudentDataSheetTemplate
   # Imported for type checking only: value_types imports this module
   from interpretation.value_types import ValueProblem
+  # Imported for type checking only: the analysis modules import this one through the interpreters
+  from interpretation.analysis.results import AnalysisProblem, AnalysisResults
 
 # A value read from a sheet, in its type. None for a blank cell, an Unreadable Value, or a blank percentage.
 TypedValue = int | float | bool | date | str | None
@@ -78,6 +80,9 @@ class StudentDataSheet:
     self._tables: list[DataSheetTable] = []
     self._scalars: dict[str, DataSheetScalarDto] = {}
     self._value_warnings: list[ValueProblem] = []
+    # Set once by StudentDataSheetInterpreter, after every section is read
+    self._analysis_results: AnalysisResults | None = None
+    self._analysis_warnings: list[AnalysisProblem] = []
 
   @property
   def student_key(self) -> str:
@@ -146,6 +151,30 @@ class StudentDataSheet:
     Add one section's value problems. Called by StudentDataSheetInterpreter only.
     """
     self._value_warnings.extend(problems)
+
+  @property
+  def analysis_results(self) -> AnalysisResults:
+    """
+    Every Data Sheet Analysis calculation of the template worked out for this sheet.
+    No results until the sheet's interpreter sets them.
+    """
+    if self._analysis_results is None:
+      from interpretation.analysis.results import AnalysisResults
+      return AnalysisResults.none()
+    return self._analysis_results
+
+  @property
+  def analysis_warnings(self) -> list[AnalysisProblem]:
+    """One problem per Broken Calculation the SLP is warned about. Empty when every calculation could be worked out."""
+    return list(self._analysis_warnings)
+
+  def set_analysis_results(self, results: AnalysisResults, warnings: Sequence[AnalysisProblem]) -> None:
+    """
+    Keep the sheet's Calculation Results and their warnings. Called by
+    StudentDataSheetInterpreter only, after every section is read.
+    """
+    self._analysis_results = results
+    self._analysis_warnings = list(warnings)
 
   def debug(self) -> None:
     print('========== Data Sheet ===========\nStudent Key:')

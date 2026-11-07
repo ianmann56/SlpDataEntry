@@ -16,7 +16,7 @@ from interpretation.analysis.model import (
   RowResultMeasure,
   TallyCountMeasure,
 )
-from interpretation.analysis.parts import TableColumnPart
+from interpretation.analysis.parts import TableColumnPart, fold
 from interpretation.templates.student_data_sheet_interpreter import SessionDataSectionInterpreterBase
 from interpretation.value_types import ColumnType
 
@@ -28,11 +28,6 @@ TALLY_TOTAL_PART: str = "Total"
 
 # The choices a True/False column offers to a choice count
 BOOLEAN_CHOICES: tuple[str, ...] = ("True", "False")
-
-
-def fold(name: str) -> str:
-  """A name as compared: ignoring letter case and surrounding spaces."""
-  return name.strip().casefold()
 
 
 class ScopeEntry(NamedTuple):

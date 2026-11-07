@@ -1,6 +1,6 @@
-from interpretation.analysis.parts import SectionParts
+from interpretation.analysis.parts import SectionParts, fold
 from interpretation.templates.student_data_sheet_interpreter import DataSheetInterpretationDto, SessionDataSectionInterpreterBase
-from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetTable
+from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetTable, TypedValue
 from interpretation.template_manager.option_rules import option_problems
 from interpretation.value_types import (
   ColumnType,
@@ -84,6 +84,47 @@ class RunningTallyInterpreter(SessionDataSectionInterpreterBase):
     """As Numeric Sheet Values: each mark's count, then the total, then each mark's percentage."""
     marks = self.tally_choice_options
     return SectionParts([], marks + ["Total"] + [f"{mark} %" for mark in marks])
+
+  def analysis_sheet_value(
+    self,
+    value: str,
+    tables: list[DataSheetTable],
+    scalars: dict[str, DataSheetScalarDto],
+  ) -> TypedValue:
+    """
+    A mark's count or the total, added up over every tally table of the section, or a
+    mark's percentage of that total on the 0-100 scale (None when the total is 0). None
+    when the section has no table on the sheet, or the name isn't one of its values.
+    """
+    if not tables:
+      return None
+    total = self._summed(tables, f"{TALLY_COLUMN_NAME} Total")
+    if fold(value) == fold("Total"):
+      return total
+    marks = self.tally_choice_options
+    # An exact name first, so marks that differ only in letter case stay apart
+    for mark in marks:
+      if value == mark:
+        return self._summed(tables, f"{TALLY_COLUMN_NAME} {mark}")
+      if value == f"{mark} %":
+        return self._summed(tables, f"{TALLY_COLUMN_NAME} {mark}") / total * 100 if total else None
+    for mark in marks:
+      if fold(value) == fold(mark):
+        return self._summed(tables, f"{TALLY_COLUMN_NAME} {mark}")
+      if fold(value) == fold(f"{mark} %"):
+        return self._summed(tables, f"{TALLY_COLUMN_NAME} {mark}") / total * 100 if total else None
+    return None
+
+  @staticmethod
+  def _summed(tables: list[DataSheetTable], key: str) -> int:
+    """One Tally Summary count added up over the section's tables (each holds one row)."""
+    total = 0
+    for table in tables:
+      for row in table["data"]:
+        scalar = row.get(key)
+        if scalar is not None and isinstance(scalar.typed_value, int):
+          total += scalar.typed_value
+    return total
 
   def option_descriptions(self) -> list[OptionDescription]:
     """Every tally option, in order."""

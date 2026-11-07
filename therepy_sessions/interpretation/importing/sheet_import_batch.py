@@ -62,7 +62,8 @@ class SheetOutcome(NamedTuple):
       message: Text shown to the SLP. Names students only by Student Key.
       saved: Where the session was saved. Set only when status is SUCCEEDED.
       warnings: One message per value that didn't fit its type (an Unreadable Value, a
-        Rounded Value, or an unknown tally mark). Set only when status is SUCCEEDED.
+        Rounded Value, or an unknown tally mark), then one per Broken Calculation (a
+        calculation that couldn't be worked out). Set only when status is SUCCEEDED.
     """
     status: SheetStatus
     student_key: str | None = None
@@ -334,10 +335,15 @@ class SheetImportBatch:
         else:
             message = f"Saved to {saved.location_name}"
         # Every value that didn't fit is listed, so the SLP can find each one (FR-012)
-        warnings = tuple(problem.message() for problem in data_sheet.value_warnings)
-        if warnings:
-            values = "value" if len(warnings) == 1 else "values"
-            message += f". {len(warnings)} {values} didn't fit their type: {'; '.join(warnings)}"
+        value_warnings = tuple(problem.message() for problem in data_sheet.value_warnings)
+        if value_warnings:
+            values = "value" if len(value_warnings) == 1 else "values"
+            message += f". {len(value_warnings)} {values} didn't fit their type: {'; '.join(value_warnings)}"
+        # A calculation that can't be worked out never fails the sheet, but the SLP is told (FR-006a)
+        calculation_warnings = tuple(problem.message() for problem in data_sheet.analysis_warnings)
+        if calculation_warnings:
+            message += ". " + "; ".join(warning.rstrip(".") for warning in calculation_warnings)
+        warnings = value_warnings + calculation_warnings
         outcome = SheetOutcome(
             SheetStatus.SUCCEEDED,
             student_key=student_key,

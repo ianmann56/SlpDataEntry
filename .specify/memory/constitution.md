@@ -1,5 +1,30 @@
 <!--
 Sync Impact Report
+- Version change: 1.11.0 → 1.12.0 (MINOR: a new rule and new optional contract methods in a
+  referenced doc, and glossary additions)
+- Modified principles: none
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Supporting docs:
+  - Updated docs/conventions/architecture/interpreters.md: new rule 12. Sections hand their
+    values to Data Sheet Analysis through the optional analysis_sheet_value() and
+    analysis_row_value(), so the results code never checks interpreter types. The
+    new-type checklist says a type offering analysis parts must give their values.
+  - Updated docs/domain/glossary.md: adds Show as, Calculation Result, Analysis Results,
+    and Broken Calculation; Data Sheet Analysis now has results worked out per sheet; a
+    Calculation has a Show as setting; a Running Tally's Numeric Sheet Values are summed
+    over its tables, with percentages on the 0-100 scale.
+- Templates requiring updates: none
+- Deferred TODOs: none
+- Prior history:
+  - 1.11.0 (2026-11-06) added Show in imported sheets and Hidden Calculation to the glossary
+  - 1.10.0 (2026-10-22) added interpreters.md rule 11 and the Data Sheet Analysis
+    glossary terms
+  - 1.9.0 (2026-10-22) rewrote interpreters.md rule 10 for values that don't fit their
+    type, and added Unreadable Value and Rounded Value
+
+Previous report (1.11.0):
 - Version change: 1.10.0 → 1.11.0 (MINOR: glossary additions)
 - Modified principles: none
 - Added principles: none
@@ -404,4 +429,4 @@ the meaning of a rule counts as an amendment and follows the Governance procedur
 - Runtime guidance for agents lives in `AGENTS.md` (via `CLAUDE.md`) and the project
   `README.md`.
 
-**Version**: 1.11.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-11-06
+**Version**: 1.12.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-11-06

@@ -3,7 +3,10 @@ The saved form of a Data Sheet Analysis, as kept under a template's "analysis" k
 templates.json. Enums are saved by member name, fixed numbers as strings (so 0.1 stays
 exactly 0.1), and formulas exactly as typed. A hidden calculation is saved with
 "show_in_imported_sheets": false; a shown one is saved without the key, so analyses with
-no hidden calculation are saved exactly as before hiding existed.
+no hidden calculation are saved exactly as before hiding existed. Likewise "show_as" is
+saved only when it differs from default_show_as() of the calculation's definition, and a
+missing one loads as that default, so analyses that keep the defaults are saved exactly as
+before Show as existed.
 
 Every calculation is saved both ways, as structure and as a formula:
 
@@ -43,7 +46,9 @@ from interpretation.analysis.model import (
   RowMeasure,
   RowResultMeasure,
   SheetValueOperand,
+  ShowAs,
   TallyCountMeasure,
+  default_show_as,
 )
 
 
@@ -100,6 +105,8 @@ def _calculation_to_json(calculation: Calculation) -> dict[str, Any]:
     data["formula"] = formula
   if not calculation.show_in_imported_sheets:
     data["show_in_imported_sheets"] = False
+  if calculation.show_as is not default_show_as(definition):
+    data["show_as"] = calculation.show_as.name
   return data
 
 
@@ -161,6 +168,7 @@ def _calculation_from_json(data: dict[str, Any]) -> Calculation:
     definition,
     # Only an explicit false hides a result, so a damaged value never hides one by accident
     show_in_imported_sheets=data.get("show_in_imported_sheets") is not False,
+    show_as=(_member(ShowAs, data["show_as"], "Show as") if "show_as" in data else default_show_as(definition)),
   )
 
 

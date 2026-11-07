@@ -11,6 +11,11 @@ from typing import NamedTuple
 from interpretation.value_types import ColumnType
 
 
+def fold(name: str) -> str:
+  """A name as Data Sheet Analysis compares it: ignoring letter case and surrounding spaces."""
+  return name.strip().casefold()
+
+
 class TableColumnPart(NamedTuple):
   """
   One column of a table section, as analysis sees it.

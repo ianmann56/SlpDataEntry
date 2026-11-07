@@ -1,0 +1,296 @@
+{
+  "format_version": 2,
+  "last_template_id": 1,
+  "templates": [
+    {
+      "id": "1",
+      "name": "Trial results",
+      "description": "Synthetic template for feature 011",
+      "interpreters": [
+        {
+          "type": "SimpleFormInterpreter",
+          "id": "form-1",
+          "title": "Session",
+          "config": {
+            "fields": {
+              "Target": {
+                "name": "Target",
+                "fieldType": "INT",
+                "options": []
+              }
+            }
+          }
+        },
+        {
+          "type": "RunningTallyInterpreter",
+          "id": "tally-1",
+          "title": "Warm-up",
+          "config": {
+            "tally_options": [
+              {
+                "mark": "Y",
+                "description": "yes"
+              },
+              {
+                "mark": "N",
+                "description": "no"
+              }
+            ]
+          }
+        },
+        {
+          "type": "TableInterpreter",
+          "id": "table-1",
+          "title": "Trials",
+          "config": {
+            "columns": [
+              {
+                "column_name": "Word",
+                "column_type": "TEXT",
+                "options": []
+              },
+              {
+                "column_name": "Trial 1",
+                "column_type": "CHOICE",
+                "options": [
+                  {
+                    "value": "+",
+                    "description": "correct"
+                  },
+                  {
+                    "value": "-",
+                    "description": "incorrect"
+                  }
+                ]
+              },
+              {
+                "column_name": "Trial 2",
+                "column_type": "CHOICE",
+                "options": [
+                  {
+                    "value": "+",
+                    "description": "correct"
+                  },
+                  {
+                    "value": "-",
+                    "description": "incorrect"
+                  }
+                ]
+              },
+              {
+                "column_name": "Trial 3",
+                "column_type": "CHOICE",
+                "options": [
+                  {
+                    "value": "+",
+                    "description": "correct"
+                  },
+                  {
+                    "value": "-",
+                    "description": "incorrect"
+                  }
+                ]
+              },
+              {
+                "column_name": "Attempts",
+                "column_type": "TALLY",
+                "options": [
+                  {
+                    "value": "Y",
+                    "description": "yes"
+                  },
+                  {
+                    "value": "N",
+                    "description": "no"
+                  },
+                  {
+                    "value": "P",
+                    "description": "prompted"
+                  }
+                ]
+              },
+              {
+                "column_name": "Score",
+                "column_type": "INT",
+                "options": []
+              },
+              {
+                "column_name": "Done",
+                "column_type": "BOOLEAN",
+                "options": []
+              }
+            ]
+          }
+        }
+      ],
+      "analysis": {
+        "layers": [
+          {
+            "calculations": [
+              {
+                "name": "Correct trials",
+                "description": "Trials marked + in any Trial column",
+                "kind": "row_aggregate",
+                "section": "Trials",
+                "combination": "SUM",
+                "measure": {
+                  "kind": "choice_count",
+                  "choice": "+",
+                  "columns": [
+                    "Trial 1",
+                    "Trial 2",
+                    "Trial 3"
+                  ]
+                },
+                "formula": "SUM(COUNT(\"+\", [Trials/Trial 1], [Trials/Trial 2], [Trials/Trial 3]))"
+              },
+              {
+                "name": "Total trials",
+                "description": "Every Attempts mark",
+                "kind": "row_aggregate",
+                "section": "Trials",
+                "combination": "SUM",
+                "measure": {
+                  "kind": "tally_count",
+                  "column": "Attempts",
+                  "mark": null
+                },
+                "formula": "SUM([Trials/Attempts/Total])",
+                "show_in_imported_sheets": false
+              },
+              {
+                "name": "Average score",
+                "description": "",
+                "kind": "row_aggregate",
+                "section": "Trials",
+                "combination": "AVERAGE",
+                "measure": {
+                  "kind": "number_column",
+                  "column": "Score"
+                },
+                "formula": "AVERAGE([Trials/Score])"
+              },
+              {
+                "name": "Prompted per row",
+                "description": "P marks in each row",
+                "kind": "row_aggregate",
+                "section": "Trials",
+                "combination": "EACH_ROW",
+                "measure": {
+                  "kind": "tally_count",
+                  "column": "Attempts",
+                  "mark": "P"
+                }
+              },
+              {
+                "name": "Rows done",
+                "description": "",
+                "kind": "row_aggregate",
+                "section": "Trials",
+                "combination": "SUM",
+                "measure": {
+                  "kind": "choice_count",
+                  "choice": "True",
+                  "columns": [
+                    "Done"
+                  ]
+                },
+                "formula": "SUM(COUNT(\"True\", [Trials/Done]))"
+              },
+              {
+                "name": "Rows at target",
+                "description": "Rows whose Score is at least the Target",
+                "kind": "row_aggregate",
+                "section": "Trials",
+                "combination": "SUM",
+                "measure": {
+                  "kind": "comparison",
+                  "left": {
+                    "kind": "number_column",
+                    "column": "Score"
+                  },
+                  "operator": "AT_LEAST",
+                  "right": {
+                    "kind": "sheet_value",
+                    "section": "Session",
+                    "value": "Target"
+                  }
+                },
+                "formula": "SUM([Trials/Score] >= [Session/Target])"
+              }
+            ]
+          },
+          {
+            "calculations": [
+              {
+                "name": "Accuracy",
+                "description": "Percent of trials correct",
+                "kind": "arithmetic",
+                "left": {
+                  "kind": "result",
+                  "calculation": "Correct trials"
+                },
+                "operation": "PERCENTAGE",
+                "right": {
+                  "kind": "result",
+                  "calculation": "Total trials"
+                },
+                "formula": "{Correct trials} / {Total trials} * 100"
+              },
+              {
+                "name": "Accuracy (formula)",
+                "description": "",
+                "kind": "formula",
+                "formula": "{Correct trials} / {Total trials} * 100",
+                "structure": {
+                  "kind": "arithmetic",
+                  "left": {
+                    "kind": "arithmetic",
+                    "left": {
+                      "kind": "result",
+                      "calculation": "Correct trials"
+                    },
+                    "operation": "DIVIDE",
+                    "right": {
+                      "kind": "result",
+                      "calculation": "Total trials"
+                    }
+                  },
+                  "operation": "MULTIPLY",
+                  "right": {
+                    "kind": "number",
+                    "number": "100"
+                  }
+                },
+                "show_as": "PERCENT"
+              },
+              {
+                "name": "Prompted total",
+                "description": "",
+                "kind": "row_aggregate",
+                "section": "Trials",
+                "combination": "SUM",
+                "measure": {
+                  "kind": "row_result",
+                  "calculation": "Prompted per row"
+                },
+                "formula": "SUM({Prompted per row})"
+              },
+              {
+                "name": "Warm-up share",
+                "description": "Percent of warm-up marks that are Y",
+                "kind": "formula",
+                "formula": "[Warm-up/Y %]",
+                "structure": {
+                  "kind": "sheet_value",
+                  "section": "Warm-up",
+                  "value": "Y %"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

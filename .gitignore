@@ -216,6 +216,7 @@ __marimo__/
 !therepy_sessions/sample_data/007/
 !therepy_sessions/sample_data/009/
 !therepy_sessions/sample_data/010/
+!therepy_sessions/sample_data/011/
 # Workspace files hold student records (Principle I)
 students.json
 templates.json

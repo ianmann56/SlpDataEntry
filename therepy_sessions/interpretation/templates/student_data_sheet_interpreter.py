@@ -5,7 +5,7 @@ from collections import namedtuple
 from typing import TYPE_CHECKING
 
 from interpretation.analysis.parts import SectionParts
-from interpretation.student_data_sheet import StudentDataSheet
+from interpretation.student_data_sheet import DataSheetScalarDto, DataSheetTable, StudentDataSheet, TypedValue
 from interpretation.value_types import OptionDescription
 from collection.collection_headers import StudentDataSheetImport
 
@@ -116,6 +116,52 @@ class SessionDataSectionInterpreterBase(ABC):
     Values. An interpreter type overrides it to opt in. By default it offers nothing.
     """
     return SectionParts.none()
+
+  def analysis_sheet_value(
+    self,
+    value: str,
+    tables: list[DataSheetTable],
+    scalars: dict[str, DataSheetScalarDto],
+  ) -> TypedValue:
+    """
+    One of this section's Numeric Sheet Values on one imported sheet, for working out
+    Data Sheet Analysis results. An interpreter type that offers sheet values through
+    analysis_parts() overrides it. By default it gives nothing.
+
+    Args:
+      value: The value's name as analysis_parts() offers it, matched ignoring letter case
+        and surrounding spaces.
+      tables: Only the tables this section produced on the sheet.
+      scalars: Every scalar of the sheet.
+
+    Returns:
+      The value in its type (a Running Tally percentage on the 0-100 scale), or None when
+      it is blank, unreadable, or not this section's.
+    """
+    return None
+
+  def analysis_row_value(
+    self,
+    row: dict[str, DataSheetScalarDto],
+    column: str,
+    part: str | None,
+  ) -> TypedValue:
+    """
+    One cell of a row of this section's tables, for working out Data Sheet Analysis
+    results. An interpreter type that offers table columns through analysis_parts()
+    overrides it. By default it gives nothing.
+
+    Args:
+      row: One row of a table this section produced.
+      column: The column's name, matched ignoring letter case and surrounding spaces.
+      part: For a Tally column, a mark (its count) or "Total" (the tally's total). None
+        for any other column.
+
+    Returns:
+      The cell's Typed Value (a number, a choice, or a True/False bool), or None when it
+      is blank, unreadable, or not one of this section's columns.
+    """
+    return None
 
   @abstractmethod
   def interpret_student_data_sheet_content(self, data_sheet_content: StudentDataSheetImport) -> DataSheetInterpretationDto:
@@ -228,7 +274,9 @@ class StudentDataSheetInterpreter:
 
     :return: The interpreted sheet. It carries the template it was interpreted with, and
       each of its tables is tagged with the id of the interpreter that produced it. Its
-      value_warnings hold every value that didn't fit, from every section.
+      value_warnings hold every value that didn't fit, from every section. Its
+      analysis_results hold every calculation of the template worked out from its values,
+      and analysis_warnings every Broken Calculation the SLP is warned about.
     """
     student_key = data_sheet_content.form_data['Student Key']
     date = data_sheet_content.form_data['Date']
@@ -254,6 +302,10 @@ class StudentDataSheetInterpreter:
         data_sheet.register_scalar(scalar_name, scalar_dto)
 
       data_sheet.add_value_warnings(interpretation.value_problems)
+
+    # Worked out last, from every section's values. Imported here: the analysis modules import this one
+    from interpretation.analysis.results import work_out_results
+    data_sheet.set_analysis_results(*work_out_results(data_sheet))
 
     return data_sheet
   
