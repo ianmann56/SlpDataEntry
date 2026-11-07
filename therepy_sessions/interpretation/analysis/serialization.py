@@ -5,15 +5,22 @@ exactly 0.1), and formulas exactly as typed. A hidden calculation is saved with
 "show_in_imported_sheets": false; a shown one is saved without the key, so analyses with
 no hidden calculation are saved exactly as before hiding existed.
 
-A menu calculation is saved with its menu choices, which are what is loaded and edited,
-and also with the equivalent "formula" text (see menu_formula.py), so every calculation
-can be read as a formula. That text is derived on every save and ignored when loading.
-A Row Aggregate combined by Each row has no formula: its result is a Row List.
+Every calculation is saved both ways, as structure and as a formula:
+
+- A menu calculation is saved with its menu choices, which are what is loaded and edited,
+  and also with the equivalent "formula" text (see menu_formula.py). A Row Aggregate
+  combined by Each row has no formula: its result is a Row List.
+- A formula calculation is saved with its "formula" exactly as typed, which is what is
+  loaded and edited, and also with its parsed "structure" (see parse_formula). A formula
+  that can't be parsed has no structure.
+
+The derived half is written on every save and ignored when loading.
 """
 
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from interpretation.analysis.formula import parse_formula
 from interpretation.analysis.menu_formula import menu_formula
 from interpretation.analysis.model import (
   AnalysisLayer,
@@ -87,6 +94,8 @@ def _calculation_to_json(calculation: Calculation) -> dict[str, Any]:
     })
   else:
     data.update({"kind": "formula", "formula": definition.text})
+    if (structure := parse_formula(definition.text).structure) is not None:
+      data["structure"] = structure
   if isinstance(definition, (RowAggregate, Arithmetic)) and (formula := menu_formula(definition)) is not None:
     data["formula"] = formula
   if not calculation.show_in_imported_sheets:

@@ -31,7 +31,7 @@ references they touch.
 
 import re
 from enum import Enum
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 
 class ReferenceKind(Enum):
@@ -82,6 +82,10 @@ class FormulaProblem(NamedTuple):
   end: int
 
 
+# One node of a formula's structure: a JSON-ready dict with a "kind" (see parse_formula)
+FormulaNode = dict[str, Any]
+
+
 class FormulaParse(NamedTuple):
   """
   The result of parsing a formula.
@@ -90,10 +94,12 @@ class FormulaParse(NamedTuple):
     problem: The first syntax problem, or None when the formula parses.
     references: Every reference, in text order. Empty when there is a problem.
     aggregates: The (start, end) of every SUM and AVERAGE, in the order they close.
+    structure: The formula as a tree of FormulaNodes, or None when there is a problem.
   """
   problem: FormulaProblem | None
   references: list[FormulaReference]
   aggregates: tuple[tuple[int, int], ...] = ()
+  structure: FormulaNode | None = None
 
 
 class LegendOperation(NamedTuple):
@@ -201,6 +207,13 @@ _SYMBOLS: frozenset[str] = frozenset("+-*/(),")
 _COMPARISONS: tuple[str, ...] = ("<=", ">=", "<>", "!=", "=", "<", ">")  # two-character ones first
 _CHOICE_COMPARISONS: frozenset[str] = frozenset({"=", "<>", "!="})
 
+# How the structure names operators: the member names of ArithmeticOperation and
+# ComparisonOperator in model.py (which imports this module, so it can't be imported here)
+_ARITHMETIC_NAMES: dict[str, str] = {"+": "ADD", "-": "SUBTRACT", "*": "MULTIPLY", "/": "DIVIDE"}
+_COMPARISON_NAMES: dict[str, str] = {
+  "=": "EQUAL", "<>": "NOT_EQUAL", "!=": "NOT_EQUAL", "<": "LESS", "<=": "AT_MOST", ">": "GREATER", ">=": "AT_LEAST",
+}
+
 
 def _read_bracketed(text: str, start: int, closing: str, split: bool) -> tuple[list[str], int]:
   """
@@ -300,6 +313,7 @@ class _Side(NamedTuple):
   token: _Token          # its first token
   reference_index: int   # for "reference", its index in the parser's references; else -1
   is_condition: bool     # whether it is itself a comparison or COUNT of conditions, in parentheses
+  node: FormulaNode
 
 
 class _Parser:
@@ -333,23 +347,24 @@ class _Parser:
       return self._next()
     raise _Problem(f'Expected "{symbol}" {context}', token.start, token.end)
 
-  def parse(self) -> None:
-    self._condition()
+  def parse(self) -> FormulaNode:
+    node, _ = self._condition()
     token = self._peek()
     if token.kind is not _Kind.END:
       if token.kind is _Kind.SYMBOL and token.text in ",)":
         raise _Problem(f'Unexpected "{token.text}"', token.start, token.end)
       raise _Problem(f'Expected an operator (+, -, *, /) before "{token.text}"', token.start, token.end)
+    return node
 
   # ----- Comparisons -----
 
-  def _condition(self) -> bool:
-    """Parse an expression, or a comparison of two. Returns whether it is a condition (gives 1 or 0)."""
+  def _condition(self) -> tuple[FormulaNode, bool]:
+    """Parse an expression, or a comparison of two. Returns its node, and whether it is a condition (gives 1 or 0)."""
     left = self._side()
     if self._peek().kind is not _Kind.COMPARE:
       if left.kind == "string":
         raise _Problem('Compare a quoted choice with a column, like [Table/Column] = "+"', left.start, left.end)
-      return left.is_condition
+      return left.node, left.is_condition
     operator = self._next()
     if self._peek().kind is _Kind.END:
       raise _Problem(f'Expected a value after "{operator.text}"', operator.end, operator.end)
@@ -359,19 +374,20 @@ class _Parser:
       raise _Problem("Compare two values at a time. To check several conditions, use COUNT(…)",
                      extra.start, extra.end)
     self._choice_comparison(left, operator, right)
-    return True
+    return {"kind": "comparison", "left": left.node, "operator": _COMPARISON_NAMES[operator.text],
+            "right": right.node}, True
 
   def _side(self) -> _Side:
     token = self._peek()
     if token.kind is _Kind.STRING:
       self._next()
-      return _Side("string", token.start, token.end, token, -1, False)
+      return _Side("string", token.start, token.end, token, -1, False, {"kind": "choice", "choice": token.value})
     position, reference_count = self._position, len(self.references)
-    is_condition = self._expression()
+    node, is_condition = self._expression()
     alone = (token.kind is _Kind.SHEET and self._position == position + 1
              and len(self.references) == reference_count + 1)
     return _Side("reference" if alone else "value", token.start, self._last_end(), token,
-                 reference_count if alone else -1, is_condition)
+                 reference_count if alone else -1, is_condition, node)
 
   def _choice_comparison(self, left: _Side, operator: _Token, right: _Side) -> None:
     """Check a comparison with a quoted choice, and attach the choice to the column it is compared with."""
@@ -403,39 +419,43 @@ class _Parser:
 
   # ----- Arithmetic -----
 
-  def _expression(self) -> bool:
-    is_condition = self._term()
+  def _expression(self) -> tuple[FormulaNode, bool]:
+    node, is_condition = self._term()
     while self._is_symbol("+") or self._is_symbol("-"):
       operator = self._next()
-      self._operand_after(operator, self._term)
+      right, _ = self._operand_after(operator, self._term)
+      node = {"kind": "arithmetic", "left": node, "operation": _ARITHMETIC_NAMES[operator.text], "right": right}
       is_condition = False
-    return is_condition
+    return node, is_condition
 
-  def _term(self) -> bool:
-    is_condition = self._unary()
+  def _term(self) -> tuple[FormulaNode, bool]:
+    node, is_condition = self._unary()
     while self._is_symbol("*") or self._is_symbol("/"):
       operator = self._next()
-      self._operand_after(operator, self._unary)
+      right, _ = self._operand_after(operator, self._unary)
+      node = {"kind": "arithmetic", "left": node, "operation": _ARITHMETIC_NAMES[operator.text], "right": right}
       is_condition = False
-    return is_condition
+    return node, is_condition
 
-  def _operand_after(self, operator: _Token, parse_operand) -> None:
+  def _operand_after(self, operator: _Token, parse_operand) -> tuple[FormulaNode, bool]:
     if self._peek().kind is _Kind.END:
       raise _Problem(f'Expected a value after "{operator.text}"', operator.end, operator.end)
-    parse_operand()
+    return parse_operand()
 
-  def _unary(self) -> bool:
+  def _unary(self) -> tuple[FormulaNode, bool]:
     if self._is_symbol("-"):
       operator = self._next()
-      self._operand_after(operator, self._unary)
-      return False
+      operand, _ = self._operand_after(operator, self._unary)
+      return {"kind": "negate", "operand": operand}, False
     return self._primary()
 
-  def _primary(self) -> bool:
-    """Parse one value. Returns whether it is a condition in parentheses."""
+  def _primary(self) -> tuple[FormulaNode, bool]:
+    """Parse one value. Returns its node, and whether it is a condition in parentheses."""
     token = self._peek()
+    node: FormulaNode
     if token.kind is _Kind.NUMBER:
       self._next()
+      node = {"kind": "number", "number": token.text}
     elif token.kind is _Kind.RESULT:
       self._next()
       if not token.value.strip():
@@ -444,10 +464,11 @@ class _Parser:
         ReferenceKind.RESULT, (token.value,), token.start, token.end,
         aggregate_start=self._aggregate.start if self._aggregate is not None else -1,
       ))
+      node = {"kind": "result", "calculation": token.value}
     elif token.kind is _Kind.SHEET:
       self._next()
       if self._aggregate is not None:
-        self._column(token)
+        node = self._column(token)
       elif len(token.parts) == 3:
         raise _Problem(f'{token.text} is a table column, so it can only be used inside SUM or AVERAGE',
                        token.start, token.end)
@@ -455,17 +476,18 @@ class _Parser:
         raise _Problem("A sheet value is written [Section/Value]", token.start, token.end)
       else:
         self.references.append(FormulaReference(ReferenceKind.SHEET_VALUE, token.parts, token.start, token.end))
+        node = {"kind": "sheet_value", "section": token.parts[0], "value": token.parts[1]}
     elif token.kind is _Kind.WORD:
-      self._function(token)
+      node = self._function(token)
     elif token.kind is _Kind.PLACEHOLDER:
       raise _Problem(f"Fill in {token.text}", token.start, token.end)
     elif self._is_symbol("("):
       opening = self._next()
       if self._is_symbol(")"):
         raise _Problem("Write something inside ( )", opening.start, self._peek().end)
-      is_condition = self._condition()
+      node, is_condition = self._condition()
       self._expect_symbol(")", 'to close "("')
-      return is_condition
+      return node, is_condition
     elif token.kind is _Kind.END:
       raise _Problem("Expected a number, a reference, or a function", token.start, token.end)
     elif token.kind is _Kind.STRING:
@@ -474,11 +496,11 @@ class _Parser:
       raise _Problem(f'Expected a value before "{token.text}"', token.start, token.end)
     else:
       raise _Problem(f'Unexpected "{token.text}"', token.start, token.end)
-    return False
+    return node, False
 
   # ----- Functions -----
 
-  def _function(self, word: _Token) -> None:
+  def _function(self, word: _Token) -> FormulaNode:
     self._next()
     if word.value not in _FUNCTIONS:
       if self._is_symbol("("):
@@ -488,8 +510,7 @@ class _Parser:
         word.start, word.end,
       )
     if word.value == "COUNT":
-      self._count(word)
-      return
+      return self._count(word)
     if self._aggregate is not None:
       raise _Problem(f"{word.text.upper()} can't be used inside another SUM or AVERAGE", word.start, word.end)
     self._expect_symbol("(", f'after "{word.text}"')
@@ -502,7 +523,7 @@ class _Parser:
       )
     self._aggregate = word
     try:
-      self._condition()
+      measure, _ = self._condition()
     finally:
       self._aggregate = None
     if self._is_symbol(","):
@@ -510,8 +531,9 @@ class _Parser:
       raise _Problem(f"{word.text.upper()} takes one row measure", comma.start, comma.end)
     closing = self._expect_symbol(")", f'to close "{word.text}("')
     self.aggregates.append((word.start, closing.end))
+    return {"kind": "aggregate", "combination": word.value, "measure": measure}
 
-  def _column(self, token: _Token, choice: _Token | None = None) -> None:
+  def _column(self, token: _Token, choice: _Token | None = None) -> FormulaNode:
     allowed = (2,) if choice is not None else (2, 3)
     if len(token.parts) not in allowed or not all(part.strip() for part in token.parts):
       shape = "[Table/Column]" if choice is not None else "[Table/Column] or [Table/Column/Mark]"
@@ -524,33 +546,41 @@ class _Parser:
       choice_end=choice.end if choice is not None else -1,
       aggregate_start=self._aggregate.start,
     ))
+    node: FormulaNode = {"kind": "column", "section": token.parts[0], "column": token.parts[1]}
+    if len(token.parts) == 3:
+      node["part"] = token.parts[2]
+    return node
 
-  def _count(self, count: _Token) -> None:
+  def _count(self, count: _Token) -> FormulaNode:
     self._expect_symbol("(", 'after "COUNT"')
     first = self._peek()
     second = self._peek(1)
     if first.kind is _Kind.STRING and second.kind is _Kind.SYMBOL and second.text == ",":
-      self._choice_count(count)
-      return
+      return self._choice_count(count)
     if self._is_symbol(")"):
       raise _Problem("COUNT needs at least one condition, like [Table/Column] >= 3", first.start, first.end)
+    conditions: list[FormulaNode] = []
     while True:
       start = self._peek().start
-      if not self._condition():
+      condition, is_condition = self._condition()
+      if not is_condition:
         raise _Problem("COUNT counts conditions, like [Table/Column] >= 3 or {Result} > 0",
                        start, self._last_end())
+      conditions.append(condition)
       if not self._is_symbol(","):
         break
       self._next()
     self._expect_symbol(")", 'to close "COUNT("')
+    return {"kind": "count", "conditions": conditions}
 
-  def _choice_count(self, count: _Token) -> None:
+  def _choice_count(self, count: _Token) -> FormulaNode:
     """COUNT("choice", column, …): per row, how many of the columns hold the choice."""
     choice = self._next()
     if self._aggregate is None:
       raise _Problem('COUNT of a choice in columns can only be used inside SUM or AVERAGE. '
                      'Outside them, COUNT counts conditions', count.start, count.end)
     self._check_choice(choice)
+    columns: list[FormulaNode] = []
     while self._is_symbol(","):
       self._next()
       column = self._peek()
@@ -559,17 +589,38 @@ class _Parser:
       if column.kind is not _Kind.SHEET:
         raise _Problem("Expected a column like [Table/Column]", column.start, column.end)
       self._next()
-      self._column(column, choice)
+      columns.append(self._column(column, choice))
     self._expect_symbol(")", 'to close "COUNT("')
+    return {"kind": "choice_count", "choice": choice.value, "columns": columns}
 
 
 def parse_formula(text: str) -> FormulaParse:
-  """Parse a formula, returning its references in text order, or its first syntax problem."""
+  """
+  Parse a formula, returning its references in text order and its structure, or its first
+  syntax problem.
+
+  The structure is a tree of FormulaNodes, each a dict with a "kind":
+
+  - "number": {"number": the digits as written}
+  - "result": {"calculation": name}, a lower-layer result (a Row List inside an aggregate)
+  - "sheet_value": {"section", "value"}, a Numeric Sheet Value, outside SUM and AVERAGE
+  - "column": {"section", "column", "part"?}, a row's cell inside SUM or AVERAGE, as written
+    (a non-table section there is a Numeric Sheet Value; the template tells them apart)
+  - "choice": {"choice"}, a quoted choice compared with a column
+  - "arithmetic": {"left", "operation", "right"}, operation ADD, SUBTRACT, MULTIPLY, or DIVIDE
+  - "negate": {"operand"}
+  - "comparison": {"left", "operator", "right"}, operator a ComparisonOperator member name
+  - "aggregate": {"combination": "SUM" or "AVERAGE", "measure"}
+  - "choice_count": {"choice", "columns": [column nodes]}
+  - "count": {"conditions": [nodes]}
+
+  Parentheses leave no node: the tree's shape is the grouping.
+  """
   try:
     parser = _Parser(_tokenize(text))
     if parser._peek().kind is _Kind.END:
       return FormulaParse(FormulaProblem("Write a formula", 0, 0), [])
-    parser.parse()
+    structure = parser.parse()
   except _Problem as e:
     return FormulaParse(e.problem, [])
-  return FormulaParse(None, parser.references, tuple(parser.aggregates))
+  return FormulaParse(None, parser.references, tuple(parser.aggregates), structure)

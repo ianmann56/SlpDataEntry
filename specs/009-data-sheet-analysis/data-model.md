@@ -188,7 +188,23 @@ The `"analysis"` key is added to a template entry only when there is at least on
             "name": "Accuracy with partial",
             "description": "",
             "kind": "formula",
-            "formula": "({Correct trials} + {Partial trials}) / {Total trials} * 100"
+            "formula": "({Correct trials} + {Partial trials}) / {Total trials} * 100",
+            "structure": {
+              "kind": "arithmetic",
+              "left": {
+                "kind": "arithmetic",
+                "left": {
+                  "kind": "arithmetic",
+                  "left": {"kind": "result", "calculation": "Correct trials"},
+                  "operation": "ADD",
+                  "right": {"kind": "result", "calculation": "Partial trials"}
+                },
+                "operation": "DIVIDE",
+                "right": {"kind": "result", "calculation": "Total trials"}
+              },
+              "operation": "MULTIPLY",
+              "right": {"kind": "number", "number": "100"}
+            }
           }
         ]
       }
@@ -203,11 +219,20 @@ Other saved shapes:
 - A sheet value operand saves `{"kind": "sheet_value", "section": ..., "value": ...}`.
 - A number operand saves `{"kind": "number", "number": "2.5"}`, as a string.
 
-A menu calculation (`row_aggregate` or `arithmetic`) is also saved with a `"formula"`: the
-equivalent formula, written by `menu_formula()` on every save. The menu choices stay the
-source: they are what is loaded, edited, and shown, and the `"formula"` of a menu
-calculation is ignored when loading. A Row Aggregate combined by `EACH_ROW` has no
-`"formula"`, because its result is a Row List and a formula's result is always one number.
+Every calculation is saved both as structure and as a formula. One half is the source,
+which is loaded, edited, and shown; the other is derived on every save and ignored when
+loading:
+
+- A menu calculation (`row_aggregate` or `arithmetic`): its menu choices are the source,
+  and `"formula"` holds the equivalent formula, written by `menu_formula()`. A Row
+  Aggregate combined by `EACH_ROW` has no `"formula"`, because its result is a Row List
+  and a formula's result is always one number.
+- A formula calculation: its `"formula"`, exactly as typed, is the source, and
+  `"structure"` holds its parse tree from `parse_formula()` (node kinds are listed in its
+  docstring). Parentheses leave no node; the tree's shape is the grouping. Inside SUM and
+  AVERAGE, a `[Section/Item]` is saved as a `"column"` node as written, since telling a
+  table column from a Numeric Sheet Value needs the template. A formula that can't be
+  parsed has no `"structure"`.
 
 Enum members are saved by name. A missing `"description"` loads as `""`.
 
